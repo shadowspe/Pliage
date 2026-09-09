@@ -1,0 +1,3370 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Optimiseur de découpe & Pliage — Tôlerie</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<!-- SheetJS pour la lecture et l'écriture des fichiers Excel -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- Three.js pour la modélisation 3D exacte -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --bg:#1c1b1a;
+    --panel:#262524;
+    --panel2:#2d2c2a;
+    --line:#3d3c3a;
+    --line-soft:#333230;
+    --accent:#ffce00;
+    --accent-dim:#9c7d00;
+    --cyan:#b7b8b6;
+    --text:#eeece7;
+    --text-dim:#a0a1a2;
+    --text-faint:#6d6c69;
+    --danger:#ff6b6b;
+    --good:#7cd68a;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse at 20% -10%, rgba(255,206,0,0.07), transparent 45%),
+      radial-gradient(ellipse at 90% 0%, rgba(183,184,182,0.05), transparent 40%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    padding:28px 20px 60px;
+  }
+  .wrap{max-width:1280px;margin:0 auto;}
+
+  header{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:24px;
+    margin-bottom:26px;
+    padding-bottom:18px;
+    border-bottom:1px solid var(--line);
+    flex-wrap:wrap;
+  }
+  .brand-eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    letter-spacing:.18em;
+    color:var(--accent);
+    text-transform:uppercase;
+    margin-bottom:6px;
+  }
+  h1{
+    font-family:'Oswald',sans-serif;
+    font-weight:700;
+    font-size:30px;
+    letter-spacing:.01em;
+    margin:0;
+    text-transform:uppercase;
+  }
+  .subtitle{color:var(--text-dim);font-size:13.5px;margin-top:6px;max-width:520px;line-height:1.5;}
+
+  .grid{
+    display:grid;
+    grid-template-columns:420px 1fr;
+    gap:20px;
+    align-items:start;
+  }
+  @media (max-width:880px){ .grid{grid-template-columns:1fr;} }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:18px 18px 20px;
+  }
+  .panel + .panel{margin-top:20px;}
+
+  .panel-title{
+    font-family:'Oswald',sans-serif;
+    font-size:14px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--text);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin:0 0 14px 0;
+  }
+  .panel-title .num{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:var(--accent);
+    border:1px solid var(--accent-dim);
+    border-radius:4px;
+    padding:1px 6px;
+  }
+
+  .error-box { 
+    background: #2c1a1a; 
+    color: var(--danger); 
+    padding: 10px; 
+    margin-bottom: 12px; 
+    border-radius: 6px; 
+    border: 1px solid var(--danger); 
+    display: none; 
+    font-size: 12px;
+  }
+
+  #cutList{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;max-height:300px;overflow-y:auto;}
+  .cut-row{
+    display:grid;
+    grid-template-columns:16px 1.2fr 1fr 1fr 50px 22px;
+    gap:6px;
+    align-items:center;
+    background:var(--panel2);
+    border:1px solid var(--line-soft);
+    border-radius:7px;
+    padding:8px 8px;
+  }
+  .cut-row input[type=number], .cut-row input[type=text]{
+    width:100%;
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:5px;
+    color:var(--text);
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    padding:6px 7px;
+  }
+  .cut-row input:focus{outline:none;border-color:var(--accent);}
+  .cut-row .qty-cell input{text-align:center;}
+  .rm-btn{
+    background:none;border:none;color:var(--text-faint);
+    cursor:pointer;font-size:16px;line-height:1;padding:4px;
+    border-radius:4px;
+  }
+  .rm-btn:hover{color:var(--danger);background:rgba(255,90,95,0.1);}
+
+  .col-heads{
+    display:grid;
+    grid-template-columns:16px 1.2fr 1fr 1fr 50px 22px;
+    gap:6px;
+    padding:0 8px;
+    margin-bottom:4px;
+  }
+  .col-heads span{font-size:9px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em;}
+
+  .action-row-btn{display:flex;flex-direction:column;gap:8px;margin-top:10px;}
+  .action-row-group{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .add-btn{
+    width:100%;
+    background:transparent;
+    border:1px dashed var(--line);
+    color:var(--text-dim);
+    border-radius:7px;
+    padding:9px;
+    font-size:12px;
+    font-family:'Inter',sans-serif;
+    cursor:pointer;
+    transition:.15s;
+    text-align:center;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+  }
+  .add-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+  .sheet-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .field{margin-bottom:10px;}
+  .field label{
+    display:block;font-size:10px;color:var(--text-faint);
+    text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;
+  }
+  .field input[type=number], .field input[type=text], .field select{
+    width:100%;
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:6px;
+    color:var(--text);
+    font-family:'JetBrains Mono',monospace;
+    font-size:13.5px;
+    padding:9px 10px;
+  }
+  .field input:focus, .field select:focus{outline:none;border-color:var(--accent);}
+
+  .toggle-row{
+    display:flex;align-items:center;gap:9px;
+    margin:12px 0 4px;
+    padding:10px 12px;
+    background:var(--panel2);
+    border:1px solid var(--line-soft);
+    border-radius:7px;
+  }
+  .toggle-row input{accent-color:var(--accent);width:15px;height:15px;}
+  .toggle-row span{font-size:12.5px;color:var(--text-dim);}
+
+  .calc-btn{
+    width:100%;
+    margin-top:10px;
+    background:linear-gradient(180deg, var(--accent), #d9ae00);
+    color:#1c1b1a;
+    border:none;
+    border-radius:8px;
+    padding:14px;
+    font-family:'Oswald',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    cursor:pointer;
+    box-shadow:0 4px 18px rgba(255,206,0,0.2);
+    transition:.15s transform;
+  }
+  .calc-btn:hover{transform:translateY(-1px);}
+
+  .print-btn{
+    width:100%;
+    margin-top:10px;
+    background:transparent;
+    color:var(--text);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:12px;
+    font-family:'Oswald',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    cursor:pointer;
+    transition:.15s;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+  }
+  .print-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .print-btn svg{width:15px;height:15px;flex:0 0 auto;}
+
+  .mail-btn{
+    width:100%;
+    margin-top:10px;
+    background:var(--panel2);
+    color:var(--accent);
+    border:1px solid var(--accent-dim);
+    border-radius:8px;
+    padding:12px;
+    font-family:'Oswald',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    cursor:pointer;
+    transition:.15s;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+  }
+  .mail-btn:hover{background:var(--accent);color:#1c1b1a;}
+
+  .icon-action-btn{
+    background:var(--panel);
+    border:1px solid var(--line);
+    color:var(--text-dim);
+    border-radius:6px;
+    padding:5px 8px;
+    cursor:pointer;
+    transition:.15s;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .icon-action-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+  #results{margin-top:0px;}
+  .stats-bar{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:12px;
+    margin-bottom:20px;
+  }
+  @media (max-width:700px){ .stats-bar{grid-template-columns:repeat(2,1fr);} }
+  .stat{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:9px;
+    padding:14px 16px;
+  }
+  .stat .label{font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;}
+  .stat .value{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:var(--text);}
+  .stat .value.accent{color:var(--accent);}
+  .stat .value.good{color:var(--good);}
+
+  .sheet-block{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:16px;
+    margin-bottom:18px;
+  }
+  .sheet-head{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-bottom:10px;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .sheet-head h3{
+    font-family:'Oswald',sans-serif;
+    font-size:15px;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    margin:0;
+    color:var(--cyan);
+  }
+  .sheet-head .fill{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px;
+    color:var(--text-dim);
+  }
+  canvas{
+    display:block;
+    width:100%;
+    height:auto;
+    border-radius:6px;
+    background:#0a0c0e;
+  }
+
+  .recap-block {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 18px;
+  }
+  .recap-block h3 {
+    font-family: 'Oswald', sans-serif;
+    font-size: 15px;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    margin: 0;
+    color: var(--accent);
+  }
+  .recap-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+  }
+  .recap-table th, .recap-table td {
+    border: 1px solid var(--line-soft);
+    padding: 8px 10px;
+    text-align: left;
+  }
+  .recap-table th {
+    background: var(--panel2);
+    color: var(--text-dim);
+    font-family: 'Oswald', sans-serif;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: .05em;
+  }
+  .recap-table tfoot td {
+    background: var(--panel2);
+    font-weight: bold;
+    color: var(--accent);
+  }
+
+  .empty-note{
+    color:var(--text-faint);
+    font-size:13px;
+    text-align:center;
+    padding:30px 10px;
+    border:1px dashed var(--line);
+    border-radius:10px;
+  }
+
+  .tabs-nav{
+    display:flex;
+    gap:6px;
+    margin-bottom:22px;
+    border-bottom:1px solid var(--line);
+  }
+  .tab-btn{
+    background:none;
+    border:none;
+    color:var(--text-faint);
+    font-family:'Oswald',sans-serif;
+    font-size:13px;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    padding:11px 4px;
+    margin-right:22px;
+    cursor:pointer;
+    position:relative;
+    top:1px;
+    border-bottom:2px solid transparent;
+    transition:.15s;
+  }
+  .tab-btn:hover{color:var(--text-dim);}
+  .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  .seg-row{
+    display:grid;
+    grid-template-columns:16px 1fr 22px;
+    gap:6px;
+    align-items:center;
+    background:var(--panel2);
+    border:1px solid var(--line-soft);
+    border-radius:7px;
+    padding:8px 8px;
+    margin-bottom:8px;
+  }
+  .seg-row.error-highlight {
+    border-color: var(--danger);
+    background: rgba(255, 107, 107, 0.05);
+  }
+  .seg-icon{
+    width:14px;height:14px;
+    border-radius:3px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:9px;font-weight:700;color:#1c1b1a;
+    flex:0 0 auto;
+  }
+  .seg-icon.type-straight{background:var(--cyan);}
+  .seg-icon.type-bend{background:var(--accent);}
+  .seg-icon.type-arc{background:#8fbf7a;}
+  .seg-icon.type-boudin{background:#c9a0ff;}
+  .seg-body{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+  .seg-body .seg-label{font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;}
+  .seg-body input[type=number]{
+    width:56px;
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:5px;
+    color:var(--text);
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px;
+    padding:4px 5px;
+  }
+  .seg-body input:focus{outline:none;border-color:var(--accent);}
+  .dir-toggle{display:flex;border:1px solid var(--line);border-radius:5px;overflow:hidden;}
+  .dir-toggle button{
+    background:var(--bg);border:none;color:var(--text-faint);
+    font-size:10px;padding:4px 6px;cursor:pointer;
+  }
+  .dir-toggle button.active{background:var(--accent);color:#1c1b1a;}
+  .diam-toggle{display:flex;gap:3px;}
+  .diam-toggle button{
+    background:var(--bg);border:1px solid var(--line);color:var(--text-dim);
+    font-family:'JetBrains Mono',monospace;font-size:10px;
+    border-radius:4px;padding:3px 6px;cursor:pointer;
+  }
+  .diam-toggle button.active{background:var(--accent);border-color:var(--accent);color:#1c1b1a;}
+
+  .hem-type-row{
+    width:100%;
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:6px;
+    margin-top:6px;
+    padding-top:6px;
+    border-top:1px dashed var(--line);
+  }
+  .hem-toggle{display:flex;gap:4px;}
+  .hem-toggle button{
+    background:var(--bg);border:1px solid var(--line);color:var(--text-dim);
+    font-family:'JetBrains Mono',monospace;font-size:10px;
+    border-radius:4px;padding:4px 7px;cursor:pointer;
+  }
+  .hem-toggle button.active{background:#a78bfa;border-color:#a78bfa;color:#1c1b1a;}
+
+  #segList{
+    max-height:280px;
+    overflow-y:auto;
+    padding-right:4px;
+  }
+  #segList::-webkit-scrollbar{width:7px;}
+  #segList::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px;}
+
+  .add-seg-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+  .add-seg-row .add-btn{font-size:11px;padding:8px 4px;}
+
+  #profileCanvasWrap{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:16px;
+    position:relative;
+  }
+  .canvas-head{
+    display:flex;align-items:center;justify-content:space-between;
+    margin-bottom:10px;
+  }
+  .canvas-head .canvas-title{
+    font-family:'Oswald',sans-serif;
+    font-size:12px;letter-spacing:.07em;text-transform:uppercase;
+    color:var(--text-faint);
+  }
+  .head-actions{display:flex;gap:8px;}
+  .fullscreen-btn{
+    display:flex;align-items:center;gap:6px;
+    background:var(--panel2);
+    border:1px solid var(--line);
+    color:var(--text-dim);
+    border-radius:6px;
+    padding:6px 10px;
+    font-size:11.5px;
+    cursor:pointer;
+    transition:.15s;
+  }
+  .fullscreen-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .fullscreen-btn svg{width:13px;height:13px;}
+
+  .rotate-controls{
+    position:absolute;
+    bottom:26px;
+    left:26px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    z-index:20;
+  }
+  .profile-rotate-icon-btn{
+    background:var(--panel2);
+    border:1px solid var(--line);
+    color:var(--accent);
+    border-radius:8px;
+    width:42px;
+    height:42px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    box-shadow:0 4px 12px rgba(0,0,0,0.3);
+    transition:.15s;
+    flex-shrink:0;
+  }
+  .profile-rotate-icon-btn:hover{border-color:var(--accent);background:var(--panel);transform:scale(1.05);}
+  .profile-rotate-icon-btn svg{width:20px;height:20px;}
+  .rotate-degree-box{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    background:var(--panel2);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:0 10px 0 12px;
+    height:42px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.3);
+  }
+  .rotate-degree-box input{
+    width:52px;
+    background:transparent;
+    border:none;
+    color:var(--text);
+    font-family:'JetBrains Mono',monospace;
+    font-size:14px;
+    text-align:right;
+    padding:0;
+  }
+  .rotate-degree-box input:focus{outline:none;}
+  .rotate-degree-box span{color:var(--text-dim);font-size:13px;}
+
+  #profileCanvas{
+    width:100%;height:400px;
+    display:block;
+    background:#0a0c0e;
+    border-radius:6px;
+    cursor: crosshair;
+  }
+
+  .develop-summary{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:12px;
+    margin-top:14px;
+  }
+
+  .toast{
+    position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--accent);color:#1c1b1a;
+    font-family:'Oswald',sans-serif;font-weight:600;font-size:13px;
+    padding:12px 20px;border-radius:8px;
+    opacity:0;pointer-events:none;
+    transition:.25s;
+    z-index:500;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .saved-profiles-list{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    margin-top:10px;
+  }
+  .profile-card{
+    background:var(--panel2);
+    border:1px solid var(--line-soft);
+    border-radius:8px;
+    padding:12px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .profile-card-info{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    cursor:pointer;
+    flex:1;
+  }
+  .profile-card-name{font-family:'Oswald',sans-serif;font-size:14px;color:var(--accent);}
+  .profile-card-meta{font-size:11px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;}
+  .profile-card-actions{display:flex;align-items:center;gap:6px;}
+
+  .view3d-presets{
+    display:flex;
+    gap:6px;
+    margin-bottom:10px;
+  }
+  .view3d-btn{
+    background:var(--panel2);
+    border:1px solid var(--line);
+    color:var(--text-dim);
+    border-radius:6px;
+    padding:5px 10px;
+    font-size:11px;
+    font-family:'JetBrains Mono',monospace;
+    cursor:pointer;
+    transition:.15s;
+  }
+  .view3d-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .view3d-btn.active{background:var(--accent);border-color:var(--accent);color:#1c1b1a;}
+
+  #fsOverlay{
+    display:none;
+    position:fixed;inset:0;
+    background:#0a0c0e;
+    z-index:1000;
+    padding:20px;
+    flex-direction:row;
+    gap:20px;
+  }
+  #fsOverlay.show{display:flex;}
+  .fs-sidebar{
+    width:320px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:16px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    overflow-y:auto;
+  }
+  .fs-main{flex:1;display:flex;flex-direction:column;}
+  .fs-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .fs-title{font-family:'Oswald',sans-serif;font-size:16px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);}
+  .fs-close{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:13px;}
+  .fs-toolbar-hint{font-size:11px;color:var(--text-faint);white-space:nowrap;}
+  #fsCanvasWrap{flex:1;position:relative;}
+  #fsCanvas{width:100%;height:100%;display:block;background:#000;border-radius:8px;}
+
+  /* Plein écran spécifique pour la 3D */
+  #fs3dOverlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: #0a0c0e;
+    z-index: 1000;
+    padding: 20px;
+    flex-direction: column;
+  }
+  #fs3dOverlay.show { display: flex; }
+  #fs3dContainer { flex: 1; width: 100%; height: 100%; border-radius: 8px; position: relative; }
+
+  #printArea{display:none;}
+  @media print{
+    @page {
+      size: A4 landscape;
+      margin: 10mm;
+    }
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+    html, body {
+      background: #ffffff !important;
+      color: #000000 !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      height: auto !important;
+      overflow: visible !important;
+    }
+    header, .tabs-nav, .tab-panel, #fsOverlay, #fs3dOverlay, .toast, .wrap > header, .wrap > .tabs-nav {
+      display: none !important;
+    }
+    #printArea {
+      display: block !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      color: #000000 !important;
+      font-family: 'Inter', sans-serif !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      box-sizing: border-box !important;
+    }
+    .print-header {
+      display: flex !important;
+      justify-content: space-between !important;
+      align-items: center !important;
+      border-bottom: 2px solid #000000 !important;
+      padding-bottom: 6px !important;
+      margin-bottom: 12px !important;
+      width: 100% !important;
+    }
+    .print-title {
+      font-family: 'Oswald', sans-serif !important;
+      font-size: 18px !important;
+      text-transform: uppercase !important;
+      font-weight: 700 !important;
+      color: #000000 !important;
+    }
+    .recap-block {
+      background: #ffffff !important;
+      border: 1px solid #000000 !important;
+      border-radius: 0 !important;
+      padding: 10px !important;
+      margin-bottom: 15px !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      width: 100% !important;
+    }
+    .recap-block h3 {
+      color: #000000 !important;
+      font-size: 14px !important;
+      margin-bottom: 8px !important;
+    }
+    .recap-table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      font-size: 11px !important;
+    }
+    .recap-table th, .recap-table td {
+      border: 1px solid #000000 !important;
+      padding: 5px 8px !important;
+      color: #000000 !important;
+    }
+    .recap-table th {
+      background: #e5e5e5 !important;
+      color: #000000 !important;
+    }
+    .recap-table tfoot td {
+      background: #f0f0f0 !important;
+      color: #000000 !important;
+    }
+    .print-sheet-block {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      margin-bottom: 20px !important;
+      width: 100% !important;
+    }
+    .print-sheet-img {
+      width: 100% !important;
+      max-height: 130mm !important;
+      object-fit: contain !important;
+      border: 1px solid #000000 !important;
+      display: block !important;
+      margin-top: 6px !important;
+      background: #ffffff !important;
+    }
+    .print-section-title {
+      font-family: 'Oswald', sans-serif !important;
+      font-size: 14px !important;
+      text-transform: uppercase !important;
+      margin: 12px 0 6px 0 !important;
+      border-bottom: 1.5px solid #000000 !important;
+      font-weight: bold !important;
+      color: #000000 !important;
+      page-break-after: avoid !important;
+      break-after: avoid !important;
+    }
+  }
+
+  /* ===== Guide interactif ===== */
+  .tutorial-launch{margin-top:12px;padding:8px 13px;border:1px solid var(--accent);background:rgba(255,255,255,.03);color:var(--accent);border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;transition:.18s ease;}
+  .tutorial-launch:hover{background:var(--accent);color:#fff;transform:translateY(-1px);}
+  #tutorialOverlay{position:fixed;inset:0;z-index:5000;display:none;pointer-events:none;}
+  #tutorialOverlay.show{display:block;}
+  .tutorial-shade{position:absolute;inset:0;background:rgba(4,7,12,.72);}
+  .tutorial-spotlight{position:fixed;z-index:5002;border:2px solid var(--accent);border-radius:10px;background:rgba(255,255,255,.035);box-shadow:0 0 0 9999px rgba(4,7,12,.78),0 0 0 5px rgba(255,255,255,.08),0 0 28px rgba(255,255,255,.25);transition:all .18s ease;pointer-events:none;}
+  .tutorial-card{position:fixed;z-index:5005;width:min(390px,calc(100vw - 28px));background:#10151b;border:1px solid #3a4653;border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.5);padding:18px;pointer-events:auto;color:#e8edf2;transition:top .18s ease,left .18s ease;}
+  .tutorial-kicker{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--accent);font-weight:800;margin-bottom:6px;}
+  .tutorial-title{font-size:18px;font-weight:800;margin-bottom:7px;}
+  .tutorial-text{font-size:12.5px;line-height:1.55;color:#b7c0ca;}
+  .tutorial-progress{display:flex;gap:5px;margin:14px 0 16px;}
+  .tutorial-dot{height:4px;flex:1;border-radius:99px;background:#2a333d;transition:.2s;}
+  .tutorial-dot.active{background:var(--accent);}
+  .tutorial-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .tutorial-actions .left,.tutorial-actions .right{display:flex;gap:7px;align-items:center;}
+  .tutorial-btn{border:1px solid #3b4652;background:#171e26;color:#dfe6ed;border-radius:7px;padding:8px 11px;font-size:11px;font-weight:700;cursor:pointer;}
+  .tutorial-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .tutorial-btn:hover{filter:brightness(1.12);}
+  .tutorial-close{position:absolute;right:10px;top:9px;background:none;border:0;color:#7f8a95;font-size:18px;cursor:pointer;}
+  .tutorial-target-hint{font-size:10.5px;color:#8f9aa5;margin-top:10px;display:flex;align-items:center;gap:6px}.tutorial-target-hint::before{content:'●';color:var(--accent);font-size:8px;}
+
+  .tutorial-active-target{position:relative!important;z-index:5004!important;filter:none!important;opacity:1!important;}
+  input.tutorial-active-target,.tutorial-active-target input,.tutorial-active-target select{box-shadow:0 0 0 2px var(--accent),0 0 18px rgba(255,255,255,.20)!important;}
+  @media(max-width:700px){.tutorial-card{width:calc(100vw - 20px);left:10px!important;top:auto!important;bottom:10px!important}.tutorial-spotlight{border-radius:8px;}}
+
+</style>
+</head>
+<body>
+
+<div class="wrap" id="app-screen">
+
+  <header>
+    <div>
+      <div class="brand-eyebrow">Plan de découpe & Pliage · Tôlerie</div>
+      <h1>Optimiseur & Schémas de Pliage</h1>
+      <div class="subtitle">Gestion des listes de découpe avec cotation dynamique, personnalisation des noms et récapitulatif.</div>
+      <button class="tutorial-launch" id="openTutorialBtn" type="button">▶ Guide de prise en main</button>
+    </div>
+  </header>
+
+  <div class="tabs-nav">
+    <button class="tab-btn active" data-tab="tab-debit">Plan de débit</button>
+    <button class="tab-btn" data-tab="tab-pliage">Plan de pliage</button>
+  </div>
+
+  <div id="tab-debit" class="tab-panel active">
+    <div class="grid">
+      <div>
+        <div class="panel">
+          <div class="panel-title">
+            <span>Pièces à découper <span class="num" id="pieceCount">0</span></span>
+            <button class="icon-action-btn" id="clearCutsBtn" style="font-size:10.5px;padding:4px 8px;" title="Tout effacer">Tout effacer</button>
+          </div>
+          
+          <div class="col-heads">
+            <span></span><span>Nom / Réf</span><span>Larg. (mm)</span><span>Haut. (mm)</span><span>Qté</span><span></span>
+          </div>
+          <div id="cutList"></div>
+
+          <div class="action-row-btn">
+            <button class="add-btn" id="addCutBtn">+ Ajouter manuellement</button>
+            <div class="action-row-group">
+              <label class="add-btn" style="cursor:pointer;margin:0;" title="Importer un fichier Excel (.xlsx, .xls) ou CSV">
+                📁 Importer Excel <input type="file" id="importExcelFile" accept=".xlsx, .xls, .csv" style="display:none;">
+              </label>
+              <button class="add-btn" id="downloadTemplateBtn" style="cursor:pointer;" title="Télécharger un modèle Excel vierge">
+                📥 Modèle Excel
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Format de tôle disponible</div>
+          <div class="sheet-fields">
+            <div class="field">
+              <label>Largeur (mm)</label>
+              <input type="number" id="sheetW" value="3000" min="1">
+            </div>
+            <div class="field">
+              <label>Hauteur (mm)</label>
+              <input type="number" id="sheetH" value="1500" min="1">
+            </div>
+          </div>
+          <div class="field">
+            <label>Trait de coupe / Kerf (mm)</label>
+            <input type="number" id="kerf" value="0" min="0" step="0.5">
+          </div>
+          <div class="toggle-row">
+            <input type="checkbox" id="allowRotate" checked>
+            <span>Autoriser la rotation des pièces (90°)</span>
+          </div>
+          <button class="calc-btn" id="calcBtn">Calculer le plan de découpe</button>
+          <button class="print-btn" id="printCombinedBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg>
+            Imprimer Tout (Débit, Récapitulatif & Schémas)
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div id="results">
+          <div class="empty-note">Ajoute tes pièces (ou importe un fichier Excel) et lance le calcul pour voir le plan de découpe apparaître ici.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-pliage" class="tab-panel">
+    <div class="grid">
+      <div>
+        <div class="panel">
+          <div class="panel-title">Nom du profil</div>
+          <div class="field" style="margin-top:0;">
+            <label>Nom du schéma</label>
+            <input type="text" id="profileName" value="Schéma pliage" placeholder="Nom de la pièce">
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Séquence du profil <span class="num" id="segCount">0</span></div>
+          <div id="globalErrorBox" class="error-box"></div>
+          <div id="segList"></div>
+          <div class="add-seg-row">
+            <button class="add-btn" data-add="straight">+ Droit</button>
+            <button class="add-btn" data-add="bend">+ Pli (angle°)</button>
+            <button class="add-btn" data-add="arc">+ Arrondi</button>
+            <button class="add-btn" data-add="boudin">+ Boudin (spirale)</button>
+          </div>
+          <button class="add-btn" id="clearSegBtn" style="border-color:var(--line-soft);">Effacer le profil</button>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Pièce, Matière, Quantité &amp; Finition</div>
+          <div class="sheet-fields">
+            <div class="field">
+              <label>Longueur pièce (mm)</label>
+              <input type="number" id="pieceLength" value="2000" min="1">
+            </div>
+            <div class="field">
+              <label>Quantité</label>
+              <input type="number" id="pieceQty" value="1" min="1">
+            </div>
+          </div>
+          <div class="sheet-fields">
+            <div class="field">
+              <label>Matière</label>
+              <select id="profileMaterial">
+                <option value="Acier">Acier</option>
+                <option value="Alu">Alu</option>
+                <option value="Zinc" selected>Zinc</option>
+                <option value="Cuivre">Cuivre</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Épaisseur (mm)</label>
+              <input type="text" id="profileThickness" value="1.5" placeholder="Ex: 1.5">
+            </div>
+          </div>
+          <div class="sheet-fields">
+            <div class="field">
+              <label>Code RAL (ex: 7016)</label>
+              <input type="text" id="profileColor" maxlength="4" placeholder="Ex: 9010" style="font-family:'JetBrains Mono',monospace;">
+            </div>
+            <div class="field">
+              <label>Thermolaquage (Côté flèche 1er droit)</label>
+              <div style="display:flex;gap:4px;margin-top:2px;">
+                <button type="button" class="add-btn" id="arrowLeftBtn" style="padding:8px;font-size:11px;" title="Pointer flèche sur le côté gauche du 1er droit">Flèche Gauche</button>
+                <button type="button" class="add-btn" id="arrowRightBtn" style="padding:8px;font-size:11px;" title="Pointer flèche sur le côté droit du 1er droit">Flèche Droite</button>
+              </div>
+            </div>
+          </div>
+          <div class="field" style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+            <span style="font-size:11px;color:var(--text-dim);">Astuce : Boutons ci-dessus ou Shift + Glisser sur le schéma.</span>
+            <button class="icon-action-btn" id="resetArrowBtn" style="font-size:11px;padding:4px 8px;">Réinitialiser flèche</button>
+          </div>
+          <button class="calc-btn" id="saveProfileBtn" style="margin-top:12px;">Enregistrer ce schéma en mémoire</button>
+          <button class="mail-btn" onclick="envoyerEmailProfile()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            Envoyer le schéma actuel par e-mail
+          </button>
+          <button class="print-btn" id="addToDebitBtn" style="margin-top:10px;">
+            Ajouter cette pièce au débit
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div id="profileCanvasWrap">
+          <div class="canvas-head">
+            <span class="canvas-title">Schéma du profil (Cliquer sur une cote pour la modifier | Molette = Zoom)</span>
+            <div class="head-actions">
+              <button class="fullscreen-btn" id="printSingleProfileBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg>
+                Imprimer ce schéma
+              </button>
+              <button class="fullscreen-btn" id="fsOpenBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                Plein écran 2D
+              </button>
+            </div>
+          </div>
+          <canvas id="profileCanvas"></canvas>
+          <div class="rotate-controls">
+            <button class="profile-rotate-icon-btn" id="rotateIconBtn" title="Pivoter le profil (90°)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            </button>
+            <div class="rotate-degree-box" title="Angle exact de pivotement">
+              <input type="number" id="rotateDegInput" value="0" step="1">
+              <span>°</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- MODULE 3D AVEC VARIANTES DE COULEURS ET LISSAGE DES ARRONDIS -->
+        <div class="panel" style="margin-top:20px;">
+          <div class="panel-title">
+            <span>Visualisation 3D Exacte & Matières</span>
+            <div style="display:flex;gap:6px;">
+              <button class="icon-action-btn" id="refresh3DBtn" style="font-size:10.5px;padding:4px 8px;">Rafraîchir 3D</button>
+              <button class="fullscreen-btn" id="fs3dOpenBtn" style="font-size:10.5px;padding:4px 8px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                Plein écran 3D
+              </button>
+            </div>
+          </div>
+          <div class="view3d-presets">
+            <button class="view3d-btn active" data-view="iso">Isométrique</button>
+            <button class="view3d-btn" data-view="front">Face</button>
+            <button class="view3d-btn" data-view="side">Profil</button>
+            <button class="view3d-btn" data-view="top">Dessus</button>
+          </div>
+          <div style="font-size:11.5px;color:var(--text-dim);margin-bottom:8px;">Maintenez le clic gauche pour pivoter · Utilisez la molette pour zoomer.</div>
+          <div id="canvas3dContainer" style="width:100%;height:350px;border-radius:6px;background:#e8ecf1;position:relative;overflow:hidden;"></div>
+        </div>
+
+        <div class="develop-summary">
+          <div class="stat"><div class="label">Développé à plat</div><div class="value accent" id="developValue">0 mm</div></div>
+          <div class="stat"><div class="label">Longueur pièce</div><div class="value" id="lengthValue">2000 mm</div></div>
+          <div class="stat"><div class="label">Quantité</div><div class="value good" id="qtyValue">1</div></div>
+        </div>
+
+        <div class="panel" style="margin-top:20px;">
+          <div class="panel-title" style="justify-content:space-between;">
+            <div>Schémas enregistrés <span class="num" id="savedCount">0</span></div>
+            <div style="display:flex;gap:6px;">
+              <button class="fullscreen-btn" id="exportJsonBtn" style="font-size:10.5px;padding:4px 8px;" title="Exporter en JSON">
+                Exporter JSON
+              </button>
+              <label class="fullscreen-btn" style="font-size:10.5px;padding:4px 8px;cursor:pointer;margin:0;" title="Importer un JSON">
+                Importer JSON <input type="file" id="importJsonFile" accept=".json" style="display:none;">
+              </label>
+              <button class="fullscreen-btn" id="printAllProfilesBtn" style="font-size:10.5px;padding:4px 8px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg>
+                Imprimer tous
+              </button>
+              <button class="fullscreen-btn" id="mailAllProfilesBtn" style="font-size:10.5px;padding:4px 8px;border-color:var(--accent-dim);color:var(--accent);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                Envoyer tous
+              </button>
+            </div>
+          </div>
+          <div id="savedProfilesList" class="saved-profiles-list">
+            <div class="empty-note" style="padding:15px;">Aucun schéma conservé en mémoire pour l'instant.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div id="fsOverlay">
+  <div class="fs-sidebar">
+    <div class="fs-head">
+      <span class="fs-title">Séquence du profil</span>
+    </div>
+    <div id="fsSequenceTable" style="font-size:12px;font-family:'JetBrains Mono',monospace;"></div>
+  </div>
+  <div class="fs-main">
+    <div class="fs-head">
+      <span class="fs-title" id="fsProfileTitle">Visualisation Plein écran</span>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="fs-toolbar-hint">Molette = Zoom · Glisser = Déplacer · Clic sur une cote = Modifier</div>
+        <button class="fullscreen-btn" id="fsRotate90Btn" title="Pivoter de 90°">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          90°
+        </button>
+        <div class="rotate-degree-box" style="height:32px;box-shadow:none;">
+          <input type="number" id="fsRotateDegInput" value="0" step="1">
+          <span>°</span>
+        </div>
+        <button class="fullscreen-btn" id="fsResetViewBtn" title="Réinitialiser le zoom / déplacement">Réinitialiser vue</button>
+        <button class="fs-close" id="fsCloseBtn">✕ Fermer</button>
+      </div>
+    </div>
+    <div id="fsCanvasWrap">
+      <canvas id="fsCanvas"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay Plein Écran 3D -->
+<div id="fs3dOverlay">
+  <div class="fs-head">
+    <span class="fs-title">Visualisation 3D Plein Écran</span>
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div class="view3d-presets" id="fs3dViewPresets" style="margin:0;">
+        <button class="view3d-btn active" data-view="iso">Isométrique</button>
+        <button class="view3d-btn" data-view="front">Face</button>
+        <button class="view3d-btn" data-view="side">Profil</button>
+        <button class="view3d-btn" data-view="top">Dessus</button>
+      </div>
+      <button class="fs-close" id="fs3dCloseBtn">✕ Fermer</button>
+    </div>
+  </div>
+  <div id="fs3dContainer"></div>
+</div>
+
+
+<div id="tutorialOverlay" aria-hidden="true">
+  <div class="tutorial-shade"></div>
+  <div class="tutorial-spotlight" id="tutorialSpotlight"></div>
+  <div class="tutorial-card" id="tutorialCard">
+    <button class="tutorial-close" id="tutorialCloseBtn" aria-label="Fermer">×</button>
+    <div class="tutorial-kicker" id="tutorialKicker">Étape 1 / 7</div>
+    <div class="tutorial-title" id="tutorialTitle">Bienvenue</div>
+    <div class="tutorial-text" id="tutorialText"></div>
+    <div class="tutorial-progress" id="tutorialProgress"></div>
+    <div class="tutorial-actions">
+      <div class="left"><button class="tutorial-btn" id="tutorialSkipBtn">Passer</button></div>
+      <div class="right"><button class="tutorial-btn" id="tutorialPrevBtn">Précédent</button><button class="tutorial-btn primary" id="tutorialNextBtn">Suivant</button></div>
+    </div>
+    <div class="tutorial-target-hint" id="tutorialHint"></div>
+  </div>
+</div>
+
+<div id="printArea"></div>
+
+<script>
+let currentProfileRotation = 0;
+let customArrowData = null;
+let isDrawingArrow = false;
+let arrowStartPoint = null;
+
+let canvasZoom = 1.0;
+let canvasPanX = 0;
+let canvasPanY = 0;
+let isPanning = false;
+let panStart = { x: 0, y: 0 };
+let lastAnnotationsMap = [];
+
+// Variables pour Three.js 3D
+let scene3D, camera3D, renderer3D, partMesh3D;
+let is3DInitialized = false;
+
+function init3DViewer() {
+  const container = document.getElementById('canvas3dContainer');
+  if (!container || is3DInitialized) return;
+
+  scene3D = new THREE.Scene();
+  scene3D.background = new THREE.Color(0xf1f5f9);
+
+  camera3D = new THREE.PerspectiveCamera(45, Math.max(1, container.clientWidth) / Math.max(1, container.clientHeight), 0.1, 20000);
+  camera3D.position.set(0, 0, 1800);
+  camera3D.lookAt(0, 0, 0);
+
+  renderer3D = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  renderer3D.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer3D.outputColorSpace = THREE.SRGBColorSpace;
+  renderer3D.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer3D.toneMappingExposure = 1.05;
+  renderer3D.setSize(container.clientWidth, container.clientHeight);
+  renderer3D.domElement.style.display = 'block';
+  renderer3D.domElement.style.width = '100%';
+  renderer3D.domElement.style.height = '100%';
+  renderer3D.domElement.style.touchAction = 'none';
+  renderer3D.domElement.style.cursor = 'grab';
+  container.appendChild(renderer3D.domElement);
+
+  scene3D.add(new THREE.HemisphereLight(0xffffff, 0x66717d, 1.15));
+  const dirLight1 = new THREE.DirectionalLight(0xffffff, 1.2);
+  dirLight1.position.set(4, 6, 5).normalize();
+  scene3D.add(dirLight1);
+  const dirLight2 = new THREE.DirectionalLight(0xffce00, 0.6);
+  dirLight2.position.set(-4, -3, -3).normalize();
+  scene3D.add(dirLight2);
+
+  // Interaction 3D :
+  // clic gauche = rotation, clic droit/Shift = déplacement, molette = zoom.
+  // Les événements sont sur le canvas WebGL lui-même : ils continuent de
+  // fonctionner quand le canvas est déplacé dans le mode plein écran.
+  let pointerMode = null;
+  let activePointerId = null;
+  let lastPointer = { x: 0, y: 0 };
+  const touchPoints = new Map();
+  let lastPinchDistance = null;
+  let lastPinchCenter = null;
+
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+  const getDistance = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  const getCenter = (a, b) => ({ x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 });
+
+  function zoom3D(amount) {
+    const current = camera3D.position.length();
+    const next = clamp(current * Math.exp(amount), 180, 12000);
+    camera3D.position.multiplyScalar(next / Math.max(current, 0.001));
+  }
+
+  function pan3D(dx, dy) {
+    if (!partMesh3D) return;
+    const factor = camera3D.position.length() * 0.0011;
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera3D.quaternion);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera3D.quaternion);
+    partMesh3D.position.addScaledVector(right, -dx * factor).addScaledVector(up, dy * factor);
+  }
+
+  const canvas = renderer3D.domElement;
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+  canvas.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    if (e.pointerType === 'touch') {
+      touchPoints.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
+      canvas.setPointerCapture?.(e.pointerId);
+      if (touchPoints.size === 2) {
+        const pts = [...touchPoints.values()];
+        lastPinchDistance = getDistance(pts[0], pts[1]);
+        lastPinchCenter = getCenter(pts[0], pts[1]);
+      }
+      return;
+    }
+    activePointerId = e.pointerId;
+    pointerMode = (e.button === 2 || e.shiftKey || e.ctrlKey) ? 'pan' : 'rotate';
+    lastPointer = { x: e.clientX, y: e.clientY };
+    canvas.style.cursor = pointerMode === 'pan' ? 'move' : 'grabbing';
+    canvas.setPointerCapture?.(e.pointerId);
+  });
+
+  canvas.addEventListener('pointermove', e => {
+    if (e.pointerType === 'touch') {
+      if (!touchPoints.has(e.pointerId) || !partMesh3D) return;
+      const previous = touchPoints.get(e.pointerId);
+      touchPoints.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
+      const pts = [...touchPoints.values()];
+      if (pts.length === 1) {
+        partMesh3D.rotation.y += (e.clientX - previous.clientX) * 0.009;
+        partMesh3D.rotation.x += (e.clientY - previous.clientY) * 0.009;
+      } else if (pts.length >= 2) {
+        const center = getCenter(pts[0], pts[1]);
+        const distance = getDistance(pts[0], pts[1]);
+        if (lastPinchDistance != null) zoom3D(-Math.log(Math.max(distance / Math.max(lastPinchDistance, 1), 0.01)) * 0.9);
+        if (lastPinchCenter) pan3D(center.x - lastPinchCenter.x, center.y - lastPinchCenter.y);
+        lastPinchDistance = distance;
+        lastPinchCenter = center;
+      }
+      renderer3D.render(scene3D, camera3D);
+      return;
+    }
+    if (activePointerId !== e.pointerId || !pointerMode || !partMesh3D) return;
+    const dx = e.clientX - lastPointer.x;
+    const dy = e.clientY - lastPointer.y;
+    if (pointerMode === 'rotate') {
+      partMesh3D.rotation.y += dx * 0.008;
+      partMesh3D.rotation.x += dy * 0.008;
+    } else {
+      pan3D(dx, dy);
+    }
+    lastPointer = { x: e.clientX, y: e.clientY };
+    renderer3D.render(scene3D, camera3D);
+  });
+
+  function endPointer(e) {
+    if (e.pointerType === 'touch') {
+      touchPoints.delete(e.pointerId);
+      if (touchPoints.size < 2) { lastPinchDistance = null; lastPinchCenter = null; }
+      return;
+    }
+    if (activePointerId === e.pointerId) {
+      activePointerId = null;
+      pointerMode = null;
+      canvas.style.cursor = 'grab';
+      try { canvas.releasePointerCapture?.(e.pointerId); } catch (_) {}
+    }
+  }
+  canvas.addEventListener('pointerup', endPointer);
+  canvas.addEventListener('pointercancel', endPointer);
+
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    zoom3D(e.deltaY * 0.0012);
+    renderer3D.render(scene3D, camera3D);
+  }, { passive: false });
+
+  // Double-clic : recentrer et remettre le zoom de départ sans modifier la géométrie.
+  canvas.addEventListener('dblclick', () => {
+    if (!partMesh3D) return;
+    partMesh3D.position.set(0, 0, 0);
+    camera3D.position.set(0, 0, 1800);
+    camera3D.lookAt(0, 0, 0);
+    renderer3D.render(scene3D, camera3D);
+  });
+
+  function resize3D() {
+    if (!renderer3D || !camera3D) return;
+    const parent = renderer3D.domElement.parentElement || container;
+    const w = Math.max(1, parent.clientWidth);
+    const h = Math.max(1, parent.clientHeight);
+    camera3D.aspect = w / h;
+    camera3D.updateProjectionMatrix();
+    renderer3D.setSize(w, h, false);
+    renderer3D.render(scene3D, camera3D);
+  }
+
+  window.addEventListener('resize', resize3D);
+  is3DInitialized = true;
+  update3DModel();
+  resize3D();
+}
+
+function update3DModel() {
+  if (!is3DInitialized) return;
+
+  const prevRotation = partMesh3D ? {
+    x: partMesh3D.rotation.x,
+    y: partMesh3D.rotation.y,
+    z: partMesh3D.rotation.z
+  } : { x: -0.5, y: 0.7, z: 0 };
+
+  if (partMesh3D) {
+    scene3D.remove(partMesh3D);
+    if (partMesh3D.geometry) partMesh3D.geometry.dispose();
+    if (partMesh3D.material) partMesh3D.material.dispose();
+  }
+
+  const thickness = parseFloat(document.getElementById('profileThickness').value) || 1.5;
+  const length = parseFloat(document.getElementById('pieceLength').value) || 2000;
+
+  // ------------------------------------------------------------------
+  // 1) Reconstitution EXACTE de la ligne centrale du profil 2D.
+  //    On échantillonne les arrondis sur leur vrai centre et leur vrai R.
+  // ------------------------------------------------------------------
+  const centerPoints = [{ x: 0, y: 0 }];
+  let curX = 0, curY = 0, curAngle = 90;
+
+  const pushPoint = (x, y) => {
+    const last = centerPoints[centerPoints.length - 1];
+    if (!last || Math.hypot(x - last.x, y - last.y) > 0.0001) {
+      centerPoints.push({ x, y });
+    }
+  };
+
+  segments.forEach(s => {
+    if (s.type === 'straight') {
+      curX += s.len * Math.cos(curAngle * Math.PI / 180);
+      curY += s.len * Math.sin(curAngle * Math.PI / 180);
+      pushPoint(curX, curY);
+    }
+    else if (s.type === 'bend') {
+      curAngle += s.angle * (s.dir || 1);
+    }
+    else if (s.type === 'arc') {
+      const r = Math.max(0.001, Number(s.radius) || 0);
+      const sweep = Number(s.angle) || 0;
+      const dir = s.dir || 1;
+      const startAng = curAngle + (dir === 1 ? -90 : 90);
+      const startRad = startAng * Math.PI / 180;
+      const cx = curX - r * Math.cos(startRad);
+      const cy = curY - r * Math.sin(startRad);
+      const sampleCount = Math.max(8, Math.ceil(Math.abs(sweep) / 4));
+
+      for (let i = 1; i <= sampleCount; i++) {
+        const t = i / sampleCount;
+        const a = (startAng + sweep * dir * t) * Math.PI / 180;
+        pushPoint(cx + r * Math.cos(a), cy + r * Math.sin(a));
+      }
+      curAngle += sweep * dir;
+      curX = centerPoints[centerPoints.length - 1].x;
+      curY = centerPoints[centerPoints.length - 1].y;
+    }
+    else if (s.type === 'boudin') {
+      // Même logique visuelle que le 2D, mais avec une progression correcte
+      // de 0 à 100 %. L'ancienne version dépassait 100 % et pouvait inverser
+      // le rayon, ce qui créait des formes énormes.
+      const R = Math.max(0.001, (Number(s.diam) || 0) / 2);
+      const dir = s.dir || 1;
+      const isOffset = s.style === 'offset';
+
+      if (isOffset) {
+        const diagLen = R * 2.5;
+        const diagAngle = curAngle - (35 * dir);
+        curX += diagLen * Math.cos(diagAngle * Math.PI / 180);
+        curY += diagLen * Math.sin(diagAngle * Math.PI / 180);
+        pushPoint(curX, curY);
+
+        const cx = curX + R * Math.cos((diagAngle + 90 * dir) * Math.PI / 180);
+        const cy = curY + R * Math.sin((diagAngle + 90 * dir) * Math.PI / 180);
+        const totalRad = 1.35 * 2 * Math.PI;
+        const baseAng = Math.atan2(curY - cy, curX - cx);
+        const n = 96;
+        for (let i = 1; i <= n; i++) {
+          const progress = i / n;
+          const currentR = R * (1 - progress * 0.28);
+          const a = baseAng + progress * totalRad * dir;
+          pushPoint(cx + currentR * Math.cos(a), cy + currentR * Math.sin(a));
+        }
+      } else {
+        const boudinAngle = curAngle + 90 * dir;
+        const cx = curX + R * Math.cos(boudinAngle * Math.PI / 180);
+        const cy = curY + R * Math.sin(boudinAngle * Math.PI / 180);
+        const totalRad = 1.35 * 2 * Math.PI;
+        const baseAng = Math.atan2(curY - cy, curX - cx);
+        const n = 96;
+        for (let i = 1; i <= n; i++) {
+          const progress = i / n;
+          const currentR = R * (1 - progress * 0.28);
+          const a = baseAng + progress * totalRad * dir;
+          pushPoint(cx + currentR * Math.cos(a), cy + currentR * Math.sin(a));
+        }
+      }
+    }
+  });
+
+  if (centerPoints.length < 2) pushPoint(100, 0);
+
+  // ------------------------------------------------------------------
+  // 2) Création d'une vraie "bande de tôle" 3D.
+  //    On évite ExtrudeGeometry + Shape : sur les profils fins et courbes,
+  //    sa triangulation pouvait produire des pointes / volumes énormes.
+  // ------------------------------------------------------------------
+  const halfT = Math.max(0.01, thickness / 2);
+  const outer = [];
+  const inner = [];
+
+  for (let i = 0; i < centerPoints.length; i++) {
+    const p = centerPoints[i];
+    let tx, ty;
+
+    if (i === 0) {
+      tx = centerPoints[1].x - p.x;
+      ty = centerPoints[1].y - p.y;
+    } else if (i === centerPoints.length - 1) {
+      tx = p.x - centerPoints[i - 1].x;
+      ty = p.y - centerPoints[i - 1].y;
+    } else {
+      tx = centerPoints[i + 1].x - centerPoints[i - 1].x;
+      ty = centerPoints[i + 1].y - centerPoints[i - 1].y;
+    }
+
+    const tl = Math.hypot(tx, ty) || 1;
+    tx /= tl; ty /= tl;
+    const nx = -ty, ny = tx;
+
+    outer.push({ x: p.x + nx * halfT, y: p.y + ny * halfT });
+    inner.push({ x: p.x - nx * halfT, y: p.y - ny * halfT });
+  }
+
+  const verts = [];
+  const pushV = (p, z) => { verts.push(p.x, p.y, z); };
+  for (let i = 0; i < centerPoints.length; i++) pushV(outer[i], -length / 2);
+  for (let i = 0; i < centerPoints.length; i++) pushV(inner[i], -length / 2);
+  for (let i = 0; i < centerPoints.length; i++) pushV(outer[i],  length / 2);
+  for (let i = 0; i < centerPoints.length; i++) pushV(inner[i],  length / 2);
+
+  const n = centerPoints.length;
+  const indices = [];
+  const quad = (a,b,c,d) => {
+    indices.push(a,b,c, a,c,d);
+  };
+
+  // Faces principales : surfaces parfaitement planes et continues.
+  for (let i = 0; i < n - 1; i++) {
+    // dessous
+    quad(i, i + 1, n + i + 1, n + i);
+    // dessus
+    quad(2*n + i, 3*n + i, 3*n + i + 1, 2*n + i + 1);
+    // bord extérieur
+    quad(i, 2*n + i, 2*n + i + 1, i + 1);
+    // bord intérieur
+    quad(n + i, n + i + 1, 3*n + i + 1, 3*n + i);
+  }
+  // Bouts de la pièce
+  quad(0, n, 3*n, 2*n);
+  quad(n - 1, 2*n - 1, 4*n - 1, 3*n - 1);
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+
+  let matColor = 0x8894a2;
+  let metalnessVal = 0.6;
+  let roughnessVal = 0.4;
+  const matType = document.getElementById('profileMaterial').value;
+  if (matType === 'Acier') {
+    matColor = 0x94a3b8; metalnessVal = 0.85; roughnessVal = 0.25;
+  } else if (matType === 'Alu') {
+    matColor = 0xf1f5f9; metalnessVal = 0.95; roughnessVal = 0.15;
+  } else if (matType === 'Zinc') {
+    matColor = 0x8291a0; metalnessVal = 0.5; roughnessVal = 0.48;
+  } else if (matType === 'Cuivre') {
+    matColor = 0xf59e0b; metalnessVal = 0.85; roughnessVal = 0.22;
+  }
+
+  const material = new THREE.MeshPhysicalMaterial({
+    color: matColor,
+    metalness: metalnessVal,
+    roughness: roughnessVal,
+    clearcoat: 0.22,
+    clearcoatRoughness: 0.16,
+    reflectivity: 0.7,
+    side: THREE.DoubleSide
+  });
+
+  partMesh3D = new THREE.Mesh(geometry, material);
+  partMesh3D.rotation.set(prevRotation.x, prevRotation.y, prevRotation.z);
+  scene3D.add(partMesh3D);
+  renderer3D.render(scene3D, camera3D);
+}
+
+const VIEW3D_PRESETS = {
+  iso:   { x: -0.5, y: 0.7 },      // Isométrique : angle par défaut
+  front: { x: 0, y: Math.PI / 2 }, // Face : élévation, on regarde la longueur de la pièce
+  side:  { x: 0, y: 0 },           // Profil : bout à bout, on voit le pliage en coupe
+  top:   { x: Math.PI / 2, y: 0 }, // Dessus : vue en plan
+};
+
+function setView3D(view, sourceBtnEl) {
+  const preset = VIEW3D_PRESETS[view];
+  if (!preset || !partMesh3D) return;
+  partMesh3D.rotation.x = preset.x;
+  partMesh3D.rotation.y = preset.y;
+  partMesh3D.rotation.z = 0;
+  renderer3D.render(scene3D, camera3D);
+  // Synchronise l'état "actif" sur les DEUX jeux de boutons (panneau + plein écran)
+  document.querySelectorAll('.view3d-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.view === view);
+  });
+}
+
+document.querySelectorAll('.view3d-btn').forEach(btn => {
+  btn.addEventListener('click', () => setView3D(btn.dataset.view, btn));
+});
+
+document.getElementById('refresh3DBtn').addEventListener('click', update3DModel);
+document.getElementById('profileMaterial').addEventListener('change', update3DModel);
+document.getElementById('profileThickness').addEventListener('input', update3DModel);
+document.getElementById('pieceLength').addEventListener('input', update3DModel);
+
+// Gestion des boutons flèche
+document.getElementById('arrowLeftBtn').addEventListener('click', () => setFirstStraightSideArrow('left'));
+document.getElementById('arrowRightBtn').addEventListener('click', () => setFirstStraightSideArrow('right'));
+document.getElementById('resetArrowBtn').addEventListener('click', () => {
+  customArrowData = null;
+  showToast('Flèche réinitialisée.');
+  redrawProfile();
+});
+
+function setFirstStraightSideArrow(side) {
+  const segList = segments;
+  if(!segList.length) {
+    showToast('Ajoutez des segments pour positionner la flèche.');
+    return;
+  }
+  const geo = generateProfileGeometry(segList, 1);
+  if(!geo.pathSteps || geo.pathSteps.length < 2) return;
+
+  const p1 = geo.pathSteps[0];
+  const p2 = geo.pathSteps[1];
+  if(!p1 || !p2 || p1.type !== 'move' || p2.type !== 'line') {
+    showToast('Premier segment non valide.');
+    return;
+  }
+
+  const midX = (p1.x + p2.x) / 2;
+  const midY = (p1.y + p2.y) / 2;
+
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const len = Math.hypot(dx, dy);
+  if(len === 0) return;
+
+  const nx = -dy / len;
+  const ny = dx / len;
+
+  const multiplier = (side === 'right') ? 1 : -1;
+  const offsetDist = 65;
+
+  customArrowData = {
+    x1: midX + (nx * offsetDist * multiplier) - 35,
+    y1: midY + (ny * offsetDist * multiplier) - 35,
+    x2: midX + (nx * offsetDist * multiplier),
+    y2: midY + (ny * offsetDist * multiplier)
+  };
+
+  showToast(`Flèche positionnée sur le côté ${side === 'right' ? 'droit' : 'gauche'}.`);
+  redrawProfile();
+}
+
+async function envoyerEmailProfile() {
+  const destinataire = "hugo.saglier@altema.pro";
+  const nomProfil = document.getElementById('profileName').value || 'Schéma pliage';
+  const dev = getDevelopTotal();
+  const len = document.getElementById('pieceLength').value;
+  const qty = document.getElementById('pieceQty').value;
+  const mat = document.getElementById('profileMaterial').value;
+  const th = document.getElementById('profileThickness').value;
+  const color = document.getElementById('profileColor').value;
+
+  const currentProfileData = {
+    name: nomProfil, dev, len, qty, mat, th, color, rotation: currentProfileRotation,
+    customArrow: customArrowData,
+    segments: JSON.parse(JSON.stringify(segments))
+  };
+
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = 1200;
+  tempCanvas.height = 600;
+  drawProfileOnCanvas(tempCanvas, true, currentProfileData);
+
+  try {
+    const blob = await new Promise(resolve => tempCanvas.toBlob(resolve, 'image/png'));
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    showToast('Image du schéma copiée ! Fais Ctrl+V dans le mail.');
+  } catch (err) {}
+
+  const sujet = encodeURIComponent(`Transmission du schéma : ${nomProfil}`);
+  const corps = encodeURIComponent(
+    `Bonjour Hugo,\n\nVeuillez trouver ci-dessous le récapitulatif du schéma technique :\n\n` +
+    `• Nom du profil : ${nomProfil}\n• Matière : ${mat} (${th} mm)\n• Développé : ${dev} mm\n• Longueur : ${len} mm | Qté : ${qty}\n` +
+    `• Peinture RAL : ${color ? color : 'Brut'}\n\n[COLLER L'IMAGE DU SCHÉMA ICI AVEC CTRL+V]\n\nCordialement,`
+  );
+
+  setTimeout(() => {
+    window.location.href = `mailto:${destinataire}?subject=${sujet}&body=${corps}`;
+  }, 300);
+}
+
+async function envoyerEmailTousProfils() {
+  if (!savedProfiles.length) {
+    showToast('Aucun schéma enregistré en mémoire.');
+    return;
+  }
+  const destinataire = "hugo.saglier@altema.pro";
+  let descriptionProfils = "";
+  savedProfiles.forEach((p, index) => {
+    descriptionProfils += `${index + 1}. ${p.name} - ${p.mat} ${p.th}mm (Dev: ${p.dev} mm, Qté: ${p.qty})\n`;
+  });
+
+  const sujet = encodeURIComponent(`Dossier complet : ${savedProfiles.length} Schéma(s) de pliage`);
+  const corps = encodeURIComponent(`Bonjour Hugo,\n\nVoici les ${savedProfiles.length} schémas enregistrés :\n\n` + descriptionProfils + `\nCordialement,`);
+
+  setTimeout(() => {
+    window.location.href = `mailto:${destinataire}?subject=${sujet}&body=${corps}`;
+  }, 300);
+}
+
+document.getElementById('mailAllProfilesBtn').addEventListener('click', envoyerEmailTousProfils);
+
+const PALETTE = ['#ffce00','#b7b8b6','#c9a0ff','#8fbf7a','#facc15','#fb7185','#60a5fa','#f472b6','#34d399','#ff9d4d'];
+let cuts = [];
+let idSeq = 1;
+let segments = [];
+let savedProfiles = JSON.parse(localStorage.getItem('altema_saved_profiles') || '[]');
+let lastPackedResult = null;
+
+function saveProfilesToLocalStorage(){
+  localStorage.setItem('altema_saved_profiles', JSON.stringify(savedProfiles));
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(()=> t.classList.remove('show'), 3200);
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'tab-pliage') {
+      redrawProfile();
+      setTimeout(init3DViewer, 100);
+    }
+  });
+});
+
+function addCut(w=600, h=400, qty=1, name="Pièce", colorHex=null){
+  const id = idSeq++;
+  const color = colorHex || PALETTE[(cuts.length) % PALETTE.length];
+  cuts.push({id, w, h, qty, color, name});
+  renderCutList();
+}
+
+function removeCut(id){
+  cuts = cuts.filter(c => c.id !== id);
+  renderCutList();
+}
+
+document.getElementById('clearCutsBtn').addEventListener('click', () => {
+  cuts = [];
+  renderCutList();
+  showToast('Liste de débit vidée.');
+});
+
+document.getElementById('downloadTemplateBtn').addEventListener('click', () => {
+  const templateData = [
+    { "Nom": "Pièce A", "Largeur": 1200, "Hauteur": 800, "Qté": 2 },
+    { "Nom": "Pièce B", "Largeur": 600, "Hauteur": 400, "Qté": 5 }
+  ];
+  const worksheet = XLSX.utils.json_to_sheet(templateData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Débit");
+  XLSX.writeFile(workbook, "modele_import_decoupe.xlsx");
+  showToast("Modèle Excel téléchargé avec succès !");
+});
+
+document.getElementById('importExcelFile').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    try {
+      const data = new Uint8Array(evt.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+      if(!jsonRows.length) {
+        showToast('Le fichier Excel est vide.');
+        return;
+      }
+
+      let importedCount = 0;
+      jsonRows.forEach(row => {
+        const normalizedRow = {};
+        Object.keys(row).forEach(k => {
+          normalizedRow[k.trim().toLowerCase()] = row[k];
+        });
+
+        let name = "";
+        let w = 0;
+        let h = 0;
+        let qty = 1;
+
+        for (let key in normalizedRow) {
+          const val = normalizedRow[key];
+          if (key.includes('nom') || key.includes('ref') || key.includes('désignation') || key.includes('piece')) {
+            if (val) name = String(val);
+          }
+          if (key.includes('larg') || key.includes('width') || key.includes('l (')) {
+            const num = Number(val);
+            if (!isNaN(num) && num > 0) w = num;
+          }
+          if (key.includes('haut') || key.includes('long') || key.includes('height') || key.includes('h (') || key.includes('lg')) {
+            const num = Number(val);
+            if (!isNaN(num) && num > 0) h = num;
+          }
+          if (key.includes('qté') || key.includes('qte') || key.includes('quantite') || key.includes('qty')) {
+            const num = Number(val);
+            if (!isNaN(num) && num > 0) qty = num;
+          }
+        }
+
+        const values = Object.values(row);
+        if (!name && values.length > 0 && typeof values[0] === 'string') name = values[0];
+        if (!w && values.length > 1) { const n = Number(values[1]); if(!isNaN(n) && n > 0) w = n; }
+        if (!h && values.length > 2) { const n = Number(values[2]); if(!isNaN(n) && n > 0) h = n; }
+        if (qty === 1 && values.length > 3) { const n = Number(values[3]); if(!isNaN(n) && n > 0) qty = n; }
+
+        if (w > 0 && h > 0) {
+          addCut(w, h, qty, name || `Pièce ${cuts.length + 1}`, null);
+          importedCount++;
+        }
+      });
+
+      if (importedCount > 0) {
+        showToast(`${importedCount} pièce(s) importée(s) avec succès !`);
+      } else {
+        showToast('Aucune pièce valide trouvée dans le fichier.');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Erreur lors de la lecture du fichier Excel.');
+    }
+    e.target.value = '';
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+function renderCutList(){
+  const list = document.getElementById('cutList');
+  list.innerHTML = '';
+  cuts.forEach(c => {
+    const row = document.createElement('div');
+    row.className = 'cut-row';
+    row.innerHTML = `
+      <input type="color" value="${c.color}" data-field="color" data-id="${c.id}" style="width:16px;height:16px;border:none;background:none;cursor:pointer;padding:0;" title="Changer la couleur">
+      <input type="text" value="${c.name}" data-field="name" data-id="${c.id}" placeholder="Nom pièce">
+      <input type="number" min="1" value="${c.w}" data-field="w" data-id="${c.id}">
+      <input type="number" min="1" value="${c.h}" data-field="h" data-id="${c.id}">
+      <div class="qty-cell"><input type="number" min="1" value="${c.qty}" data-field="qty" data-id="${c.id}"></div>
+      <button class="rm-btn" data-id="${c.id}">✕</button>
+    `;
+    list.appendChild(row);
+  });
+  document.getElementById('pieceCount').textContent = cuts.length;
+
+  list.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('input', e => {
+      const id = Number(e.target.dataset.id);
+      const field = e.target.dataset.field;
+      const cut = cuts.find(c => c.id === id);
+      if (cut) {
+        if (field === 'name' || field === 'color') {
+          cut[field] = e.target.value;
+        } else {
+          cut[field] = Math.max(1, Number(e.target.value) || 1);
+        }
+      }
+    });
+  });
+  list.querySelectorAll('.rm-btn').forEach(btn => {
+    btn.addEventListener('click', e => removeCut(Number(e.target.dataset.id)));
+  });
+}
+
+document.getElementById('addCutBtn').addEventListener('click', () => addCut());
+
+function packAll(pieces, sheetW, sheetH, kerf, allowRotate){
+  const items = [];
+  pieces.forEach(p => {
+    for(let i=0; i<p.qty; i++){
+      items.push({w: p.w, h: p.h, color: p.color, id: p.id, name: p.name});
+    }
+  });
+
+  items.sort((a,b) => {
+    if (b.h !== a.h) return b.h - a.h;
+    return b.w - a.w;
+  });
+
+  const sheets = [];
+  const unplaced = [];
+
+  function tryPlaceOnSheet(sheet, w, h){
+    let best = null;
+    sheet.freeRects.forEach((r, idx) => {
+      if (w <= r.w && h <= r.h){
+        const heightFit = r.h - h;
+        const widthFit = r.w - w;
+        const score = heightFit * 1000 + widthFit;
+
+        if (!best || score < best.score){
+          best = {rectIndex: idx, w, h, rotated:false, score};
+        }
+      }
+      if (allowRotate && h <= r.w && w <= r.h){
+        const heightFit = r.h - w;
+        const widthFit = r.w - h;
+        const score = heightFit * 1000 + widthFit;
+
+        if (!best || score < best.score){
+          best = {rectIndex: idx, w:h, h:w, rotated:true, score};
+        }
+      }
+    });
+    return best;
+  }
+
+  function placeInSheet(sheet, fit, piece){
+    const r = sheet.freeRects[fit.rectIndex];
+    const finalW = fit.rotated ? piece.h : piece.w;
+    const finalH = fit.rotated ? piece.w : piece.h;
+
+    sheet.placed.push({
+      x: r.x, y: r.y, w: fit.w, h: fit.h,
+      color: piece.color, rotated: fit.rotated, origW: finalW, origH: finalH, name: piece.name
+    });
+    sheet.freeRects.splice(fit.rectIndex, 1);
+    const occW = fit.w + kerf;
+    const occH = fit.h + kerf;
+    const rightW = r.w - occW;
+    const bottomH = r.h - occH;
+
+    if (rightW > 0.01 && bottomH > 0.01){
+      if (rightW >= bottomH) {
+        sheet.freeRects.push({x: r.x + occW, y: r.y, w: rightW, h: r.h});
+        sheet.freeRects.push({x: r.x, y: r.y + occH, w: occW, h: bottomH});
+      } else {
+        sheet.freeRects.push({x: r.x, y: r.y + occH, w: r.w, h: bottomH});
+        sheet.freeRects.push({x: r.x + occW, y: r.y, w: rightW, h: occH});
+      }
+    } else if (rightW > 0.01){
+      sheet.freeRects.push({x: r.x + occW, y: r.y, w: rightW, h: r.h});
+    } else if (bottomH > 0.01){
+      sheet.freeRects.push({x: r.x, y: r.y + occH, w: r.w, h: bottomH});
+    }
+  }
+
+  items.forEach(piece => {
+    let placed = false;
+    for(const s of sheets){
+      const fit = tryPlaceOnSheet(s, piece.w, piece.h);
+      if(fit){
+        placeInSheet(s, fit, piece);
+        placed = true;
+        break;
+      }
+    }
+    if(!placed){
+      const newS = { freeRects:[{x:0,y:0,w:sheetW,h:sheetH}], placed:[] };
+      const fit = tryPlaceOnSheet(newS, piece.w, piece.h);
+      if(fit){
+        placeInSheet(newS, fit, piece);
+        sheets.push(newS);
+      } else {
+        unplaced.push(piece);
+      }
+    }
+  });
+  return { sheets, unplaced };
+}
+
+function groupSimilarSheets(sheets){
+  const groups = [];
+  sheets.forEach(sheet => {
+    const signature = sheet.placed.map(p => `${p.x},${p.y},${p.w},${p.h}`).sort().join('|');
+    const existing = groups.find(g => g.signature === signature);
+    if(existing){
+      existing.count++;
+      existing.indices.push(sheet.index);
+    } else {
+      groups.push({ signature, count: 1, sheet, indices: [sheet.index] });
+    }
+  });
+  return groups;
+}
+
+document.getElementById('calcBtn').addEventListener('click', runCalculation);
+
+function runCalculation(){
+  const sW = Number(document.getElementById('sheetW').value) || 3000;
+  const sH = Number(document.getElementById('sheetH').value) || 1500;
+  const kerf = Number(document.getElementById('kerf').value);
+  const allowRotate = document.getElementById('allowRotate').checked;
+
+  const result = packAll(cuts, sW, sH, isNaN(kerf) ? 0 : kerf, allowRotate);
+  result.sheets.forEach((s, i) => s.index = i + 1);
+  lastPackedResult = { ...result, sW, sH };
+
+  const groups = groupSimilarSheets(result.sheets);
+  const container = document.getElementById('results');
+  container.innerHTML = '';
+
+  let totalAreaPlaced = 0;
+  const totalSheetArea = result.sheets.length * (sW * sH);
+  result.sheets.forEach(s => {
+    s.placed.forEach(p => totalAreaPlaced += p.w * p.h);
+  });
+  const fillRate = totalSheetArea > 0 ? ((totalAreaPlaced / totalSheetArea) * 100).toFixed(1) : 0;
+
+  const statsHTML = `
+    <div class="stats-bar">
+      <div class="stat"><div class="label">Tôles requises</div><div class="value accent">${result.sheets.length}</div></div>
+      <div class="stat"><div class="label">Taux d'utilisation</div><div class="value good">${fillRate}%</div></div>
+      <div class="stat"><div class="label">Chute totale</div><div class="value">${(100 - fillRate).toFixed(1)}%</div></div>
+      <div class="stat"><div class="label">Pièces non placées</div><div class="value ${result.unplaced.length ? 'danger':''}">${result.unplaced.length}</div></div>
+    </div>
+  `;
+  container.insertAdjacentHTML('beforeend', statsHTML);
+
+  const recapMap = {};
+  result.sheets.forEach(s => {
+    s.placed.forEach(p => {
+      const keyName = p.name || 'Pièce sans nom';
+      const dimsStr = `${p.origW} x ${p.origH} mm`;
+      const uniqueKey = keyName + "_" + dimsStr;
+      if (!recapMap[uniqueKey]) {
+        recapMap[uniqueKey] = {
+          name: keyName,
+          dims: dimsStr,
+          origH: p.origH,
+          qty: 0,
+          totalArea: 0,
+          totalLinear: 0
+        };
+      }
+      recapMap[uniqueKey].qty++;
+      recapMap[uniqueKey].totalArea += (p.origW * p.origH);
+      recapMap[uniqueKey].totalLinear += p.origH;
+    });
+  });
+
+  let recapItems = Object.values(recapMap);
+
+  const sortMode = document.getElementById('recapSortSelect') ? document.getElementById('recapSortSelect').value : 'name';
+  if (sortMode === 'name') {
+    recapItems.sort((a, b) => a.name.localeCompare(b.name));
+  } else if (sortMode === 'qty-desc') {
+    recapItems.sort((a, b) => b.qty - a.qty);
+  } else if (sortMode === 'surface-desc') {
+    recapItems.sort((a, b) => b.totalArea - a.totalArea);
+  }
+
+  let totalQtySum = 0;
+  let totalLinearSumMm = 0;
+  let totalAreaSumM2 = 0;
+
+  recapItems.forEach(item => {
+    totalQtySum += item.qty;
+    totalLinearSumMm += item.totalLinear;
+    totalAreaSumM2 += item.totalArea;
+  });
+
+  let recapHtml = `
+    <div class="recap-block">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+        <h3>Récapitulatif de débit</h3>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:11px;color:var(--text-dim);">Trier par :</span>
+          <select id="recapSortSelect" style="background:var(--bg);border:1px solid var(--line);color:var(--text);font-size:11.5px;padding:4px 8px;border-radius:5px;font-family:'Inter',sans-serif;">
+            <option value="name" ${sortMode==='name'?'selected':''}>Nom (A-Z)</option>
+            <option value="qty-desc" ${sortMode==='qty-desc'?'selected':''}>Quantité (Décroissante)</option>
+            <option value="surface-desc" ${sortMode==='surface-desc'?'selected':''}>Surface totale (Décroissante)</option>
+          </select>
+        </div>
+      </div>
+      <table class="recap-table">
+        <thead>
+          <tr>
+            <th>Pièces / Réf</th>
+            <th>Dimensions</th>
+            <th>Qté Totale</th>
+            <th>Mètre linéaire (Haut.)</th>
+            <th>Surface totale</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+  
+  recapItems.forEach(item => {
+    const itemLinearM = (item.totalLinear / 1000).toFixed(2);
+    const itemAreaM2 = (item.totalArea / 1000000).toFixed(2);
+    recapHtml += `
+      <tr>
+        <td><b>${item.name}</b></td>
+        <td>${item.dims}</td>
+        <td>${item.qty}</td>
+        <td>${itemLinearM} m</td>
+        <td>${itemAreaM2} m²</td>
+      </tr>
+    `;
+  });
+
+  recapHtml += `
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2" style="text-align:right;">TOTAL GÉNÉRAL :</td>
+            <td>${totalQtySum}</td>
+            <td>${(totalLinearSumMm / 1000).toFixed(2)} m</td>
+            <td>${(totalAreaSumM2 / 1000000).toFixed(2)} m²</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  `;
+  container.insertAdjacentHTML('beforeend', recapHtml);
+
+  const sortSelect = document.getElementById('recapSortSelect');
+  if (sortSelect) {
+    sortSelect.addEventListener('change', () => {
+      runCalculation();
+    });
+  }
+
+  groups.forEach((g, gIdx) => {
+    const s = g.sheet;
+    const titleText = g.count > 1 ? `Tôles ${g.indices.join(', ')} (x${g.count} identiques)` : `Tôle ${s.index}`;
+    const block = document.createElement('div');
+    block.className = 'sheet-block';
+    block.innerHTML = `
+      <div class="sheet-head">
+        <h3>${titleText}</h3>
+        <span class="fill">Format: ${sW} x ${sH} mm</span>
+      </div>
+      <canvas id="sheetCanvas_${gIdx}"></canvas>
+    `;
+    container.appendChild(block);
+    drawSheetCanvas(block.querySelector('canvas'), s, sW, sH);
+  });
+}
+
+function drawSheetCanvas(canvas, sheet, sW, sH, isLight = false){
+  const ratio = sH / sW;
+  canvas.width = 1200;
+  canvas.height = 1200 * ratio;
+  const ctx = canvas.getContext('2d');
+  const scale = canvas.width / sW;
+
+  ctx.fillStyle = isLight ? '#ffffff' : '#0a0c0e';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  sheet.placed.forEach(p => {
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x * scale, p.y * scale, p.w * scale, p.h * scale);
+    ctx.strokeStyle = isLight ? '#000000' : '#1c1b1a';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(p.x * scale, p.y * scale, p.w * scale, p.h * scale);
+
+    const line1 = `${p.name ? p.name : 'Pièce'}${p.rotated ? ' (R)' : ''}`;
+    const line2 = `${p.origW} × ${p.origH} mm`;
+
+    const cx = (p.x + p.w/2)*scale;
+    const cy = (p.y + p.h/2)*scale;
+
+    ctx.font = 'bold 15px "JetBrains Mono"';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const w1 = ctx.measureText(line1).width;
+    const w2 = ctx.measureText(line2).width;
+    const maxTextW = Math.max(w1, w2);
+    
+    ctx.fillStyle = isLight ? 'rgba(255,255,255,0.95)' : 'rgba(28,27,26,0.85)';
+    ctx.fillRect(cx - maxTextW/2 - 8, cy - 20, maxTextW + 16, 40);
+
+    ctx.fillStyle = isLight ? '#000000' : '#eeece7';
+    ctx.fillText(line1, cx, cy - 8);
+    ctx.fillText(line2, cx, cy + 10);
+  });
+}
+
+function addSegment(type){
+  if(type==='straight') segments.push({type:'straight', len:100});
+  if(type==='bend') segments.push({type:'bend', angle:90, dir:1, hemType:'aucun', hemGap:6});
+  if(type==='arc') segments.push({type:'arc', radius:50, angle:90, dir:1});
+  if(type==='boudin') segments.push({type:'boudin', diam:18, dir:1, style:'offset'});
+  renderSegments();
+  redrawProfile();
+}
+
+function validateSegments() {
+  let hasError = false;
+  let errorMsgText = "";
+
+  segments.forEach((s, idx) => {
+    if (s.type === 'straight' && (s.len <= 0 || isNaN(s.len))) {
+      hasError = true;
+      errorMsgText = `Erreur : Le segment droit #${idx + 1} a une dimension invalide (≤ 0).`;
+    }
+    if (s.type === 'bend' && (s.angle <= 0 || s.angle > 180 || isNaN(s.angle))) {
+      hasError = true;
+      errorMsgText = `Erreur : L'angle du pli #${idx + 1} doit être compris entre 1° et 180°.`;
+    }
+    if (s.type === 'arc' && (s.radius <= 0 || s.angle <= 0 || isNaN(s.radius) || isNaN(s.angle))) {
+      hasError = true;
+      errorMsgText = `Erreur : Paramètre d'arrondi invalide sur l'élément #${idx + 1}.`;
+    }
+  });
+
+  const errBox = document.getElementById('globalErrorBox');
+  if (hasError) {
+    errBox.textContent = errorMsgText;
+    errBox.style.display = 'block';
+  } else {
+    errBox.style.display = 'none';
+  }
+  return !hasError;
+}
+
+function renderSegments(){
+  const list = document.getElementById('segList');
+  list.innerHTML = '';
+  
+  segments.forEach((s, idx) => {
+    const row = document.createElement('div');
+    row.className = 'seg-row';
+    
+    if ((s.type === 'straight' && s.len <= 0) || (s.type === 'bend' && (s.angle <= 0 || s.angle > 180)) || (s.type === 'arc' && (s.radius <= 0 || s.angle <= 0))) {
+      row.classList.add('error-highlight');
+    }
+
+    let controls = '';
+    if(s.type==='straight'){
+      controls = `<span class="seg-label">Droit</span> <input type="number" value="${s.len}" data-idx="${idx}" data-key="len"> <span class="seg-label">mm</span>`;
+    } else if(s.type==='bend'){
+      const hemType = s.hemType || 'aucun';
+      controls = `
+        <span class="seg-label">Pli</span> <input type="number" value="${s.angle}" data-idx="${idx}" data-key="angle"> <span class="seg-label">°</span>
+        <div class="dir-toggle">
+          <button class="${s.dir===1?'active':''}" data-idx="${idx}" data-dir="1">Haut</button>
+          <button class="${s.dir===-1?'active':''}" data-idx="${idx}" data-dir="-1">Bas</button>
+        </div>
+        <div class="hem-type-row" style="display:${s.angle==180?'flex':'none'};">
+          <span class="seg-label" style="width:100%;">Pli 180° — type :</span>
+          <div class="hem-toggle">
+            <button class="${hemType==='aucun'?'active':''}" data-idx="${idx}" data-hem="aucun">Simple</button>
+            <button class="${hemType==='ferme'?'active':''}" data-idx="${idx}" data-hem="ferme">Ourlet fermé</button>
+            <button class="${hemType==='ouvert'?'active':''}" data-idx="${idx}" data-hem="ouvert">Ourlet ouvert</button>
+          </div>
+          ${hemType==='ouvert' ? `<span class="seg-label">Ouverture T</span> <input type="number" value="${s.hemGap||6}" data-idx="${idx}" data-key="hemGap" style="width:56px;"> <span class="seg-label">mm</span>` : ''}
+        </div>
+      `;
+    } else if(s.type==='arc'){
+      controls = `
+        <span class="seg-label">Rayon</span> <input type="number" value="${s.radius}" data-idx="${idx}" data-key="radius">
+        <span class="seg-label">Angle</span> <input type="number" value="${s.angle}" data-idx="${idx}" data-key="angle">
+      `;
+    } else if(s.type==='boudin'){
+      controls = `
+        <span class="seg-label">Boudin</span>
+        <div class="diam-toggle">
+          <button class="${s.diam===18?'active':''}" data-idx="${idx}" data-diam="18">⌀18</button>
+          <button class="${s.diam===16?'active':''}" data-idx="${idx}" data-diam="16">⌀16</button>
+          <button class="${s.diam===14?'active':''}" data-idx="${idx}" data-diam="14">⌀14</button>
+        </div>
+        <div class="dir-toggle">
+          <button class="${s.style==='straight'?'active':''}" data-idx="${idx}" data-style="straight">Droit</button>
+          <button class="${s.style==='offset'?'active':''}" data-idx="${idx}" data-style="offset">Déporté</button>
+        </div>
+        <div class="dir-toggle">
+          <button class="${s.dir===1?'active':''}" data-idx="${idx}" data-dir="1">G</button>
+          <button class="${s.dir===-1?'active':''}" data-idx="${idx}" data-dir="-1">D</button>
+        </div>
+      `;
+    }
+
+    row.innerHTML = `
+      <div class="seg-icon type-${s.type}">${s.type[0].toUpperCase()}</div>
+      <div class="seg-body">${controls}</div>
+      <button class="rm-btn" data-idx="${idx}">✕</button>
+    `;
+    list.appendChild(row);
+  });
+
+  document.getElementById('segCount').textContent = segments.length;
+  validateSegments();
+
+  list.querySelectorAll('input').forEach(i => {
+    i.addEventListener('input', e => {
+      const idx = e.target.dataset.idx;
+      const key = e.target.dataset.key;
+      segments[idx][key] = Number(e.target.value) || 0;
+      // On ne reconstruit pas toute la liste ici : ça faisait perdre le focus
+      // du champ à chaque chiffre tapé (ex: "523" -> obligé de recliquer entre
+      // chaque chiffre). On se contente de redessiner le schéma et de
+      // rafraîchir juste le surlignage d'erreur de CETTE ligne.
+      const s = segments[idx];
+      const isInvalid = (s.type === 'straight' && s.len <= 0) ||
+                         (s.type === 'bend' && (s.angle <= 0 || s.angle > 180)) ||
+                         (s.type === 'arc' && (s.radius <= 0 || s.angle <= 0));
+      e.target.closest('.seg-row').classList.toggle('error-highlight', isInvalid);
+      if (key === 'angle') {
+        const hemRow = e.target.closest('.seg-row').querySelector('.hem-type-row');
+        if (hemRow) hemRow.style.display = (s.angle == 180) ? 'flex' : 'none';
+      }
+      validateSegments();
+      redrawProfile();
+    });
+  });
+  list.querySelectorAll('.hem-toggle button').forEach(b => {
+    b.addEventListener('click', e => {
+      const idx = e.target.dataset.idx;
+      segments[idx].hemType = e.target.dataset.hem;
+      if (segments[idx].hemType === 'ouvert' && !segments[idx].hemGap) segments[idx].hemGap = 6;
+      renderSegments();
+      redrawProfile();
+    });
+  });
+  list.querySelectorAll('.dir-toggle button').forEach(b => {
+    b.addEventListener('click', e => {
+      const idx = e.target.dataset.idx;
+      if(e.target.dataset.dir) segments[idx].dir = Number(e.target.dataset.dir);
+      if(e.target.dataset.style) segments[idx].style = e.target.dataset.style;
+      renderSegments();
+      redrawProfile();
+    });
+  });
+  list.querySelectorAll('.diam-toggle button').forEach(b => {
+    b.addEventListener('click', e => {
+      const idx = e.target.dataset.idx;
+      segments[idx].diam = Number(e.target.dataset.diam);
+      renderSegments();
+      redrawProfile();
+    });
+  });
+  list.querySelectorAll('.rm-btn').forEach(b => {
+    b.addEventListener('click', e => {
+      segments.splice(e.target.dataset.idx, 1);
+      renderSegments();
+      redrawProfile();
+    });
+  });
+}
+
+document.querySelectorAll('[data-add]').forEach(btn => {
+  btn.addEventListener('click', () => addSegment(btn.dataset.add));
+});
+document.getElementById('clearSegBtn').addEventListener('click', () => {
+  segments = [];
+  renderSegments();
+  redrawProfile();
+});
+
+renderSegments();
+
+function getDevelopTotal(segList = segments){
+  let dev = 0;
+  segList.forEach(s => {
+    if(s.type==='straight') dev += s.len;
+    if(s.type==='arc') dev += (Math.PI * s.radius * (s.angle/180));
+    if(s.type==='boudin') dev += (Math.PI * s.diam * 1.15);
+  });
+  return Math.round(dev);
+}
+
+function generateProfileGeometry(segList, scale = 1){
+  let curX = 0, curY = 0, curAngle = 90;
+  const pathSteps = [];
+  const annotations = [];
+
+  pathSteps.push({type:'move', x:curX, y:curY});
+
+  segList.forEach((s, index) => {
+    const startX = curX;
+    const startY = curY;
+
+    if(s.type==='straight'){
+      const len = s.len * scale;
+      curX += len * Math.cos(curAngle * Math.PI / 180);
+      curY += len * Math.sin(curAngle * Math.PI / 180);
+      pathSteps.push({type:'line', x:curX, y:curY});
+
+      const dx = curX - startX;
+      const dy = curY - startY;
+      const segLen = Math.hypot(dx, dy);
+      let nx = 0, ny = 0;
+      if (segLen > 0.001) {
+        nx = -dy / segLen;
+        ny = dx / segLen;
+      }
+      const offsetDist = 35 + (index % 2) * 12;
+      const midX = (startX + curX) / 2 + nx * offsetDist;
+      const midY = (startY + curY) / 2 + ny * offsetDist;
+
+      annotations.push({
+        type: 'dim',
+        segmentIndex: index,
+        text: `${s.len} mm`,
+        midX: midX,
+        midY: midY,
+        startX: startX,
+        startY: startY,
+        endX: curX,
+        endY: curY,
+        nx: nx,
+        ny: ny,
+        offsetDist: offsetDist,
+        angle: curAngle
+      });
+    }
+    else if(s.type==='bend'){
+      const hemType = s.hemType || 'aucun';
+      if (s.angle == 180 && hemType !== 'aucun') {
+        const gapMm = hemType === 'ferme' ? 2.5 : (s.hemGap || 6);
+        const r = (gapMm / 2) * scale;
+        const dir = s.dir || 1;
+        const startAng = curAngle + (dir === 1 ? -90 : 90);
+        const endAng = startAng + (180 * dir);
+
+        const cx = curX - r * Math.cos(startAng * Math.PI / 180);
+        const cy = curY - r * Math.sin(startAng * Math.PI / 180);
+
+        pathSteps.push({
+          type:'arc', cx, cy, r,
+          startAng: startAng * Math.PI / 180,
+          endAng: endAng * Math.PI / 180,
+          counterclockwise: dir === -1
+        });
+
+        curAngle += 180 * dir;
+        curX = cx + r * Math.cos(endAng * Math.PI / 180);
+        curY = cy + r * Math.sin(endAng * Math.PI / 180);
+
+        annotations.push({
+          type: 'hem',
+          segmentIndex: index,
+          text: hemType === 'ferme' ? 'Ourlet fermé' : `Ourlet ouvert (T${gapMm})`,
+          x: (cx + startX) / 2 + (cx - startX) * 0.5,
+          y: (cy + startY) / 2 + (cy - startY) * 0.5
+        });
+      } else {
+        annotations.push({
+          type: 'angle',
+          segmentIndex: index,
+          text: `${s.angle}°`,
+          x: curX,
+          y: curY
+        });
+        curAngle += s.angle * s.dir;
+      }
+    }
+    else if(s.type==='arc'){
+      const r = s.radius * scale;
+      const sweep = s.angle;
+      const dir = s.dir || 1;
+      const startAng = curAngle + (dir === 1 ? -90 : 90);
+      const endAng = startAng + (sweep * dir);
+      
+      const cx = curX - r * Math.cos(startAng * Math.PI / 180);
+      const cy = curY - r * Math.sin(startAng * Math.PI / 180);
+
+      pathSteps.push({
+        type:'arc', cx, cy, r,
+        startAng: startAng * Math.PI / 180,
+        endAng: endAng * Math.PI / 180,
+        counterclockwise: dir === -1
+      });
+
+      curAngle += sweep * dir;
+      curX = cx + r * Math.cos(endAng * Math.PI / 180);
+      curY = cy + r * Math.sin(endAng * Math.PI / 180);
+
+      annotations.push({
+        type: 'dim',
+        segmentIndex: index,
+        text: `R${s.radius}`,
+        midX: (startX + curX) / 2 + 30,
+        midY: (startY + curY) / 2 - 20,
+        angle: curAngle
+      });
+    }
+    else if(s.type==='boudin'){
+      const R = (s.diam / 2) * scale;
+      const dir = s.dir || 1;
+      const isOffset = s.style === 'offset';
+
+      if(isOffset){
+        const diagLen = R * 2.5;
+        const diagAngle = curAngle - (35 * dir); 
+        curX += diagLen * Math.cos(diagAngle * Math.PI / 180);
+        curY += diagLen * Math.sin(diagAngle * Math.PI / 180);
+        pathSteps.push({type:'line', x:curX, y:curY});
+
+        const cx = curX + R * Math.cos((diagAngle + 90 * dir) * Math.PI / 180);
+        const cy = curY + R * Math.sin((diagAngle + 90 * dir) * Math.PI / 180);
+
+        const totalTurns = 1.35;
+        const totalRad = totalTurns * 2 * Math.PI;
+        const baseAng = Math.atan2(curY - cy, curX - cx);
+
+        for(let i=0; i<=40; i++){
+          const progress = i / 40;
+          const currentR = R * (1 - progress * 0.28);
+          const angle = baseAng + (progress * totalRad * dir);
+          pathSteps.push({type:'line', x: cx + currentR * Math.cos(angle), y: cy + currentR * Math.sin(angle)});
+        }
+        curX = cx; curY = cy;
+      } else {
+        const boudinAngle = curAngle + (90 * dir);
+        const cx = curX + R * Math.cos(boudinAngle * Math.PI / 180);
+        const cy = curY + R * Math.sin(boudinAngle * Math.PI / 180);
+        const totalRad = 1.35 * 2 * Math.PI;
+        const baseAng = Math.atan2(curY - cy, curX - cx);
+
+        for(let i=0; i<=40; i++){
+          const progress = i / 40;
+          const currentR = R * (1 - progress * 0.28);
+          const angle = baseAng + (progress * totalRad * dir);
+          pathSteps.push({type:'line', x: cx + currentR * Math.cos(angle), y: cy + currentR * Math.sin(angle)});
+        }
+        curX = cx; curY = cy;
+      }
+
+      annotations.push({
+        type: 'dim',
+        segmentIndex: index,
+        text: `⌀${s.diam}`,
+        midX: curX - 35,
+        midY: curY + R + 20,
+        angle: 0
+      });
+    }
+  });
+
+  return { pathSteps, annotations };
+}
+
+function drawProfileOnCanvas(canvas, isLight = false, profileData = null){
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width = (canvas.offsetWidth || 800) * 2;
+  const h = canvas.height = (canvas.offsetHeight || 450) * 2;
+  ctx.clearRect(0, 0, w, h);
+
+  if(isLight){
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  const segList = profileData ? profileData.segments : segments;
+  const color = profileData ? profileData.color : document.getElementById('profileColor').value;
+  const rotation = profileData ? (profileData.rotation || 0) : currentProfileRotation;
+  const activeArrow = profileData ? profileData.customArrow : customArrowData;
+
+  if(!segList.length) {
+    lastAnnotationsMap = [];
+    return;
+  }
+
+  const tempGeo = generateProfileGeometry(segList, 1);
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+
+  tempGeo.pathSteps.forEach(st => {
+    if(st.x !== undefined){
+      minX = Math.min(minX, st.x); maxX = Math.max(maxX, st.x);
+      minY = Math.min(minY, st.y); maxY = Math.max(maxY, st.y);
+    }
+  });
+
+  const pW = (maxX - minX) || 100;
+  const pH = (maxY - minY) || 100;
+  const padding = 180;
+  let scale = Math.min((w - padding*2) / pW, (h - padding*2) / pH);
+  if(!profileData) scale *= canvasZoom;
+
+  const finalGeo = generateProfileGeometry(segList, scale);
+
+  minX = Infinity; maxX = -Infinity; minY = Infinity; maxY = -Infinity;
+  finalGeo.pathSteps.forEach(st => {
+    if(st.x !== undefined){
+      minX = Math.min(minX, st.x); maxX = Math.max(maxX, st.x);
+      minY = Math.min(minY, st.y); maxY = Math.max(maxY, st.y);
+    }
+  });
+
+  const finalPW = (maxX - minX);
+  const finalPH = (maxY - minY);
+  let offsetX = (w - finalPW) / 2 - minX;
+  let offsetY = (h - finalPH) / 2 - minY;
+  if(!profileData){
+    offsetX += canvasPanX * 2;
+    offsetY += canvasPanY * 2;
+  }
+
+  ctx.save();
+  ctx.translate(w / 2, h / 2);
+  ctx.rotate((rotation * Math.PI) / 180);
+  const textCorrectionAngle = -rotation;
+
+  ctx.lineWidth = isLight ? 6 : 5;
+  ctx.strokeStyle = isLight ? '#000000' : '#ffce00';
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.setLineDash([]);
+
+  ctx.beginPath();
+  finalGeo.pathSteps.forEach(st => {
+    if(st.type === 'move'){
+      ctx.moveTo(st.x + offsetX - (w/2), st.y + offsetY - (h/2));
+    } else if(st.type === 'line'){
+      ctx.lineTo(st.x + offsetX - (w/2), st.y + offsetY - (h/2));
+    } else if(st.type === 'arc'){
+      ctx.arc(st.cx + offsetX - (w/2), st.cy + offsetY - (h/2), st.r, st.startAng, st.endAng, st.counterclockwise);
+    }
+  });
+  ctx.stroke();
+
+  // --- NOUVEAU SYSTÈME DE FLÈCHE RAL AMÉLIORÉ ---
+  if(activeArrow && color && color.trim().length > 0){
+    const ax1 = activeArrow.x1, ay1 = activeArrow.y1;
+    const ax2 = activeArrow.x2, ay2 = activeArrow.y2;
+
+    ctx.save();
+    ctx.strokeStyle = '#ff3b30';
+    ctx.fillStyle = '#ff3b30';
+    ctx.lineWidth = 5;
+
+    ctx.beginPath();
+    ctx.moveTo(ax1, ay1);
+    ctx.lineTo(ax2, ay2);
+    ctx.stroke();
+
+    const headLen = 20;
+    const angleLine = Math.atan2(ay2 - ay1, ax2 - ax1);
+    ctx.beginPath();
+    ctx.moveTo(ax2, ay2);
+    ctx.lineTo(ax2 - headLen * Math.cos(angleLine - Math.PI / 6), ay2 - headLen * Math.sin(angleLine - Math.PI / 6));
+    ctx.lineTo(ax2 - headLen * Math.cos(angleLine + Math.PI / 6), ay2 - headLen * Math.sin(angleLine + Math.PI / 6));
+    ctx.lineTo(ax2, ay2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(ax1, ay1, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    const labelText = `RAL ${color}`;
+    ctx.save();
+    ctx.translate(ax1, ay1 - 22);
+    ctx.rotate((textCorrectionAngle * Math.PI) / 180);
+
+    ctx.font = 'bold 16px "JetBrains Mono"';
+    const metrics = ctx.measureText(labelText);
+    ctx.fillStyle = isLight ? 'rgba(255,255,255,0.95)' : 'rgba(28,27,26,0.95)';
+    ctx.fillRect(-metrics.width/2 - 10, -15, metrics.width + 20, 30);
+    ctx.strokeStyle = '#ff3b30';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-metrics.width/2 - 10, -15, metrics.width + 20, 30);
+
+    ctx.fillStyle = isLight ? '#000000' : '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(labelText, 0, 0);
+    ctx.restore();
+    ctx.restore();
+  }
+
+  if(!profileData) lastAnnotationsMap = [];
+
+  finalGeo.annotations.forEach(ann => {
+    ctx.save();
+    const textX = ann.midX !== undefined ? ann.midX + offsetX - (w/2) : ann.x + offsetX - (w/2);
+    const textY = ann.midY !== undefined ? ann.midY + offsetY - (h/2) : ann.y + offsetY - (h/2) - 22;
+
+    if(!profileData) {
+      const clientRect = canvas.getBoundingClientRect();
+      const scaleFactorX = clientRect.width / canvas.width;
+      const scaleFactorY = clientRect.height / canvas.height;
+      
+      const screenClientX = clientRect.left + (w/2 + (textX)) * scaleFactorX;
+      const screenClientY = clientRect.top + (h/2 + (textY)) * scaleFactorY;
+      
+      lastAnnotationsMap.push({
+        segmentIndex: ann.segmentIndex,
+        x: screenClientX,
+        y: screenClientY,
+        type: ann.type
+      });
+    }
+
+    if(ann.type === 'dim'){
+      if (ann.startX !== undefined && ann.nx !== undefined) {
+        ctx.strokeStyle = isLight ? 'rgba(0,0,0,0.3)' : 'rgba(255,206,0,0.3)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+
+        const sX = ann.startX + offsetX - (w/2);
+        const sY = ann.startY + offsetY - (h/2);
+        const eX = ann.endX + offsetX - (w/2);
+        const eY = ann.endY + offsetY - (h/2);
+
+        const offDist = ann.offsetDist;
+        const osX = sX + ann.nx * offDist;
+        const osY = sY + ann.ny * offDist;
+        const oeX = eX + ann.nx * offDist;
+        const oeY = eY + ann.ny * offDist;
+
+        ctx.beginPath();
+        ctx.moveTo(sX, sY);
+        ctx.lineTo(osX, osY);
+        ctx.moveTo(eX, eY);
+        ctx.lineTo(oeX, oeY);
+        ctx.moveTo(osX, osY);
+        ctx.lineTo(oeX, oeY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      ctx.translate(textX, textY);
+      ctx.rotate((textCorrectionAngle * Math.PI) / 180);
+
+      ctx.font = 'bold 18px "JetBrains Mono"';
+      const metrics = ctx.measureText(ann.text);
+      ctx.fillStyle = isLight ? 'rgba(255, 255, 255, 0.95)' : 'rgba(28, 27, 26, 0.90)';
+      ctx.fillRect(-metrics.width/2 - 6, -14, metrics.width + 12, 28);
+      ctx.strokeStyle = isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,206,0,0.2)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(-metrics.width/2 - 6, -14, metrics.width + 12, 28);
+
+      ctx.fillStyle = isLight ? '#000000' : '#eeece7';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(ann.text, 0, 0);
+    } else if(ann.type === 'angle'){
+      const ax = ann.x + offsetX - (w/2);
+      const ay = ann.y + offsetY - (h/2);
+      
+      ctx.fillStyle = isLight ? '#d97706' : '#ffce00';
+      ctx.beginPath();
+      ctx.arc(ax, ay, 7, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.translate(textX, textY);
+      ctx.rotate((textCorrectionAngle * Math.PI) / 180);
+
+      ctx.font = 'bold 18px "JetBrains Mono"';
+      const metrics = ctx.measureText(ann.text);
+      ctx.fillStyle = isLight ? 'rgba(255, 255, 255, 0.9)' : 'rgba(28, 27, 26, 0.85)';
+      ctx.fillRect(-metrics.width/2 - 6, -13, metrics.width + 12, 26);
+
+      ctx.fillStyle = isLight ? '#000000' : '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(ann.text, 0, 0);
+    }
+    ctx.restore();
+  });
+
+  ctx.restore();
+}
+
+const profileCanvas = document.getElementById('profileCanvas');
+
+let activeCanvasEl = profileCanvas;
+let activeRedraw = () => redrawProfile();
+
+function bindCanvasInteractions(canvas, redrawFn){
+  canvas.addEventListener('click', (e) => {
+    if (isPanning) return;
+    const clickX = e.clientX;
+    const clickY = e.clientY;
+
+    const found = lastAnnotationsMap.find(ann => Math.hypot(ann.x - clickX, ann.y - clickY) < 25);
+    if (found) {
+      const seg = segments[found.segmentIndex];
+      if (!seg) return;
+
+      let currentVal = seg.type === 'straight' ? seg.len : (seg.type === 'bend' ? seg.angle : (seg.type === 'arc' ? seg.radius : seg.diam));
+
+      let existingInput = document.getElementById('active-inline-input');
+      if (existingInput) existingInput.remove();
+
+      let input = document.createElement('input');
+      input.id = 'active-inline-input';
+      input.type = 'number';
+      input.value = currentVal;
+      input.style.position = 'fixed';
+      input.style.left = `${clickX - 40}px`;
+      input.style.top = `${clickY - 15}px`;
+      input.style.width = '80px';
+      input.style.zIndex = '9999';
+      input.style.background = 'var(--panel)';
+      input.style.border = '2px solid var(--accent)';
+      input.style.color = 'var(--text)';
+      input.style.fontFamily = 'JetBrains Mono, monospace';
+      input.style.fontSize = '14px';
+      input.style.padding = '4px';
+      input.style.borderRadius = '4px';
+      input.style.textAlign = 'center';
+
+      document.body.appendChild(input);
+      input.focus();
+      input.select();
+
+      const saveVal = () => {
+        const newVal = Number(input.value);
+        if (!isNaN(newVal) && newVal > 0) {
+          if (seg.type === 'straight') seg.len = newVal;
+          else if (seg.type === 'bend') seg.angle = newVal;
+          else if (seg.type === 'arc') seg.radius = newVal;
+          else if (seg.type === 'boudin') seg.diam = newVal;
+          renderSegments();
+          redrawProfile();
+          if (redrawFn !== redrawProfile) redrawFn();
+        }
+        input.remove();
+      };
+
+      input.addEventListener('blur', saveVal);
+      input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') saveVal();
+        if (ev.key === 'Escape') input.remove();
+      });
+    }
+  });
+
+  canvas.addEventListener('mousedown', (e) => {
+    activeCanvasEl = canvas;
+    activeRedraw = redrawFn;
+    if (e.shiftKey) {
+      isDrawingArrow = true;
+      const rect = canvas.getBoundingClientRect();
+      arrowStartPoint = {
+        x: (e.clientX - rect.left) * (canvas.width / rect.width),
+        y: (e.clientY - rect.top) * (canvas.height / rect.height)
+      };
+      return;
+    }
+    if (e.button === 0) {
+      isPanning = true;
+      panStart = { x: e.clientX - canvasPanX, y: e.clientY - canvasPanY };
+    }
+  });
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const zoomFactor = 1.1;
+    if (e.deltaY < 0) {
+      canvasZoom *= zoomFactor;
+    } else {
+      canvasZoom /= zoomFactor;
+    }
+    canvasZoom = Math.max(0.2, Math.min(10, canvasZoom));
+    redrawFn();
+  }, { passive: false });
+}
+
+window.addEventListener('mousemove', (e) => {
+  if (isPanning) {
+    canvasPanX = e.clientX - panStart.x;
+    canvasPanY = e.clientY - panStart.y;
+    if (activeRedraw) activeRedraw();
+  }
+});
+
+window.addEventListener('mouseup', (e) => {
+  isPanning = false;
+  if (isDrawingArrow) {
+    isDrawingArrow = false;
+    const rect = activeCanvasEl.getBoundingClientRect();
+    const endX = (e.clientX - rect.left) * (activeCanvasEl.width / rect.width);
+    const endY = (e.clientY - rect.top) * (activeCanvasEl.height / rect.height);
+
+    customArrowData = {
+      x1: arrowStartPoint.x,
+      y1: arrowStartPoint.y,
+      x2: endX,
+      y2: endY
+    };
+    showToast('Flèche RAL personnalisée tracée !');
+    if (activeRedraw) activeRedraw();
+  }
+});
+
+bindCanvasInteractions(profileCanvas, redrawProfile);
+
+const rotateDegInput = document.getElementById('rotateDegInput');
+
+document.getElementById('rotateIconBtn').addEventListener('click', () => {
+  currentProfileRotation = (currentProfileRotation + 90) % 360;
+  rotateDegInput.value = currentProfileRotation;
+  syncFsRotateInput();
+  redrawProfile();
+});
+
+rotateDegInput.addEventListener('input', e => {
+  let deg = Number(e.target.value);
+  if (isNaN(deg)) deg = 0;
+  deg = ((deg % 360) + 360) % 360;
+  currentProfileRotation = deg;
+  syncFsRotateInput();
+  redrawProfile();
+});
+rotateDegInput.addEventListener('blur', e => {
+  e.target.value = currentProfileRotation;
+});
+
+function syncFsRotateInput(){
+  const fsInput = document.getElementById('fsRotateDegInput');
+  if (fsInput) fsInput.value = currentProfileRotation;
+}
+
+function redrawProfile(){
+  drawProfileOnCanvas(profileCanvas, false);
+  const dev = getDevelopTotal();
+  document.getElementById('developValue').textContent = `${dev} mm`;
+  document.getElementById('lengthValue').textContent = `${document.getElementById('pieceLength').value} mm`;
+  document.getElementById('qtyValue').textContent = document.getElementById('pieceQty').value;
+  if (is3DInitialized) update3DModel();
+}
+
+['pieceLength', 'pieceQty', 'profileThickness', 'profileColor'].forEach(id => {
+  document.getElementById(id).addEventListener('input', redrawProfile);
+});
+
+document.getElementById('saveProfileBtn').addEventListener('click', () => {
+  if(!segments.length) {
+    showToast('Le profil est vide.');
+    return;
+  }
+  const name = document.getElementById('profileName').value || 'Schéma pliage';
+  const dev = getDevelopTotal();
+  const len = document.getElementById('pieceLength').value;
+  const qty = document.getElementById('pieceQty').value;
+  const mat = document.getElementById('profileMaterial').value;
+  const th = document.getElementById('profileThickness').value;
+  const color = document.getElementById('profileColor').value;
+
+  savedProfiles.push({
+    id: Date.now(),
+    name, dev, len, qty, mat, th, color,
+    rotation: currentProfileRotation,
+    customArrow: customArrowData,
+    segments: JSON.parse(JSON.stringify(segments))
+  });
+  saveProfilesToLocalStorage();
+  renderSavedProfiles();
+  showToast('Schéma enregistré avec succès !');
+});
+
+document.getElementById('addToDebitBtn').addEventListener('click', () => {
+  const name = document.getElementById('profileName').value || 'Profil plié';
+  const len = Number(document.getElementById('pieceLength').value) || 2000;
+  const dev = getDevelopTotal();
+  const qty = Number(document.getElementById('pieceQty').value) || 1;
+
+  if(dev <= 0) {
+    showToast('Dé Développé invalide.');
+    return;
+  }
+  addCut(dev, len, qty, name, null);
+  showToast(`Pièce "${name}" ajoutée au plan de débit (${dev} x ${len} mm).`);
+});
+
+function renderSavedProfiles(){
+  const list = document.getElementById('savedProfilesList');
+  list.innerHTML = '';
+  document.getElementById('savedCount').textContent = savedProfiles.length;
+
+  if(!savedProfiles.length){
+    list.innerHTML = `<div class="empty-note" style="padding:15px;">Aucun schéma conservé en mémoire pour l'instant.</div>`;
+    return;
+  }
+
+  savedProfiles.forEach((p) => {
+    const card = document.createElement('div');
+    card.className = 'profile-card';
+    card.innerHTML = `
+      <div class="profile-card-info" data-load="${p.id}">
+        <div class="profile-card-name">${p.name}</div>
+        <div class="profile-card-meta">Dev: ${p.dev} mm · ${p.mat} ${p.th}mm · Qté: ${p.qty} ${p.color ? '· RAL '+p.color : ''}</div>
+      </div>
+      <div class="profile-card-actions">
+        <button class="icon-action-btn load-btn" data-id="${p.id}" title="Charger">📂</button>
+        <button class="icon-action-btn rm-profile-btn" data-id="${p.id}" title="Supprimer">✕</button>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+
+  list.querySelectorAll('.load-btn, .profile-card-info').forEach(el => {
+    el.addEventListener('click', () => {
+      const id = Number(el.dataset.id || el.parentElement.querySelector('.load-btn').dataset.id);
+      const p = savedProfiles.find(x => x.id === id);
+      if(p){
+        document.getElementById('profileName').value = p.name;
+        document.getElementById('pieceLength').value = p.len;
+        document.getElementById('pieceQty').value = p.qty;
+        document.getElementById('profileMaterial').value = p.mat;
+        document.getElementById('profileThickness').value = p.th;
+        document.getElementById('profileColor').value = p.color || '';
+        currentProfileRotation = p.rotation || 0;
+        document.getElementById('rotateDegInput').value = currentProfileRotation;
+        customArrowData = p.customArrow || null;
+        segments = JSON.parse(JSON.stringify(p.segments));
+        renderSegments();
+        redrawProfile();
+        showToast(`Schéma "${p.name}" chargé !`);
+      }
+    });
+  });
+
+  list.querySelectorAll('.rm-profile-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const id = Number(e.target.dataset.id);
+      savedProfiles = savedProfiles.filter(x => x.id !== id);
+      saveProfilesToLocalStorage();
+      renderSavedProfiles();
+      showToast('Schéma supprimé.');
+    });
+  });
+}
+
+renderSavedProfiles();
+
+document.getElementById('exportJsonBtn').addEventListener('click', () => {
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(savedProfiles, null, 2));
+  const dlAnchor = document.createElement('a');
+  dlAnchor.setAttribute("href", dataStr);
+  dlAnchor.setAttribute("download", "schemas_pliage_altema.json");
+  document.body.appendChild(dlAnchor);
+  dlAnchor.click();
+  dlAnchor.remove();
+  showToast('Export JSON réussi !');
+});
+
+document.getElementById('importJsonFile').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    try {
+      const imported = JSON.parse(evt.target.result);
+      if(Array.isArray(imported)) {
+        savedProfiles = imported;
+        saveProfilesToLocalStorage();
+        renderSavedProfiles();
+        showToast('Import JSON réussi !');
+      } else {
+        showToast('Format JSON invalide.');
+      }
+    } catch(err) {
+      showToast('Erreur lors de la lecture du fichier JSON.');
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+});
+
+// Plein écran 2D
+const fsOverlay = document.getElementById('fsOverlay');
+const fsCanvas = document.getElementById('fsCanvas');
+const fsRotateDegInput = document.getElementById('fsRotateDegInput');
+
+function redrawFsProfile(){
+  drawProfileOnCanvas(fsCanvas, true);
+  renderFsSequenceTable();
+}
+
+function renderFsSequenceTable(){
+  const seqTable = document.getElementById('fsSequenceTable');
+  seqTable.innerHTML = '';
+  segments.forEach((s, idx) => {
+    const div = document.createElement('div');
+    div.style.padding = '4px 0';
+    div.style.borderBottom = '1px solid var(--line)';
+    let hemLabel = '';
+    if (s.type === 'bend' && s.angle == 180 && s.hemType && s.hemType !== 'aucun') {
+      hemLabel = s.hemType === 'ferme' ? ' · Ourlet fermé' : ` · Ourlet ouvert (T${s.hemGap||6})`;
+    }
+    div.textContent = `#${idx+1} : ${s.type.toUpperCase()} ${s.len ? s.len+'mm' : ''} ${s.angle ? s.angle+'°' : ''} ${s.radius ? 'R'+s.radius : ''} ${s.diam ? '⌀'+s.diam : ''}${hemLabel}`;
+    seqTable.appendChild(div);
+  });
+}
+
+bindCanvasInteractions(fsCanvas, redrawFsProfile);
+
+document.getElementById('fsOpenBtn').addEventListener('click', () => {
+  fsOverlay.classList.add('show');
+  document.getElementById('fsProfileTitle').textContent = document.getElementById('profileName').value || 'Schéma pliage';
+  fsRotateDegInput.value = currentProfileRotation;
+  renderFsSequenceTable();
+  activeCanvasEl = fsCanvas;
+  activeRedraw = redrawFsProfile;
+
+  setTimeout(() => drawProfileOnCanvas(fsCanvas, true), 50);
+});
+
+document.getElementById('fsRotate90Btn').addEventListener('click', () => {
+  currentProfileRotation = (currentProfileRotation + 90) % 360;
+  fsRotateDegInput.value = currentProfileRotation;
+  rotateDegInput.value = currentProfileRotation;
+  redrawFsProfile();
+});
+
+fsRotateDegInput.addEventListener('input', e => {
+  let deg = Number(e.target.value);
+  if (isNaN(deg)) deg = 0;
+  deg = ((deg % 360) + 360) % 360;
+  currentProfileRotation = deg;
+  rotateDegInput.value = deg;
+  redrawFsProfile();
+});
+fsRotateDegInput.addEventListener('blur', e => {
+  e.target.value = currentProfileRotation;
+});
+
+document.getElementById('fsResetViewBtn').addEventListener('click', () => {
+  canvasZoom = 1.0;
+  canvasPanX = 0;
+  canvasPanY = 0;
+  redrawFsProfile();
+});
+
+document.getElementById('fsCloseBtn').addEventListener('click', () => {
+  fsOverlay.classList.remove('show');
+  activeCanvasEl = profileCanvas;
+  activeRedraw = redrawProfile;
+  redrawProfile();
+});
+
+// Plein écran 3D
+const fs3dOverlay = document.getElementById('fs3dOverlay');
+document.getElementById('fs3dOpenBtn').addEventListener('click', () => {
+  fs3dOverlay.classList.add('show');
+  const container3D = document.getElementById('canvas3dContainer');
+  const fsContainer = document.getElementById('fs3dContainer');
+  if(renderer3D && container3D) {
+    fsContainer.appendChild(renderer3D.domElement);
+    renderer3D.setSize(fsContainer.clientWidth, fsContainer.clientHeight);
+    camera3D.aspect = fsContainer.clientWidth / fsContainer.clientHeight;
+    camera3D.updateProjectionMatrix();
+    renderer3D.render(scene3D, camera3D);
+  }
+});
+
+document.getElementById('fs3dCloseBtn').addEventListener('click', () => {
+  fs3dOverlay.classList.remove('show');
+  const container3D = document.getElementById('canvas3dContainer');
+  if(renderer3D && container3D) {
+    container3D.appendChild(renderer3D.domElement);
+    renderer3D.setSize(container3D.clientWidth, container3D.clientHeight);
+    camera3D.aspect = container3D.clientWidth / container3D.clientHeight;
+    camera3D.updateProjectionMatrix();
+    renderer3D.render(scene3D, camera3D);
+  }
+});
+
+// Impression unique profil
+document.getElementById('printSingleProfileBtn').addEventListener('click', () => {
+  const printArea = document.getElementById('printArea');
+  const nomProfil = document.getElementById('profileName').value || 'Schéma pliage';
+  const dev = getDevelopTotal();
+  const len = document.getElementById('pieceLength').value;
+  const qty = document.getElementById('pieceQty').value;
+  const mat = document.getElementById('profileMaterial').value;
+  const th = document.getElementById('profileThickness').value;
+  const color = document.getElementById('profileColor').value;
+
+  const printCanvas = document.createElement('canvas');
+  printCanvas.width = 1400;
+  printCanvas.height = 700;
+  drawProfileOnCanvas(printCanvas, true);
+  const dataUrl = printCanvas.toDataURL('image/png');
+
+  printArea.innerHTML = `
+    <div class="print-header">
+      <div class="print-title">ALFEMA • Fiche Technique de Pliage</div>
+      <div style="font-size:12px;">Date : ${new Date().toLocaleDateString()}</div>
+    </div>
+    <div class="recap-block">
+      <h3>${nomProfil}</h3>
+      <table class="recap-table">
+        <tr>
+          <th>Matière</th><th>Épaisseur</th><th>Développé à plat</th><th>Longueur</th><th>Quantité</th><th>Thermolaquage RAL</th>
+        </tr>
+        <tr>
+          <td><b>${mat}</b></td><td>${th} mm</td><td><b>${dev} mm</b></td><td>${len} mm</td><td>${qty}</td><td>${color ? 'RAL ' + color : 'Brut'}</td>
+        </tr>
+      </table>
+    </div>
+    <div class="print-section-title">Schéma coté & Repérage pliage</div>
+    <img src="${dataUrl}" class="print-sheet-img">
+  `;
+  window.print();
+});
+
+// Impression globale
+document.getElementById('printCombinedBtn').addEventListener('click', () => {
+  if (!lastPackedResult || !lastPackedResult.sheets.length) {
+    showToast('Veuillez d\'abord lancer le calcul du plan de débit.');
+    return;
+  }
+  const printArea = document.getElementById('printArea');
+  let html = `
+    <div class="print-header">
+      <div class="print-title">ALFEMA • Dossier Complet Débit & Schémas</div>
+      <div style="font-size:12px;">Date : ${new Date().toLocaleDateString()}</div>
+    </div>
+  `;
+
+  const recapTableNode = document.querySelector('.recap-block');
+  if (recapTableNode) {
+    html += `<div class="print-section-title">Récapitulatif Global de Débit</div>`;
+    html += recapTableNode.outerHTML;
+  }
+
+  lastPackedResult.sheets.forEach((s, idx) => {
+    const tempCanvas = document.createElement('canvas');
+    drawSheetCanvas(tempCanvas, s, lastPackedResult.sW, lastPackedResult.sH, true);
+    const imgUrl = tempCanvas.toDataURL('image/png');
+
+    html += `
+      <div class="print-sheet-block">
+        <div class="print-section-title">Plan de découpe — Tôle ${idx + 1} (${lastPackedResult.sW} x ${lastPackedResult.sH} mm)</div>
+        <img src="${imgUrl}" class="print-sheet-img">
+      </div>
+    `;
+  });
+
+  printArea.innerHTML = html;
+  window.print();
+});
+
+document.getElementById('printAllProfilesBtn').addEventListener('click', () => {
+  if (!savedProfiles.length) {
+    showToast('Aucun schéma enregistré.');
+    return;
+  }
+  const printArea = document.getElementById('printArea');
+  let html = `
+    <div class="print-header">
+      <div class="print-title">ALFEMA • Dossier des Schémas de Pliage Enregistrés</div>
+      <div style="font-size:12px;">Date : ${new Date().toLocaleDateString()}</div>
+    </div>
+  `;
+
+  savedProfiles.forEach((p, idx) => {
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = 1400;
+    tempCanvas.height = 700;
+    drawProfileOnCanvas(tempCanvas, true, p);
+    const dataUrl = tempCanvas.toDataURL('image/png');
+
+    html += `
+      <div class="print-sheet-block" style="page-break-before:always;">
+        <div class="recap-block">
+          <h3>${idx + 1}. ${p.name}</h3>
+          <table class="recap-table">
+            <tr><th>Matière</th><th>Épaisseur</th><th>Développé</th><th>Longueur</th><th>Qté</th><th>RAL</th></tr>
+            <tr><td><b>${p.mat}</b></td><td>${p.th} mm</td><td><b>${p.dev} mm</b></td><td>${p.len} mm</td><td>${p.qty}</td><td>${p.color ? 'RAL ' + p.color : 'Brut'}</td></tr>
+          </table>
+        </div>
+        <img src="${dataUrl}" class="print-sheet-img">
+      </div>
+    `;
+  });
+
+  printArea.innerHTML = html;
+  window.print();
+});
+
+
+/* ===== Guide interactif de prise en main ===== */
+(function initInteractiveTutorial(){
+  const overlay = document.getElementById('tutorialOverlay');
+  if(!overlay) return;
+  const spot = document.getElementById('tutorialSpotlight');
+  const card = document.getElementById('tutorialCard');
+  const kicker = document.getElementById('tutorialKicker');
+  const title = document.getElementById('tutorialTitle');
+  const text = document.getElementById('tutorialText');
+  const hint = document.getElementById('tutorialHint');
+  const progress = document.getElementById('tutorialProgress');
+  const next = document.getElementById('tutorialNextBtn');
+  const prev = document.getElementById('tutorialPrevBtn');
+  const skip = document.getElementById('tutorialSkipBtn');
+  const close = document.getElementById('tutorialCloseBtn');
+
+  // Chaque étape pointe volontairement vers la zone qui correspond à son titre,
+  // plutôt que vers un élément voisin. Pour les champs, on encadre leur bloc complet.
+  const steps = [
+    { getTarget:()=>document.getElementById('profileName')?.closest('.field') || document.getElementById('profileName'), title:'Nommer la pièce', text:'Donne un nom clair au profil. Il sera repris dans les schémas enregistrés et les impressions.', hint:'Ici : Nom du schéma' },
+    { getTarget:()=>document.getElementById('segList')?.closest('.panel'), title:'Construire le profil', text:'Ajoute les éléments avec Droit, Pli, Arrondi ou Boudin. Cette zone contient toute la séquence de fabrication.', hint:'Ici : Séquence du profil' },
+    { getTarget:()=>document.getElementById('profileMaterial')?.closest('.sheet-fields'), title:'Choisir matière et épaisseur', text:'Choisis la matière et l’épaisseur de la tôle. Les deux champs sont regroupés et mis en évidence ensemble.', hint:'Ici : Matière + Épaisseur' },
+    { getTarget:()=>document.getElementById('profileCanvasWrap'), title:'Contrôler le schéma 2D', text:'Vérifie les longueurs, angles et rayons directement sur le dessin. Les cotes permettent de contrôler la géométrie.', hint:'Ici : Schéma 2D' },
+    { getTarget:()=>document.getElementById('canvas3dContainer'), title:'Manipuler la 3D', text:'Clic gauche + glisser : rotation. Clic droit ou Shift : déplacement. Molette : zoom. Double-clic : recentrage.', hint:'Ici : Vue 3D' },
+    { getTarget:()=>document.getElementById('fs3dOpenBtn'), title:'Ouvrir le plein écran 3D', text:'Passe la visualisation 3D en plein écran pour travailler plus confortablement. Les commandes restent identiques.', hint:'Ici : Plein écran 3D' },
+    { getTarget:()=>document.getElementById('saveProfileBtn'), title:'Enregistrer le schéma', text:'Enregistre le profil pour le conserver en mémoire et le retrouver ensuite dans tes schémas.', hint:'Ici : Enregistrer ce schéma' }
+  ];
+  let index = 0;
+
+  progress.innerHTML='';
+  steps.forEach((_,i)=>{
+    const d=document.createElement('span');
+    d.className='tutorial-dot';
+    d.dataset.i=i;
+    progress.appendChild(d);
+  });
+
+  function closeTutorial(){
+    overlay.classList.remove('show');
+    overlay.setAttribute('aria-hidden','true');
+    document.body.style.overflow='';
+    document.querySelectorAll('.tutorial-active-target').forEach(el=>el.classList.remove('tutorial-active-target'));
+  }
+
+  function placeCard(rect){
+    const margin=16;
+    const gap=18;
+    const cw=Math.min(390, window.innerWidth-margin*2);
+    const ch=card.offsetHeight || 245;
+    let left;
+    let top;
+
+    // On choisit le côté avec le plus de place, puis on contraint toujours
+    // la carte à rester entièrement dans la fenêtre.
+    const roomRight=window.innerWidth-rect.right-margin;
+    const roomLeft=rect.left-margin;
+    if(roomRight >= cw+gap) left=rect.right+gap;
+    else if(roomLeft >= cw+gap) left=rect.left-cw-gap;
+    else left=Math.max(margin,(window.innerWidth-cw)/2);
+
+    top=Math.max(margin, Math.min(rect.top, window.innerHeight-ch-margin));
+    card.style.width=cw+'px';
+    card.style.left=Math.round(left)+'px';
+    card.style.top=Math.round(top)+'px';
+    card.style.transform='none';
+  }
+
+  function positionSpot(rect){
+    const pad=7;
+    spot.style.display='block';
+    spot.style.left=Math.round(rect.left-pad)+'px';
+    spot.style.top=Math.round(rect.top-pad)+'px';
+    spot.style.width=Math.round(rect.width+pad*2)+'px';
+    spot.style.height=Math.round(rect.height+pad*2)+'px';
+  }
+
+  function renderStep(){
+    const st=steps[index];
+    const el=st.getTarget();
+    kicker.textContent=`Étape ${index+1} / ${steps.length}`;
+    title.textContent=st.title;
+    text.textContent=st.text;
+    hint.textContent=st.hint;
+    prev.disabled=index===0;
+    prev.style.opacity=index===0?.45:1;
+    next.textContent=index===steps.length-1?'Terminer':'Suivant';
+    progress.querySelectorAll('.tutorial-dot').forEach((d,i)=>d.classList.toggle('active',i<=index));
+    document.querySelectorAll('.tutorial-active-target').forEach(x=>x.classList.remove('tutorial-active-target'));
+
+    if(!el){
+      spot.style.display='none';
+      card.style.left='50%';
+      card.style.top='50%';
+      card.style.transform='translate(-50%,-50%)';
+      return;
+    }
+
+    el.classList.add('tutorial-active-target');
+
+    // Important : on attend réellement la fin du scroll avant de calculer
+    // le rectangle. Cela supprime le décalage observé entre l'étape et sa case.
+    el.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});
+    requestAnimationFrame(()=>{
+      setTimeout(()=>{
+        const r=el.getBoundingClientRect();
+        positionSpot(r);
+        placeCard(r);
+      },280);
+    });
+  }
+
+  function openTutorial(start=0){
+    index=Math.max(0,Math.min(start,steps.length-1));
+    overlay.classList.add('show');
+    overlay.setAttribute('aria-hidden','false');
+    document.body.style.overflow='hidden';
+    renderStep();
+  }
+
+  document.getElementById('openTutorialBtn')?.addEventListener('click',()=>openTutorial(0));
+  close.addEventListener('click',closeTutorial);
+  skip.addEventListener('click',closeTutorial);
+  prev.addEventListener('click',()=>{if(index>0){index--;renderStep();}});
+  next.addEventListener('click',()=>{if(index<steps.length-1){index++;renderStep();}else closeTutorial();});
+  overlay.addEventListener('click',e=>{if(e.target===overlay || e.target.classList.contains('tutorial-shade')) closeTutorial();});
+  document.addEventListener('keydown',e=>{
+    if(!overlay.classList.contains('show')) return;
+    if(e.key==='Escape') closeTutorial();
+    if(e.key==='ArrowRight') next.click();
+    if(e.key==='ArrowLeft') prev.click();
+  });
+  window.addEventListener('resize',()=>{if(overlay.classList.contains('show')) renderStep();});
+})();
+
+</script>
+</body>
+</html>
