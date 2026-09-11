@@ -794,6 +794,43 @@
       page-break-after: avoid !important;
       break-after: avoid !important;
     }
+    .biais-piece-block {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      border: 1px solid #000000 !important;
+      margin-bottom: 12px !important;
+      padding: 8px !important;
+      width: 100% !important;
+    }
+    .biais-piece-title {
+      font-family: 'Oswald', sans-serif !important;
+      font-size: 12.5px !important;
+      font-weight: 700 !important;
+      color: #000000 !important;
+      margin-bottom: 6px !important;
+    }
+    .biais-piece-imgs {
+      display: flex !important;
+      gap: 10px !important;
+      width: 100% !important;
+    }
+    .biais-piece-col {
+      flex: 1 1 50% !important;
+      text-align: center !important;
+    }
+    .biais-piece-col img {
+      width: 100% !important;
+      max-height: 85mm !important;
+      object-fit: contain !important;
+      border: 1px solid #000000 !important;
+      background: #ffffff !important;
+    }
+    .biais-piece-col .biais-piece-caption {
+      font-size: 10.5px !important;
+      color: #000000 !important;
+      margin-top: 4px !important;
+      line-height: 1.4 !important;
+    }
   }
 
   /* ===== Guide interactif ===== */
@@ -822,6 +859,24 @@
   input.tutorial-active-target,.tutorial-active-target input,.tutorial-active-target select{box-shadow:0 0 0 2px var(--accent),0 0 18px rgba(255,255,255,.20)!important;}
   @media(max-width:700px){.tutorial-card{width:calc(100vw - 20px);left:10px!important;top:auto!important;bottom:10px!important}.tutorial-spotlight{border-radius:8px;}}
 
+  /* ===================== SCHÉMA BIAIS ===================== */
+  .male-toggle button.active{background:var(--accent);color:#1c1b1a;}
+  .biais-sub-panel{background:var(--panel2);border:1px solid var(--line-soft);border-radius:10px;padding:16px 16px 18px;margin-top:14px;}
+  .biais-hint{font-size:11px;color:var(--text-dim);line-height:1.5;margin:-4px 0 12px;}
+  .biais-schema-wrap{margin-top:14px;background:#f4f2ee;border:1px solid var(--line-soft);border-radius:8px;padding:10px;}
+  .biais-schema-wrap svg{width:100%;height:auto;display:block;}
+  .jeu-override-row{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;}
+  .jeu-override-row label{font-size:11.5px;color:var(--text-dim);margin:0;}
+  .jeu-override-row input[type=checkbox]{width:15px;height:15px;accent-color:var(--accent);}
+  .jeu-override-row input[type=number]{width:80px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;padding:7px 9px;}
+  .seg-summary-line{font-size:11.5px;color:var(--text-dim);margin:8px 0 10px;}
+  .biais-seg-table{width:100%;border-collapse:collapse;font-size:11.5px;}
+  .biais-seg-table th{text-align:left;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;font-size:9.5px;padding:6px 8px;border-bottom:1px solid var(--line);}
+  .biais-seg-table td{padding:7px 8px;border-bottom:1px solid var(--line-soft);color:var(--text);vertical-align:top;}
+  .biais-seg-table tr:last-child td{border-bottom:none;}
+  .dev-mini{color:var(--text-dim);font-family:'JetBrains Mono',monospace;font-size:10.5px;}
+  .badge-male{color:var(--accent);}
+  .badge-femelle{color:var(--cyan);}
 </style>
 </head>
 <body>
@@ -981,6 +1036,84 @@
           <button class="print-btn" id="addToDebitBtn" style="margin-top:10px;">
             Ajouter cette pièce au débit
           </button>
+        </div>
+
+        <div class="panel" id="biaisPanel">
+          <div class="panel-title">
+            <span>Schéma biais</span>
+          </div>
+          <div class="toggle-row" style="margin-top:0;">
+            <input type="checkbox" id="biaisEnabled">
+            <span>Activer le schéma biais (pièce qui passe progressivement d'un profil Gauche à un profil Droite)</span>
+          </div>
+
+          <div id="biaisBody" style="display:none;">
+
+            <div class="biais-hint">Dessine le profil <b>Gauche</b> puis le profil <b>Droite</b> avec les mêmes outils que ci-dessus (Séquence du profil). Les deux profils doivent avoir le même nombre de segments, les mêmes types et les mêmes angles/sens de pli — seules les longueurs, rayons et diamètres peuvent différer. Le logiciel interpole progressivement de l'un vers l'autre sur la longueur de la pièce.</div>
+
+            <div class="dir-toggle male-toggle" id="biaisSideToggle" style="margin-bottom:10px;">
+              <button type="button" class="active" data-side="gauche">✎ Éditer le profil Gauche</button>
+              <button type="button" data-side="droite">✎ Éditer le profil Droite</button>
+            </div>
+            <button class="add-btn" id="biaisCopyGDBtn" type="button" style="margin-bottom:10px;">Copier Gauche → Droite (pour repartir de la même structure)</button>
+            <button class="add-btn" id="biaisFitViewBtn" type="button" style="margin-bottom:10px;">🔍 Cadrer la vue 3D sur la pièce entière</button>
+
+            <div class="error-box" id="biaisValidBox" style="display:block;"></div>
+            <div class="biais-hint" id="biaisGDReadout" style="font-weight:700;"></div>
+
+            <div class="sheet-fields">
+              <div class="field">
+                <label>Sens d'écoulement (mâle / femelle)</label>
+                <button type="button" class="add-btn" id="biaisSensInvertBtn" data-sens="gd" style="width:100%;text-align:center;">
+                  Gauche (femelle) → Droite (mâle)  🔄 cliquer pour inverser
+                </button>
+              </div>
+              <div class="field">
+                <label>Profondeur d'emboîtement (mm)</label>
+                <input type="number" id="biaisEmboitementProfondeur" value="50" min="0">
+              </div>
+            </div>
+            <div class="biais-hint" id="biaisSensHint" style="margin-top:-4px;"></div>
+
+            <div class="jeu-override-row">
+              <span style="font-size:11.5px;color:var(--text-dim);">Jeu d'emboîtement (auto, selon épaisseur) :</span>
+              <span class="value good" id="biaisJeuValue" style="font-family:'JetBrains Mono',monospace;font-size:13px;">1 mm</span>
+              <input type="checkbox" id="biaisJeuOverrideChk">
+              <label>Forcer un jeu manuel (mm) :</label>
+              <input type="number" id="biaisJeuOverrideVal" value="1" min="0" step="0.1" disabled>
+            </div>
+
+            <div class="sheet-fields" style="margin-top:12px;">
+              <div class="field">
+                <label>Longueur totale (mm, emboîtement compris)</label>
+                <input type="number" id="biaisTotalRaw" value="6150" min="1">
+              </div>
+              <div class="field">
+                <label>Longueur de segment souhaitée (mm)</label>
+                <input type="number" id="biaisSegLenSouhaitee" value="2000" min="100">
+              </div>
+            </div>
+            <div class="sheet-fields">
+              <div class="field">
+                <label>Longueur max autorisée / segment (mm, ≤ 4000)</label>
+                <input type="number" id="biaisMaxSegLen" value="4000" min="500" max="4000">
+              </div>
+            </div>
+            <div class="biais-hint" style="margin-top:-4px;">Contrainte machine/livraison : aucun segment ne dépassera cette longueur (le nombre de pièces est augmenté automatiquement si besoin). 4000 mm = limite machine.</div>
+
+            <div class="develop-summary" id="biaisPlanStats">
+              <div class="stat"><div class="label">Nombre de pièces</div><div class="value accent" id="biaisPlanN">0</div></div>
+              <div class="stat"><div class="label">Longueur réelle / pièce</div><div class="value" id="biaisPlanL">0 mm</div></div>
+              <div class="stat"><div class="label">Portée finie couverte</div><div class="value good" id="biaisPlanFinie">0 mm</div></div>
+            </div>
+
+            <div id="biaisPiecesTableWrap" style="margin-top:12px;overflow-x:auto;"></div>
+
+            <button class="print-btn" id="printBiaisCalpinageBtn" type="button" style="margin-top:12px;">
+              🖨 Imprimer le plan de calpinage des segments
+            </button>
+
+          </div>
         </div>
       </div>
 
@@ -1331,8 +1464,21 @@ function update3DModel() {
 
   if (partMesh3D) {
     scene3D.remove(partMesh3D);
-    if (partMesh3D.geometry) partMesh3D.geometry.dispose();
-    if (partMesh3D.material) partMesh3D.material.dispose();
+    const disposeObj3D = (obj) => {
+      if (obj.geometry) obj.geometry.dispose();
+      if (obj.material) obj.material.dispose();
+      if (obj.children) obj.children.forEach(disposeObj3D);
+    };
+    disposeObj3D(partMesh3D);
+  }
+
+  const biaisChk = document.getElementById('biaisEnabled');
+  if (biaisChk && biaisChk.checked) {
+    partMesh3D = buildBiaisModelGroup();
+    partMesh3D.rotation.set(prevRotation.x, prevRotation.y, prevRotation.z);
+    scene3D.add(partMesh3D);
+    renderer3D.render(scene3D, camera3D);
+    return;
   }
 
   const thickness = parseFloat(document.getElementById('profileThickness').value) || 1.5;
@@ -2876,6 +3022,13 @@ function redrawProfile(){
   document.getElementById('developValue').textContent = `${dev} mm`;
   document.getElementById('lengthValue').textContent = `${document.getElementById('pieceLength').value} mm`;
   document.getElementById('qtyValue').textContent = document.getElementById('pieceQty').value;
+  // Le tableau de calpinage biais doit aussi se rafraîchir à chaque cote tapée
+  // dans "Séquence du profil" (pas seulement la 3D) — sinon il affichait encore
+  // les valeurs d'avant la saisie tant qu'on ne changeait pas d'onglet Gauche/Droite.
+  const biaisChkEl = document.getElementById('biaisEnabled');
+  if (biaisChkEl && biaisChkEl.checked && typeof renderBiaisPiecesTable === 'function') {
+    renderBiaisPiecesTable();
+  }
   if (is3DInitialized) update3DModel();
 }
 
@@ -3152,6 +3305,28 @@ document.getElementById('printSingleProfileBtn').addEventListener('click', () =>
     <div class="print-section-title">Schéma coté & Repérage pliage</div>
     <img src="${dataUrl}" class="print-sheet-img">
   `;
+
+  if (document.getElementById('biaisEnabled').checked) {
+    const canvasG = document.createElement('canvas');
+    canvasG.width = 1400; canvasG.height = 700;
+    drawProfileOnCanvas(canvasG, true, { segments: biaisSegGauche, color: color, rotation: 0, customArrow: null });
+    const canvasD = document.createElement('canvas');
+    canvasD.width = 1400; canvasD.height = 700;
+    drawProfileOnCanvas(canvasD, true, { segments: biaisSegDroite, color: color, rotation: 0, customArrow: null });
+
+    printArea.innerHTML += `
+      <div class="print-sheet-block">
+        <div class="print-section-title">Schéma biais — Profil Gauche (référence)</div>
+        <img src="${canvasG.toDataURL('image/png')}" class="print-sheet-img">
+      </div>
+      <div class="print-sheet-block">
+        <div class="print-section-title">Schéma biais — Profil Droite (référence)</div>
+        <img src="${canvasD.toDataURL('image/png')}" class="print-sheet-img">
+      </div>
+      ${buildBiaisCalpinagePrintHTML()}
+    `;
+  }
+
   window.print();
 });
 
@@ -3232,6 +3407,569 @@ document.getElementById('printAllProfilesBtn').addEventListener('click', () => {
 
 
 /* ===== Guide interactif de prise en main ===== */
+/* ===================== SCHÉMA BIAIS ===================== */
+// Deux profils (Gauche / Droite) sont dessinés par l'utilisateur avec les mêmes
+// outils que "Plan de pliage" (même tableau de segments, structure identique :
+// mêmes types, mêmes angles/sens — seules les longueurs/rayons/diamètres
+// diffèrent). Le logiciel interpole progressivement de l'un vers l'autre sur la
+// longueur totale de la pièce, et découpe le résultat en pièces fabricables.
+
+let biaisSegGauche = [];
+let biaisSegDroite = [];
+let biaisActiveSide = 'gauche';
+
+// Reconstruit la ligne centrale d'un profil à partir d'un tableau de segments
+// donné (identique à la logique de update3DModel), + longueur cumulée (développé)
+// en chaque point.
+function computeCrossSectionPoints(segList = segments){
+  const centerPoints = [{ x: 0, y: 0 }];
+  let curX = 0, curY = 0, curAngle = 90;
+
+  const pushPoint = (x, y) => {
+    const last = centerPoints[centerPoints.length - 1];
+    if (!last || Math.hypot(x - last.x, y - last.y) > 0.0001) {
+      centerPoints.push({ x, y });
+    }
+  };
+
+  segList.forEach(s => {
+    if (s.type === 'straight') {
+      curX += s.len * Math.cos(curAngle * Math.PI / 180);
+      curY += s.len * Math.sin(curAngle * Math.PI / 180);
+      pushPoint(curX, curY);
+    }
+    else if (s.type === 'bend') {
+      curAngle += s.angle * (s.dir || 1);
+    }
+    else if (s.type === 'arc') {
+      const r = Math.max(0.001, Number(s.radius) || 0);
+      const sweep = Number(s.angle) || 0;
+      const dir = s.dir || 1;
+      const startAng = curAngle + (dir === 1 ? -90 : 90);
+      const startRad = startAng * Math.PI / 180;
+      const cx = curX - r * Math.cos(startRad);
+      const cy = curY - r * Math.sin(startRad);
+      const sampleCount = Math.max(8, Math.ceil(Math.abs(sweep) / 4));
+      for (let i = 1; i <= sampleCount; i++) {
+        const t = i / sampleCount;
+        const a = (startAng + sweep * dir * t) * Math.PI / 180;
+        pushPoint(cx + r * Math.cos(a), cy + r * Math.sin(a));
+      }
+      curAngle += sweep * dir;
+      curX = centerPoints[centerPoints.length - 1].x;
+      curY = centerPoints[centerPoints.length - 1].y;
+    }
+    else if (s.type === 'boudin') {
+      const R = Math.max(0.001, (Number(s.diam) || 0) / 2);
+      const dir = s.dir || 1;
+      const isOffset = s.style === 'offset';
+      if (isOffset) {
+        const diagLen = R * 2.5;
+        const diagAngle = curAngle - (35 * dir);
+        curX += diagLen * Math.cos(diagAngle * Math.PI / 180);
+        curY += diagLen * Math.sin(diagAngle * Math.PI / 180);
+        pushPoint(curX, curY);
+        const cx = curX + R * Math.cos((diagAngle + 90 * dir) * Math.PI / 180);
+        const cy = curY + R * Math.sin((diagAngle + 90 * dir) * Math.PI / 180);
+        const totalRad = 1.35 * 2 * Math.PI;
+        const baseAng = Math.atan2(curY - cy, curX - cx);
+        const n = 96;
+        for (let i = 1; i <= n; i++) {
+          const progress = i / n;
+          const currentR = R * (1 - progress * 0.28);
+          const a = baseAng + progress * totalRad * dir;
+          pushPoint(cx + currentR * Math.cos(a), cy + currentR * Math.sin(a));
+        }
+      } else {
+        const boudinAngle = curAngle + 90 * dir;
+        const cx = curX + R * Math.cos(boudinAngle * Math.PI / 180);
+        const cy = curY + R * Math.sin(boudinAngle * Math.PI / 180);
+        const totalRad = 1.35 * 2 * Math.PI;
+        const baseAng = Math.atan2(curY - cy, curX - cx);
+        const n = 96;
+        for (let i = 1; i <= n; i++) {
+          const progress = i / n;
+          const currentR = R * (1 - progress * 0.28);
+          const a = baseAng + progress * totalRad * dir;
+          pushPoint(cx + currentR * Math.cos(a), cy + currentR * Math.sin(a));
+        }
+      }
+    }
+  });
+
+  if (centerPoints.length < 2) pushPoint(100, 0);
+
+  const s = [0];
+  for (let i = 1; i < centerPoints.length; i++) {
+    s.push(s[i - 1] + Math.hypot(centerPoints[i].x - centerPoints[i - 1].x, centerPoints[i].y - centerPoints[i - 1].y));
+  }
+  return { centerPoints, s, devTotal: s[s.length - 1] || 1 };
+}
+
+// Construit une "bande de tôle" 3D conique entre une section GAUCHE (à zLeft) et
+// une section DROITE (à zRight) — les deux doivent avoir le même nombre de points
+// (garanti si les deux profils ont la même structure de segments).
+function buildTaperedStripGeometry(centerLeft, centerRight, thickness, zLeft, zRight){
+  const halfT = Math.max(0.01, thickness / 2);
+  const offsetSet = (centerPoints) => {
+    const outer = [], inner = [];
+    for (let i = 0; i < centerPoints.length; i++) {
+      const p = centerPoints[i];
+      let tx, ty;
+      if (i === 0) { tx = centerPoints[1].x - p.x; ty = centerPoints[1].y - p.y; }
+      else if (i === centerPoints.length - 1) { tx = p.x - centerPoints[i - 1].x; ty = p.y - centerPoints[i - 1].y; }
+      else { tx = centerPoints[i + 1].x - centerPoints[i - 1].x; ty = centerPoints[i + 1].y - centerPoints[i - 1].y; }
+      const tl = Math.hypot(tx, ty) || 1;
+      tx /= tl; ty /= tl;
+      const nx = -ty, ny = tx;
+      outer.push({ x: p.x + nx * halfT, y: p.y + ny * halfT });
+      inner.push({ x: p.x - nx * halfT, y: p.y - ny * halfT });
+    }
+    return { outer, inner };
+  };
+  const L = offsetSet(centerLeft);
+  const R = offsetSet(centerRight);
+  const n = centerLeft.length;
+
+  const verts = [];
+  const pushV = (p, z) => { verts.push(p.x, p.y, z); };
+  for (let i = 0; i < n; i++) pushV(L.outer[i], zLeft);
+  for (let i = 0; i < n; i++) pushV(L.inner[i], zLeft);
+  for (let i = 0; i < n; i++) pushV(R.outer[i], zRight);
+  for (let i = 0; i < n; i++) pushV(R.inner[i], zRight);
+
+  const indices = [];
+  const quad = (a, b, c, d) => { indices.push(a, b, c, a, c, d); };
+  for (let i = 0; i < n - 1; i++) {
+    quad(i, i + 1, n + i + 1, n + i);
+    quad(2*n + i, 3*n + i, 3*n + i + 1, 2*n + i + 1);
+    quad(i, 2*n + i, 2*n + i + 1, i + 1);
+    quad(n + i, n + i + 1, 3*n + i + 1, 3*n + i);
+  }
+  quad(0, n, 3*n, 2*n);
+  quad(n - 1, 2*n - 1, 4*n - 1, 3*n - 1);
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+function createBiaisMaterial(){
+  let matColor = 0x8894a2, metalnessVal = 0.6, roughnessVal = 0.4;
+  const matType = document.getElementById('profileMaterial').value;
+  if (matType === 'Acier') { matColor = 0x94a3b8; metalnessVal = 0.85; roughnessVal = 0.25; }
+  else if (matType === 'Alu') { matColor = 0xf1f5f9; metalnessVal = 0.95; roughnessVal = 0.15; }
+  else if (matType === 'Zinc') { matColor = 0x8291a0; metalnessVal = 0.5; roughnessVal = 0.48; }
+  else if (matType === 'Cuivre') { matColor = 0xf59e0b; metalnessVal = 0.85; roughnessVal = 0.22; }
+  return new THREE.MeshPhysicalMaterial({
+    color: matColor, metalness: metalnessVal, roughness: roughnessVal,
+    clearcoat: 0.22, clearcoatRoughness: 0.16, reflectivity: 0.7, side: THREE.DoubleSide
+  });
+}
+
+// Jeu d'emboîtement lié à l'épaisseur matière (règle par défaut : arrondi au mm
+// supérieur, ex. 0.8 mm -> 1 mm de jeu), modifiable manuellement.
+function computeJeuValue(){
+  const overrideChk = document.getElementById('biaisJeuOverrideChk');
+  if (overrideChk && overrideChk.checked) {
+    return parseFloat(document.getElementById('biaisJeuOverrideVal').value) || 0;
+  }
+  const thickness = parseFloat(document.getElementById('profileThickness').value) || 1.5;
+  return Math.max(1, Math.ceil(thickness));
+}
+
+// Vérifie que les deux profils ont la même structure (nombre de segments, types,
+// angles et sens identiques) — seules les longueurs/rayons/diamètres peuvent varier.
+function biaisValidateStructures(){
+  const a = biaisSegGauche, b = biaisSegDroite;
+  if (!a.length || !b.length) return { ok: false, msg: "Dessine d'abord le profil Gauche et le profil Droite (bouton ci-dessus)." };
+  if (a.length !== b.length) return { ok: false, msg: `Nombre de segments différent (Gauche : ${a.length}, Droite : ${b.length}).` };
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].type !== b[i].type) return { ok: false, msg: `Segment ${i + 1} : type différent entre Gauche (${a[i].type}) et Droite (${b[i].type}).` };
+    if (a[i].type === 'bend' || a[i].type === 'arc') {
+      if (Number(a[i].angle) !== Number(b[i].angle)) return { ok: false, msg: `Segment ${i + 1} : angle différent entre Gauche et Droite (doit être identique — seule la cote change).` };
+      if ((a[i].dir || 1) !== (b[i].dir || 1)) return { ok: false, msg: `Segment ${i + 1} : sens de pli/arrondi différent entre Gauche et Droite.` };
+    }
+    if (a[i].type === 'boudin' && (a[i].style || '') !== (b[i].style || '')) return { ok: false, msg: `Segment ${i + 1} : style de boudin différent entre Gauche et Droite.` };
+  }
+  return { ok: true, msg: 'Profils compatibles — même structure, la cote varie de Gauche à Droite.' };
+}
+
+// Retourne un tableau de segments interpolés à la fraction f (0 = Gauche, 1 = Droite).
+function interpolateSegmentsAt(f){
+  f = Math.max(0, Math.min(1, f));
+  const a = biaisSegGauche, b = biaisSegDroite;
+  return a.map((seg, i) => {
+    const segB = b[i] || seg;
+    const out = Object.assign({}, seg);
+    if (seg.type === 'straight') {
+      out.len = (Number(seg.len) || 0) + f * ((Number(segB.len) || 0) - (Number(seg.len) || 0));
+    } else if (seg.type === 'arc') {
+      out.radius = (Number(seg.radius) || 0) + f * ((Number(segB.radius) || 0) - (Number(seg.radius) || 0));
+    } else if (seg.type === 'boudin') {
+      out.diam = (Number(seg.diam) || 0) + f * ((Number(segB.diam) || 0) - (Number(seg.diam) || 0));
+    }
+    return out;
+  });
+}
+
+function formatSegSummary(segArr){
+  return segArr.map(s => {
+    if (s.type === 'straight') return `Droit ${Math.round(s.len)}mm`;
+    if (s.type === 'bend') return `Pli ${s.angle}°`;
+    if (s.type === 'arc') return `Arrondi R${Math.round(s.radius)}/${s.angle}°`;
+    if (s.type === 'boudin') return `Boudin Ø${Math.round(s.diam)}mm`;
+    return s.type;
+  }).join(' · ');
+}
+
+// Calcule le nombre de pièces et la longueur brute réelle de chacune, à partir de
+// la longueur totale (emboîtement compris), de la longueur de segment souhaitée,
+// et de la longueur max autorisée par segment (contrainte machine/livraison,
+// plafonnée dans tous les cas à 4000 mm).
+function getBiaisMaxSegLen(){
+  let v = parseFloat(document.getElementById('biaisMaxSegLen').value) || 4000;
+  if (v > 4000) { v = 4000; document.getElementById('biaisMaxSegLen').value = 4000; }
+  if (v < 100) { v = 100; document.getElementById('biaisMaxSegLen').value = 100; }
+  return v;
+}
+function computeSegPlan(totalRaw, segLenWanted, maxSegLen = 4000){
+  maxSegLen = Math.min(4000, maxSegLen || 4000);
+  let n = Math.max(1, Math.round(totalRaw / Math.max(1, segLenWanted)));
+  let L = totalRaw / n;
+  let guard = 0;
+  while (L > maxSegLen && guard < 500) { n++; L = totalRaw / n; guard++; }
+  return { n, L };
+}
+
+function buildBiaisModelGroup(){
+  const group = new THREE.Group();
+  const val = biaisValidateStructures();
+  if (!val.ok) return group;
+
+  const thickness = parseFloat(document.getElementById('profileThickness').value) || 1.5;
+  const totalRaw = parseFloat(document.getElementById('biaisTotalRaw').value) || 0;
+  const segLenWanted = parseFloat(document.getElementById('biaisSegLenSouhaitee').value) || totalRaw || 1;
+  if (totalRaw <= 0) return group;
+
+  const plan = computeSegPlan(totalRaw, segLenWanted, getBiaisMaxSegLen());
+  const material = createBiaisMaterial();
+  let zCursor = -(plan.n * plan.L) / 2;
+
+  for (let i = 0; i < plan.n; i++) {
+    const fLeft = (i * plan.L) / totalRaw;
+    const fRight = ((i + 1) * plan.L) / totalRaw;
+    const crossLeft = computeCrossSectionPoints(interpolateSegmentsAt(fLeft)).centerPoints;
+    const crossRight = computeCrossSectionPoints(interpolateSegmentsAt(fRight)).centerPoints;
+    const geom = buildTaperedStripGeometry(crossLeft, crossRight, thickness, zCursor, zCursor + plan.L);
+    group.add(new THREE.Mesh(geom, material));
+    zCursor += plan.L;
+  }
+  return group;
+}
+
+// Calcule les données de chaque pièce (position, cotes gauche/droite, mâle/femelle,
+// développé ajusté du jeu) — réutilisé par l'affichage écran ET par l'impression.
+function computeBiaisPieceRows(){
+  const val = biaisValidateStructures();
+  if (!val.ok) return { val, rows: [], plan: { n: 0, L: 0 }, finiCouvert: 0 };
+
+  const totalRaw = parseFloat(document.getElementById('biaisTotalRaw').value) || 0;
+  const segLenWanted = parseFloat(document.getElementById('biaisSegLenSouhaitee').value) || totalRaw || 1;
+  const profondeur = parseFloat(document.getElementById('biaisEmboitementProfondeur').value) || 0;
+  const jeu = computeJeuValue();
+  const senseGD = (document.getElementById('biaisSensInvertBtn')?.dataset.sens || 'gd') === 'gd';
+
+  if (totalRaw <= 0) return { val, rows: [], plan: { n: 0, L: 0 }, finiCouvert: 0, senseGD, profondeur };
+
+  const plan = computeSegPlan(totalRaw, segLenWanted, getBiaisMaxSegLen());
+  const finiCouvert = plan.n === 1 ? plan.L : (plan.n * plan.L - (plan.n - 1) * profondeur);
+
+  const rows = [];
+  for (let i = 0; i < plan.n; i++) {
+    const fLeft = (i * plan.L) / totalRaw;
+    const fRight = ((i + 1) * plan.L) / totalRaw;
+    const segLeft = interpolateSegmentsAt(fLeft);
+    const segRight = interpolateSegmentsAt(fRight);
+    const devLeft = getDevelopTotal(segLeft);
+    const devRight = getDevelopTotal(segRight);
+
+    const isFirst = (i === 0), isLast = (i === plan.n - 1);
+    let leftType, leftDev, rightType, rightDev;
+
+    if (isFirst) { leftType = 'Terminal Gauche (référence)'; leftDev = devLeft; }
+    else { leftType = senseGD ? 'Jonction : mâle' : 'Jonction : femelle'; leftDev = senseGD ? (devLeft - jeu) : (devLeft + jeu); }
+
+    if (isLast) { rightType = 'Terminal Droite (référence)'; rightDev = devRight; }
+    else { rightType = senseGD ? 'Jonction : femelle' : 'Jonction : mâle'; rightDev = senseGD ? (devRight + jeu) : (devRight - jeu); }
+
+    rows.push({
+      idx: i + 1, L: plan.L, fLeft, fRight,
+      leftType, leftDev, leftSummary: formatSegSummary(segLeft), segLeft,
+      rightType, rightDev, rightSummary: formatSegSummary(segRight), segRight
+    });
+  }
+  return { val, rows, plan, finiCouvert, senseGD, profondeur };
+}
+
+function renderBiaisPiecesTable(){
+  const wrap = document.getElementById('biaisPiecesTableWrap');
+  const data = computeBiaisPieceRows();
+  const val = data.val;
+  document.getElementById('biaisValidBox').style.display = 'block';
+  document.getElementById('biaisValidBox').style.color = val.ok ? 'var(--good)' : 'var(--danger)';
+  document.getElementById('biaisValidBox').style.borderColor = val.ok ? 'var(--good)' : 'var(--danger)';
+  document.getElementById('biaisValidBox').textContent = val.msg;
+
+  const readout = document.getElementById('biaisGDReadout');
+  if (val.ok) {
+    const devG = getDevelopTotal(biaisSegGauche);
+    const devD = getDevelopTotal(biaisSegDroite);
+    readout.textContent = `Développé Gauche : ${devG} mm  —  Développé Droite : ${devD} mm` + (devG === devD ? '  (⚠ identiques pour le moment — modifie l\'un des deux profils pour créer le biais)' : '');
+    readout.style.color = (devG === devD) ? 'var(--danger)' : 'var(--good)';
+  } else {
+    readout.textContent = '';
+  }
+
+  if (!val.ok) { wrap.innerHTML = ''; document.getElementById('biaisPlanN').textContent = '0'; document.getElementById('biaisPlanL').textContent = '0 mm'; document.getElementById('biaisPlanFinie').textContent = '0 mm'; return; }
+
+  const profondeur = data.profondeur;
+  document.getElementById('biaisSensHint').textContent = data.senseGD
+    ? "Flèche Gauche → Droite : à chaque jonction, la pièce côté Gauche est femelle, la pièce côté Droite est mâle (s'emboîte dedans, profondeur " + Math.round(profondeur) + " mm)."
+    : "Flèche Droite → Gauche : à chaque jonction, la pièce côté Droite est femelle, la pièce côté Gauche est mâle (s'emboîte dedans, profondeur " + Math.round(profondeur) + " mm).";
+
+  if (!data.rows.length) { wrap.innerHTML = ''; return; }
+
+  const plan = data.plan;
+  document.getElementById('biaisPlanN').textContent = plan.n;
+  document.getElementById('biaisPlanL').textContent = `${Math.round(plan.L)} mm`;
+  document.getElementById('biaisPlanFinie').textContent = `${Math.round(data.finiCouvert)} mm`;
+
+  let rows = '';
+  data.rows.forEach(r => {
+    rows += `<tr>
+      <td>${r.idx}</td>
+      <td>${Math.round(r.L)} mm</td>
+      <td>${(r.fLeft*100).toFixed(0)}% → ${(r.fRight*100).toFixed(0)}%</td>
+      <td>${r.leftType}<br><span class="dev-mini">${r.leftSummary}</span><br><span class="dev-mini">développé ${Math.round(r.leftDev)} mm</span></td>
+      <td>${r.rightType}<br><span class="dev-mini">${r.rightSummary}</span><br><span class="dev-mini">développé ${Math.round(r.rightDev)} mm</span></td>
+    </tr>`;
+  });
+
+  wrap.innerHTML = `
+    <table class="biais-seg-table">
+      <thead><tr><th>Pièce</th><th>Longueur brute</th><th>Position</th><th>Bout Gauche</th><th>Bout Droite</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function updateBiaisAll(){
+  const enabled = document.getElementById('biaisEnabled').checked;
+  document.getElementById('biaisBody').style.display = enabled ? 'block' : 'none';
+
+  if (enabled) {
+    document.getElementById('biaisJeuValue').textContent = `${computeJeuValue()} mm`;
+    renderBiaisPiecesTable();
+  }
+  update3DModel();
+}
+
+// Petite flèche SVG noire (compatible impression) indiquant le sens d'écoulement.
+function buildFlowArrowSVG(senseGD){
+  const W = 340, H = 40;
+  const xStart = senseGD ? 46 : 294;
+  const xEnd = senseGD ? 294 : 46;
+  const headX = xEnd;
+  const tri = senseGD
+    ? `${headX-14},${17} ${headX},${24} ${headX-14},${31}`
+    : `${headX+14},${17} ${headX},${24} ${headX+14},${31}`;
+  return `
+    <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;margin:4px 0 10px;">
+      <text x="4" y="16" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#000">GAUCHE</text>
+      <text x="${W-64}" y="16" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#000">DROITE</text>
+      <line x1="${xStart}" y1="24" x2="${xEnd}" y2="24" stroke="#000" stroke-width="2.5"/>
+      <polygon points="${tri}" fill="#000"/>
+    </svg>`;
+}
+
+// Génère le HTML imprimable du calpinage biais (liste des pièces, cotes
+// gauche/droite, mâle/femelle, flèche de sens) — inséré dans la fiche technique.
+function buildBiaisCalpinagePrintHTML(){
+  if (!document.getElementById('biaisEnabled').checked) return '';
+  const data = computeBiaisPieceRows();
+  if (!data.val.ok || !data.rows.length) return '';
+  const color = document.getElementById('profileColor').value;
+
+  let rows = '';
+  data.rows.forEach(r => {
+    rows += `<tr>
+      <td>${r.idx}</td>
+      <td>${Math.round(r.L)} mm</td>
+      <td>${(r.fLeft*100).toFixed(0)}% → ${(r.fRight*100).toFixed(0)}%</td>
+      <td><b>${r.leftType}</b><br>${r.leftSummary}<br>développé ${Math.round(r.leftDev)} mm</td>
+      <td><b>${r.rightType}</b><br>${r.rightSummary}<br>développé ${Math.round(r.rightDev)} mm</td>
+    </tr>`;
+  });
+
+  let pieceBlocks = '';
+  data.rows.forEach(r => {
+    const canvasL = document.createElement('canvas');
+    drawProfileOnCanvas(canvasL, true, { segments: r.segLeft, color, rotation: 0, customArrow: null });
+    const canvasR = document.createElement('canvas');
+    drawProfileOnCanvas(canvasR, true, { segments: r.segRight, color, rotation: 0, customArrow: null });
+
+    pieceBlocks += `
+      <div class="biais-piece-block">
+        <div class="biais-piece-title">Pièce ${r.idx} — ${Math.round(r.L)} mm brut — position ${(r.fLeft*100).toFixed(0)}% → ${(r.fRight*100).toFixed(0)}%</div>
+        <div class="biais-piece-imgs">
+          <div class="biais-piece-col">
+            <img src="${canvasL.toDataURL('image/png')}">
+            <div class="biais-piece-caption"><b>Bout Gauche — ${r.leftType}</b><br>${r.leftSummary}<br>développé ${Math.round(r.leftDev)} mm</div>
+          </div>
+          <div class="biais-piece-col">
+            <img src="${canvasR.toDataURL('image/png')}">
+            <div class="biais-piece-caption"><b>Bout Droite — ${r.rightType}</b><br>${r.rightSummary}<br>développé ${Math.round(r.rightDev)} mm</div>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  return `
+    <div class="print-section-title">Calpinage biais — ${data.rows.length} pièce(s), ${Math.round(data.plan.L)} mm brut chacune (portée finie ${Math.round(data.finiCouvert)} mm)</div>
+    ${buildFlowArrowSVG(data.senseGD)}
+    <table class="recap-table">
+      <tr><th>Pièce</th><th>Longueur brute</th><th>Position</th><th>Bout Gauche</th><th>Bout Droite</th></tr>
+      ${rows}
+    </table>
+    <div class="print-section-title">Schémas cotés — bout Gauche et bout Droite de chaque pièce</div>
+    ${pieceBlocks}
+  `;
+}
+
+
+document.getElementById('printBiaisCalpinageBtn').addEventListener('click', () => {
+  const calp = buildBiaisCalpinagePrintHTML();
+  if (!calp) {
+    showToast("Aucun calpinage à imprimer (vérifie que les profils Gauche/Droite sont compatibles et que la longueur totale est renseignée).");
+    return;
+  }
+  const nomProfil = document.getElementById('profileName').value || 'Schéma pliage';
+  const printArea = document.getElementById('printArea');
+  printArea.innerHTML = `
+    <div class="print-header">
+      <div class="print-title">ALFEMA • Plan de Calpinage Biais</div>
+      <div style="font-size:12px;">Date : ${new Date().toLocaleDateString()}</div>
+    </div>
+    <div class="recap-block">
+      <h3>${nomProfil}</h3>
+    </div>
+    ${calp}
+  `;
+  window.print();
+});
+
+
+// --- Cadrage automatique de la caméra 3D sur toute la pièce biais ---
+// (utile car une pièce biais peut être bien plus longue qu'un profil simple :
+// sans ça, la caméra restait à la distance par défaut et on ne voyait qu'un bout
+// de la pièce, donc pas le changement de cote entre la gauche et la droite).
+function fitCameraToPartMesh(){
+  if (!partMesh3D || !camera3D || !renderer3D || !scene3D) return;
+  const box = new THREE.Box3().setFromObject(partMesh3D);
+  if (box.isEmpty()) return;
+  const sphere = new THREE.Sphere();
+  box.getBoundingSphere(sphere);
+  if (!sphere.radius) return;
+  const fovRad = camera3D.fov * Math.PI / 180;
+  let dist = (sphere.radius / Math.sin(fovRad / 2)) * 1.35;
+  dist = Math.max(180, Math.min(12000, dist));
+  const dir = camera3D.position.clone();
+  if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1);
+  dir.normalize().multiplyScalar(dist);
+  camera3D.position.copy(dir);
+  camera3D.lookAt(0, 0, 0);
+  renderer3D.render(scene3D, camera3D);
+}
+
+// --- Bascule d'édition Gauche / Droite (réutilise l'éditeur "Séquence du profil") ---
+function biaisSwitchSide(side){
+  biaisActiveSide = side;
+  segments = (side === 'gauche') ? biaisSegGauche : biaisSegDroite;
+  document.querySelectorAll('#biaisSideToggle button').forEach(b => b.classList.toggle('active', b.dataset.side === side));
+  renderSegments();
+  redrawProfile();
+  updateBiaisAll();
+}
+
+document.getElementById('biaisEnabled').addEventListener('change', function(){
+  if (this.checked) {
+    if (!biaisSegGauche.length && !biaisSegDroite.length) {
+      // Premier lancement : on part du profil courant comme base Gauche, et on
+      // duplique une copie indépendante pour Droite (l'utilisateur ajuste ensuite).
+      biaisSegGauche = segments;
+      biaisSegDroite = JSON.parse(JSON.stringify(segments));
+    }
+    biaisSwitchSide('gauche');
+    setTimeout(fitCameraToPartMesh, 50);
+  } else {
+    if (biaisActiveSide !== 'gauche') biaisSwitchSide('gauche');
+    updateBiaisAll();
+  }
+});
+
+document.getElementById('biaisFitViewBtn').addEventListener('click', () => {
+  if (!is3DInitialized) { showToast("Ouvre d'abord la visualisation 3D."); return; }
+  fitCameraToPartMesh();
+});
+
+document.querySelectorAll('#biaisSideToggle button').forEach(b => {
+  b.addEventListener('click', () => biaisSwitchSide(b.dataset.side));
+});
+
+document.getElementById('biaisCopyGDBtn').addEventListener('click', () => {
+  biaisSegDroite = JSON.parse(JSON.stringify(biaisSegGauche));
+  if (biaisActiveSide === 'droite') { segments = biaisSegDroite; renderSegments(); redrawProfile(); }
+  updateBiaisAll();
+  showToast('Structure du profil Gauche copiée sur Droite. Ajuste maintenant les cotes à droite.');
+});
+
+document.getElementById('biaisSensInvertBtn').addEventListener('click', function(){
+  const next = this.dataset.sens === 'gd' ? 'dg' : 'gd';
+  this.dataset.sens = next;
+  this.textContent = (next === 'gd')
+    ? 'Gauche (femelle) → Droite (mâle)  🔄 cliquer pour inverser'
+    : 'Droite (femelle) → Gauche (mâle)  🔄 cliquer pour inverser';
+  updateBiaisAll();
+});
+
+['biaisEmboitementProfondeur', 'biaisTotalRaw', 'biaisSegLenSouhaitee', 'biaisMaxSegLen', 'profileThickness'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateBiaisAll);
+});
+document.getElementById('biaisJeuOverrideChk').addEventListener('change', function(){
+  document.getElementById('biaisJeuOverrideVal').disabled = !this.checked;
+  updateBiaisAll();
+});
+document.getElementById('biaisJeuOverrideVal').addEventListener('input', updateBiaisAll);
+
+// Garde les profils Gauche/Droite synchronisés si l'utilisateur efface le profil
+// ou charge un schéma enregistré pendant qu'il édite l'un des deux côtés.
+document.getElementById('clearSegBtn').addEventListener('click', () => {
+  if (biaisActiveSide === 'gauche') biaisSegGauche = segments; else biaisSegDroite = segments;
+  if (document.getElementById('biaisEnabled').checked) updateBiaisAll();
+});
+document.getElementById('savedProfilesList').addEventListener('click', (e) => {
+  if (e.target.closest('.load-btn, .profile-card-info')) {
+    if (biaisActiveSide === 'gauche') biaisSegGauche = segments; else biaisSegDroite = segments;
+    if (document.getElementById('biaisEnabled').checked) updateBiaisAll();
+  }
+});
+
 (function initInteractiveTutorial(){
   const overlay = document.getElementById('tutorialOverlay');
   if(!overlay) return;
