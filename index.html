@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Optimiseur de découpe & Pliage — Tôlerie by HUGO</title>
+<title>Optimiseur de découpe & Pliage — Tôlerie</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <!-- SheetJS pour la lecture et l'écriture des fichiers Excel -->
@@ -895,6 +895,9 @@
   <div class="tabs-nav">
     <button class="tab-btn active" data-tab="tab-debit">Plan de débit</button>
     <button class="tab-btn" data-tab="tab-pliage">Plan de pliage</button>
+    <button class="tab-btn" data-tab="tab-assemblage">Assemblage</button>
+    <button class="tab-btn" data-tab="tab-tasseaux">Bac à tasseaux</button>
+    <button class="tab-btn" data-tab="tab-jointdebout">Joint debout</button>
   </div>
 
   <div id="tab-debit" class="tab-panel active">
@@ -1011,10 +1014,11 @@
               <input type="text" id="profileThickness" value="1.5" placeholder="Ex: 1.5">
             </div>
           </div>
-          <div class="sheet-fields">
+          <div class="sheet-fields" id="paintFieldsRow">
             <div class="field">
               <label>Code RAL (ex: 7016)</label>
               <input type="text" id="profileColor" maxlength="4" placeholder="Ex: 9010" style="font-family:'JetBrains Mono',monospace;">
+              <div id="ralSwatchRow" style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap;"></div>
             </div>
             <div class="field">
               <label>Thermolaquage (Côté flèche 1er droit)</label>
@@ -1024,7 +1028,8 @@
               </div>
             </div>
           </div>
-          <div class="field" style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+          <div class="biais-hint" id="paintUnavailableMsg" style="display:none;">Le thermolaquage (RAL) ne s'applique qu'à l'acier et à l'aluminium — le zinc et le cuivre gardent leur teinte naturelle.</div>
+          <div class="field" id="arrowHintRow" style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
             <span style="font-size:11px;color:var(--text-dim);">Astuce : Boutons ci-dessus ou Shift + Glisser sur le schéma.</span>
             <button class="icon-action-btn" id="resetArrowBtn" style="font-size:11px;padding:4px 8px;">Réinitialiser flèche</button>
           </div>
@@ -1057,6 +1062,10 @@
             </div>
             <button class="add-btn" id="biaisCopyGDBtn" type="button" style="margin-bottom:10px;">Copier Gauche → Droite (pour repartir de la même structure)</button>
             <button class="add-btn" id="biaisFitViewBtn" type="button" style="margin-bottom:10px;">🔍 Cadrer la vue 3D sur la pièce entière</button>
+            <div class="toggle-row" style="margin-top:0;">
+              <input type="checkbox" id="biaisShow3DDims" checked>
+              <span>Afficher les cotes de calpinage (extrémités de chaque pièce) sur la 3D</span>
+            </div>
 
             <div class="error-box" id="biaisValidBox" style="display:block;"></div>
             <div class="biais-hint" id="biaisGDReadout" style="font-weight:700;"></div>
@@ -1101,6 +1110,23 @@
             </div>
             <div class="biais-hint" style="margin-top:-4px;">Contrainte machine/livraison : aucun segment ne dépassera cette longueur (le nombre de pièces est augmenté automatiquement si besoin). 4000 mm = limite machine.</div>
 
+            <div class="sheet-fields">
+              <div class="field">
+                <label>Position du biais sur la pièce</label>
+                <select id="biaisPositionMode">
+                  <option value="progressif">Progressif (sur toute la longueur)</option>
+                  <option value="droite">Côté Droite (reste Gauche pur au départ — mur droit à gauche)</option>
+                  <option value="gauche">Côté Gauche (reste Droite pur à la fin — mur droit à droite)</option>
+                  <option value="central">Central (reste pur aux deux bouts)</option>
+                </select>
+              </div>
+              <div class="field" id="biaisTransitionLenField" style="display:none;">
+                <label>Longueur de transition du biais (mm)</label>
+                <input type="number" id="biaisTransitionLen" value="1000" min="10">
+              </div>
+            </div>
+            <div class="biais-hint" id="biaisPositionHint" style="margin-top:-4px;">Le profil reste constant (Gauche ou Droite pur) sur la portion "mur droit", et la transformation se concentre côté "mur en biais".</div>
+
             <div class="develop-summary" id="biaisPlanStats">
               <div class="stat"><div class="label">Nombre de pièces</div><div class="value accent" id="biaisPlanN">0</div></div>
               <div class="stat"><div class="label">Longueur réelle / pièce</div><div class="value" id="biaisPlanL">0 mm</div></div>
@@ -1111,6 +1137,9 @@
 
             <button class="print-btn" id="printBiaisCalpinageBtn" type="button" style="margin-top:12px;">
               🖨 Imprimer le plan de calpinage des segments
+            </button>
+            <button class="mail-btn" id="exportBiaisExcelBtn" type="button" style="margin-top:10px;">
+              📊 Exporter le calpinage (Excel)
             </button>
 
           </div>
@@ -1163,6 +1192,10 @@
             <button class="view3d-btn" data-view="top">Dessus</button>
           </div>
           <div style="font-size:11.5px;color:var(--text-dim);margin-bottom:8px;">Maintenez le clic gauche pour pivoter · Utilisez la molette pour zoomer.</div>
+          <div class="toggle-row" style="margin:0 0 10px;">
+            <input type="checkbox" id="profile3dShowDims" checked>
+            <span>Afficher les cotes déportées sur la 3D</span>
+          </div>
           <div id="canvas3dContainer" style="width:100%;height:350px;border-radius:6px;background:#e8ecf1;position:relative;overflow:hidden;"></div>
         </div>
 
@@ -1192,6 +1225,7 @@
               </button>
             </div>
           </div>
+          <input type="text" id="savedProfilesSearch" placeholder="🔎 Rechercher un schéma par nom..." style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--text);font-family:'Inter',sans-serif;font-size:12.5px;padding:8px 10px;margin-bottom:10px;">
           <div id="savedProfilesList" class="saved-profiles-list">
             <div class="empty-note" style="padding:15px;">Aucun schéma conservé en mémoire pour l'instant.</div>
           </div>
@@ -1204,6 +1238,67 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+  <div id="tab-assemblage" class="tab-panel">
+    <div class="grid">
+      <div>
+        <div class="panel">
+          <div class="panel-title"><span>Assemblage de pliage</span></div>
+          <div class="biais-hint">Combine plusieurs schémas déjà enregistrés (ex: sous-face + fixation, ou couvertine + fixation) et des blocs (murs, acrotères) pour visualiser leur assemblage en 3D et en schéma. Enregistre d'abord tes profils dans l'onglet "Plan de pliage" (bouton "Enregistrer ce schéma en mémoire").</div>
+
+          <div class="panel-title" style="font-size:12px;margin-top:14px;">Profils enregistrés disponibles</div>
+          <div class="saved-profiles-list" id="assembleAvailableList" style="max-height:220px;overflow-y:auto;"></div>
+          <button class="add-btn" id="assembleAddBlockBtn" type="button" style="margin-top:10px;">+ Ajouter un mur / acrotère (bloc)</button>
+
+          <div class="panel-title" style="font-size:12px;margin-top:16px;justify-content:space-between;">
+            <span>Composants de l'assemblage</span>
+            <button class="icon-action-btn" id="assembleCompactBtn" type="button" style="font-size:10px;padding:4px 8px;">☰ Vue compacte</button>
+          </div>
+          <div class="biais-hint" style="margin-top:-6px;">Clique sur un composant (ici ou sur le schéma 2D) pour le sélectionner, puis glisse-le directement sur le schéma de section pour le positionner.</div>
+          <div id="assembleComponentsList"></div>
+
+          <button class="print-btn" id="printAssembleBtn" type="button" style="margin-top:12px;">
+            🖨 Imprimer l'assemblage
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div id="assembleSchemaWrap" style="background:#fff;border-radius:10px;padding:10px;margin-bottom:16px;">
+          <div class="canvas-head" style="margin-bottom:8px;">
+            <span class="canvas-title" style="color:#1c1b1a;">Schéma d'assemblage (vue de section)</span>
+          </div>
+          <div id="assemble2DWrap"></div>
+        </div>
+        <div class="panel">
+          <div class="canvas-head">
+            <span class="canvas-title">Visualisation 3D de l'assemblage</span>
+          </div>
+          <div class="dir-toggle male-toggle" id="assembleViewToggle" style="margin-top:10px;">
+            <button type="button" class="active" data-view="iso">Isométrique</button>
+            <button type="button" data-view="face">Face</button>
+            <button type="button" data-view="profil">Profil</button>
+            <button type="button" data-view="dessus">Dessus</button>
+          </div>
+          <div class="toggle-row" style="margin:10px 0 0;">
+            <input type="checkbox" id="assembleShowDims" checked>
+            <span>Afficher les cotes sur la 3D</span>
+          </div>
+          <button class="add-btn" id="assembleRealisticBtn" type="button" style="margin-top:10px;">✨ Vue réaliste (sol, ombres, reflets)</button>
+          <div id="assembleCanvas3dContainer" style="width:100%;height:460px;border-radius:6px;background:#e8ecf1;position:relative;overflow:hidden;margin-top:10px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-tasseaux" class="tab-panel">
+    <div id="zincRoot_tas" class="grid"></div>
+  </div>
+
+  <div id="tab-jointdebout" class="tab-panel">
+    <div id="zincRoot_jd" class="grid"></div>
+  </div>
+
 
 <div id="fsOverlay">
   <div class="fs-sidebar">
@@ -1288,6 +1383,102 @@ let lastAnnotationsMap = [];
 // Variables pour Three.js 3D
 let scene3D, camera3D, renderer3D, partMesh3D;
 let is3DInitialized = false;
+let profile3DLabelsWrap = null;
+
+function updateProfile3DLabels(){
+  if (!profile3DLabelsWrap) return;
+  profile3DLabelsWrap.innerHTML = '';
+  if (!partMesh3D || !camera3D || !renderer3D) return;
+  const container = document.getElementById('canvas3dContainer');
+  if (!container) return;
+  partMesh3D.updateMatrixWorld(true);
+
+  const biaisChk = document.getElementById('biaisEnabled');
+  const labels = [];
+
+  if (biaisChk && biaisChk.checked) {
+    const dimsChk = document.getElementById('biaisShow3DDims');
+    if (dimsChk && dimsChk.checked) {
+      // Une cote à chaque jonction entre pièces du calpinage (mêmes valeurs que
+      // le tableau "Séquence du profil" / l'impression du calpinage). Les deux
+      // valeurs d'une même jonction (mâle / femelle) sont fusionnées en une seule
+      // étiquette pour ne pas se superposer au même point physique.
+      const data = computeBiaisPieceRows();
+      if (data.val.ok && data.rows.length) {
+        const n = data.plan.n, L = data.plan.L;
+        const zStart = -(n * L) / 2;
+        const rows = data.rows;
+        for (let i = 0; i <= n; i++) {
+          const z = zStart + i * L;
+          let text;
+          if (i === 0) text = `${rows[0].leftType} : ${Math.round(rows[0].leftDev)} mm`;
+          else if (i === n) text = `${rows[n-1].rightType} : ${Math.round(rows[n-1].rightDev)} mm`;
+          else text = `${rows[i-1].rightType.replace('Jonction : ','')} ${Math.round(rows[i-1].rightDev)} / ${rows[i].leftType.replace('Jonction : ','')} ${Math.round(rows[i].leftDev)} mm`;
+          labels.push({ local: new THREE.Vector3(0, 40, z), text, anchor: new THREE.Vector3(0, 0, z) });
+        }
+      }
+    }
+  } else {
+    const chk = document.getElementById('profile3dShowDims');
+    if (!chk || !chk.checked) return;
+    // Même principe que les cotes du schéma 2D, projetées sur la face avant de la 3D.
+    const length = parseFloat(document.getElementById('pieceLength').value) || 2000;
+    const geo = generateProfileGeometry(segments, 1);
+    const z = length / 2;
+    geo.annotations.forEach(ann => {
+      if (ann.type === 'dim') {
+        const x = ann.midX !== undefined ? ann.midX : ann.x;
+        const y = ann.midY !== undefined ? ann.midY : ann.y;
+        labels.push({ local: new THREE.Vector3(x, y, z), text: ann.text });
+      } else if (ann.type === 'angle') {
+        labels.push({ local: new THREE.Vector3(ann.x, ann.y, z), text: ann.text });
+      }
+    });
+  }
+
+  // Anti-collision à l'écran : à distance/zoom faible, beaucoup de cotes se
+  // projettent trop près les unes des autres et deviennent illisibles. On ne
+  // garde que celles qui restent à distance suffisante des cotes déjà retenues
+  // (les premières et dernières de la liste sont toujours prioritaires).
+  const MIN_DIST = 46;
+  const accepted = [];
+  const projected = labels.map(L => {
+    const world = L.local.clone().applyMatrix4(partMesh3D.matrixWorld);
+    const v = world.clone().project(camera3D);
+    if (v.z >= 1) return null;
+    const x = (v.x * 0.5 + 0.5) * container.clientWidth;
+    const y = (-v.y * 0.5 + 0.5) * container.clientHeight;
+    if (x < -60 || x > container.clientWidth + 60 || y < -60 || y > container.clientHeight + 60) return null;
+    let ax = x, ay = y;
+    if (L.anchor) {
+      const aw = L.anchor.clone().applyMatrix4(partMesh3D.matrixWorld);
+      const av = aw.clone().project(camera3D);
+      ax = (av.x * 0.5 + 0.5) * container.clientWidth;
+      ay = (-av.y * 0.5 + 0.5) * container.clientHeight;
+    }
+    return { x, y, ax, ay, text: L.text };
+  });
+
+  projected.forEach((p, i) => {
+    if (!p) return;
+    const isEdge = (i === 0 || i === projected.length - 1);
+    const tooClose = !isEdge && accepted.some(q => Math.hypot(q.x - p.x, q.y - p.y) < MIN_DIST);
+    if (tooClose) return;
+    accepted.push(p);
+
+    if (p.ax !== p.x || p.ay !== p.y) {
+      const dot = document.createElement('div');
+      dot.style.cssText = `position:absolute;left:${p.ax}px;top:${p.ay}px;width:5px;height:5px;margin:-2.5px;border-radius:50%;background:var(--accent);`;
+      profile3DLabelsWrap.appendChild(dot);
+    }
+    const lbl = document.createElement('div');
+    lbl.textContent = p.text;
+    lbl.style.cssText = `position:absolute;left:${p.x}px;top:${p.y}px;transform:translate(-50%,-50%);
+      background:rgba(20,20,20,0.85);color:#fff;font-family:'JetBrains Mono',monospace;font-size:10px;
+      padding:2px 6px;border-radius:4px;white-space:nowrap;border:1px solid var(--accent);pointer-events:none;`;
+    profile3DLabelsWrap.appendChild(lbl);
+  });
+}
 
 function init3DViewer() {
   const container = document.getElementById('canvas3dContainer');
@@ -1296,7 +1487,7 @@ function init3DViewer() {
   scene3D = new THREE.Scene();
   scene3D.background = new THREE.Color(0xf1f5f9);
 
-  camera3D = new THREE.PerspectiveCamera(45, Math.max(1, container.clientWidth) / Math.max(1, container.clientHeight), 0.1, 20000);
+  camera3D = new THREE.PerspectiveCamera(45, Math.max(1, container.clientWidth) / Math.max(1, container.clientHeight), 0.1, 120000);
   camera3D.position.set(0, 0, 1800);
   camera3D.lookAt(0, 0, 0);
 
@@ -1312,6 +1503,10 @@ function init3DViewer() {
   renderer3D.domElement.style.touchAction = 'none';
   renderer3D.domElement.style.cursor = 'grab';
   container.appendChild(renderer3D.domElement);
+
+  profile3DLabelsWrap = document.createElement('div');
+  profile3DLabelsWrap.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;';
+  container.appendChild(profile3DLabelsWrap);
 
   scene3D.add(new THREE.HemisphereLight(0xffffff, 0x66717d, 1.15));
   const dirLight1 = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -1338,7 +1533,7 @@ function init3DViewer() {
 
   function zoom3D(amount) {
     const current = camera3D.position.length();
-    const next = clamp(current * Math.exp(amount), 180, 12000);
+    const next = clamp(current * Math.exp(amount), 180, 100000);
     camera3D.position.multiplyScalar(next / Math.max(current, 0.001));
   }
 
@@ -1389,7 +1584,7 @@ function init3DViewer() {
         lastPinchDistance = distance;
         lastPinchCenter = center;
       }
-      renderer3D.render(scene3D, camera3D);
+      renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
       return;
     }
     if (activePointerId !== e.pointerId || !pointerMode || !partMesh3D) return;
@@ -1402,7 +1597,7 @@ function init3DViewer() {
       pan3D(dx, dy);
     }
     lastPointer = { x: e.clientX, y: e.clientY };
-    renderer3D.render(scene3D, camera3D);
+    renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
   });
 
   function endPointer(e) {
@@ -1424,7 +1619,7 @@ function init3DViewer() {
   canvas.addEventListener('wheel', e => {
     e.preventDefault();
     zoom3D(e.deltaY * 0.0012);
-    renderer3D.render(scene3D, camera3D);
+    renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
   }, { passive: false });
 
   // Double-clic : recentrer et remettre le zoom de départ sans modifier la géométrie.
@@ -1433,7 +1628,7 @@ function init3DViewer() {
     partMesh3D.position.set(0, 0, 0);
     camera3D.position.set(0, 0, 1800);
     camera3D.lookAt(0, 0, 0);
-    renderer3D.render(scene3D, camera3D);
+    renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
   });
 
   function resize3D() {
@@ -1444,13 +1639,59 @@ function init3DViewer() {
     camera3D.aspect = w / h;
     camera3D.updateProjectionMatrix();
     renderer3D.setSize(w, h, false);
-    renderer3D.render(scene3D, camera3D);
+    renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
   }
 
   window.addEventListener('resize', resize3D);
   is3DInitialized = true;
   update3DModel();
   resize3D();
+}
+
+// Table RAL Classic (valeurs hexadécimales approximatives, usage courant en
+// bâtiment/couverture) — utilisée pour la teinte 3D de la face peinte et pour
+// retrouver une pastille même si le code n'est pas dans la palette rapide.
+const RAL_HEX_MAP = {
+  '1000':'#cbc59d','1013':'#e9e0ca','1015':'#e6d2b5','1021':'#f5c40b',
+  '2004':'#e35b13',
+  '3000':'#a72920','3004':'#752424','3005':'#59191f','3009':'#5e2b25','3020':'#c1121c',
+  '5005':'#0e4c92','5010':'#0e294b','5012':'#4d8fcc','5015':'#1e6ea7','5024':'#7d9bb5',
+  '6002':'#2a4d2e','6005':'#0f3d2e','6009':'#173b26','6011':'#6b8e4e','6018':'#4c9141',
+  '7001':'#8b969a','7011':'#4b555c','7012':'#42494e','7016':'#383e42','7021':'#2c3134',
+  '7022':'#4b4640','7024':'#4a4c50','7030':'#928d80','7035':'#d7d7d7','7038':'#b6b8b1',
+  '7040':'#9da3a6','7042':'#8f9494','7044':'#c9c6bd',
+  '8003':'#a05c30','8004':'#8f4e35','8014':'#4a3526','8017':'#442f29','8019':'#3c3634',
+  '9002':'#e7ebe4','9005':'#0a0a0a','9006':'#a5a8a5','9007':'#8f8f8c','9010':'#f2f2ec',
+  '9016':'#f2f4f2','9017':'#26282a','9023':'#8a9291'
+};
+function getRalHex(code){
+  return RAL_HEX_MAP[code] || '#b9bcbb';
+}
+
+// Matière brute (non peinte) : mêmes réglages qu'auparavant, un aspect par matière.
+function getRawMetalMaterial(matType){
+  let matColor = 0x8894a2, metalnessVal = 0.6, roughnessVal = 0.4;
+  if (matType === 'Acier') { matColor = 0x94a3b8; metalnessVal = 0.85; roughnessVal = 0.25; }
+  else if (matType === 'Alu') { matColor = 0xf1f5f9; metalnessVal = 0.95; roughnessVal = 0.15; }
+  else if (matType === 'Zinc') { matColor = 0x8291a0; metalnessVal = 0.5; roughnessVal = 0.48; }
+  else if (matType === 'Cuivre') { matColor = 0xf59e0b; metalnessVal = 0.85; roughnessVal = 0.22; }
+  return new THREE.MeshPhysicalMaterial({
+    color: matColor, metalness: metalnessVal, roughness: roughnessVal,
+    clearcoat: 0.22, clearcoatRoughness: 0.16, reflectivity: 0.7, side: THREE.DoubleSide
+  });
+}
+// Face thermolaquée (RAL) : peinture, donc peu métallique, avec un léger vernis
+// (clearcoat) qui donne le rendu satiné/brillant typique d'un thermolaquage.
+function getRalPaintMaterial(ralCode){
+  return new THREE.MeshPhysicalMaterial({
+    color: getRalHex(ralCode),
+    metalness: 0.05,
+    roughness: 0.38,
+    clearcoat: 0.55,
+    clearcoatRoughness: 0.22,
+    reflectivity: 0.35,
+    side: THREE.DoubleSide
+  });
 }
 
 function update3DModel() {
@@ -1477,7 +1718,7 @@ function update3DModel() {
     partMesh3D = buildBiaisModelGroup();
     partMesh3D.rotation.set(prevRotation.x, prevRotation.y, prevRotation.z);
     scene3D.add(partMesh3D);
-    renderer3D.render(scene3D, camera3D);
+    renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
     return;
   }
 
@@ -1611,61 +1852,54 @@ function update3DModel() {
   for (let i = 0; i < centerPoints.length; i++) pushV(inner[i],  length / 2);
 
   const n = centerPoints.length;
-  const indices = [];
-  const quad = (a,b,c,d) => {
-    indices.push(a,b,c, a,c,d);
-  };
+  const indicesRaw = [];
+  const indicesPaint = [];
+  const quadInto = (arr, a,b,c,d) => { arr.push(a,b,c, a,c,d); };
 
   // Faces principales : surfaces parfaitement planes et continues.
+  // Seule la face "extérieure" (côté visible/exposé) reçoit la peinture RAL ;
+  // le reste (face intérieure, bouts) garde l'aspect brut de la matière.
   for (let i = 0; i < n - 1; i++) {
     // dessous
-    quad(i, i + 1, n + i + 1, n + i);
+    quadInto(indicesRaw, i, i + 1, n + i + 1, n + i);
     // dessus
-    quad(2*n + i, 3*n + i, 3*n + i + 1, 2*n + i + 1);
-    // bord extérieur
-    quad(i, 2*n + i, 2*n + i + 1, i + 1);
+    quadInto(indicesRaw, 2*n + i, 3*n + i, 3*n + i + 1, 2*n + i + 1);
+    // bord extérieur (face peinte)
+    quadInto(indicesPaint, i, 2*n + i, 2*n + i + 1, i + 1);
     // bord intérieur
-    quad(n + i, n + i + 1, 3*n + i + 1, 3*n + i);
+    quadInto(indicesRaw, n + i, n + i + 1, 3*n + i + 1, 3*n + i);
   }
   // Bouts de la pièce
-  quad(0, n, 3*n, 2*n);
-  quad(n - 1, 2*n - 1, 4*n - 1, 3*n - 1);
+  quadInto(indicesRaw, 0, n, 3*n, 2*n);
+  quadInto(indicesRaw, n - 1, 2*n - 1, 4*n - 1, 3*n - 1);
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-  geometry.setIndex(indices);
+
+  const matType = document.getElementById('profileMaterial').value;
+  const ralCode = document.getElementById('profileColor').value.trim();
+  const canPaint = (matType === 'Acier' || matType === 'Alu') && ralCode.length > 0;
+
+  let material;
+  if (canPaint) {
+    // Groupe 0 = reste brut de la matière, groupe 1 = face peinte (RAL).
+    geometry.setIndex(indicesRaw.concat(indicesPaint));
+    geometry.addGroup(0, indicesRaw.length, 0);
+    geometry.addGroup(indicesRaw.length, indicesPaint.length, 1);
+    material = [getRawMetalMaterial(matType), getRalPaintMaterial(ralCode)];
+  } else {
+    geometry.setIndex(indicesRaw.concat(indicesPaint));
+    material = getRawMetalMaterial(matType);
+  }
+
   geometry.computeVertexNormals();
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
 
-  let matColor = 0x8894a2;
-  let metalnessVal = 0.6;
-  let roughnessVal = 0.4;
-  const matType = document.getElementById('profileMaterial').value;
-  if (matType === 'Acier') {
-    matColor = 0x94a3b8; metalnessVal = 0.85; roughnessVal = 0.25;
-  } else if (matType === 'Alu') {
-    matColor = 0xf1f5f9; metalnessVal = 0.95; roughnessVal = 0.15;
-  } else if (matType === 'Zinc') {
-    matColor = 0x8291a0; metalnessVal = 0.5; roughnessVal = 0.48;
-  } else if (matType === 'Cuivre') {
-    matColor = 0xf59e0b; metalnessVal = 0.85; roughnessVal = 0.22;
-  }
-
-  const material = new THREE.MeshPhysicalMaterial({
-    color: matColor,
-    metalness: metalnessVal,
-    roughness: roughnessVal,
-    clearcoat: 0.22,
-    clearcoatRoughness: 0.16,
-    reflectivity: 0.7,
-    side: THREE.DoubleSide
-  });
-
   partMesh3D = new THREE.Mesh(geometry, material);
   partMesh3D.rotation.set(prevRotation.x, prevRotation.y, prevRotation.z);
   scene3D.add(partMesh3D);
-  renderer3D.render(scene3D, camera3D);
+  renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
 }
 
 const VIEW3D_PRESETS = {
@@ -1681,7 +1915,7 @@ function setView3D(view, sourceBtnEl) {
   partMesh3D.rotation.x = preset.x;
   partMesh3D.rotation.y = preset.y;
   partMesh3D.rotation.z = 0;
-  renderer3D.render(scene3D, camera3D);
+  renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
   // Synchronise l'état "actif" sur les DEUX jeux de boutons (panneau + plein écran)
   document.querySelectorAll('.view3d-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.view === view);
@@ -1693,7 +1927,8 @@ document.querySelectorAll('.view3d-btn').forEach(btn => {
 });
 
 document.getElementById('refresh3DBtn').addEventListener('click', update3DModel);
-document.getElementById('profileMaterial').addEventListener('change', update3DModel);
+document.getElementById('profile3dShowDims').addEventListener('change', updateProfile3DLabels);
+document.getElementById('profileMaterial').addEventListener('change', () => { update3DModel(); updatePaintAvailability(); });
 document.getElementById('profileThickness').addEventListener('input', update3DModel);
 document.getElementById('pieceLength').addEventListener('input', update3DModel);
 
@@ -1705,6 +1940,55 @@ document.getElementById('resetArrowBtn').addEventListener('click', () => {
   showToast('Flèche réinitialisée.');
   redrawProfile();
 });
+
+// Palette de RAL courants en tôlerie/couverture — clic rapide au lieu de taper le code.
+const COMMON_RAL = [
+  { code: '9010', hex: '#f2f2ec', name: 'Blanc pur' },
+  { code: '9006', hex: '#a5a8a5', name: 'Aluminium blanc' },
+  { code: '9007', hex: '#8f8f8c', name: 'Aluminium gris' },
+  { code: '7016', hex: '#383e42', name: 'Gris anthracite' },
+  { code: '7035', hex: '#d7d7d7', name: 'Gris clair' },
+  { code: '7040', hex: '#9da3a6', name: 'Gris fenêtre' },
+  { code: '8017', hex: '#442f29', name: 'Brun chocolat' },
+  { code: '8004', hex: '#8f4e35', name: 'Brun cuivré' },
+  { code: '6005', hex: '#0f3d2e', name: 'Vert mousse' },
+  { code: '3009', hex: '#5e2b25', name: 'Rouge oxyde' },
+  { code: '5010', hex: '#0e294b', name: 'Bleu gentiane' },
+  { code: '1015', hex: '#e6d2b5', name: 'Ivoire clair' }
+];
+
+function renderRalSwatches(){
+  const wrap = document.getElementById('ralSwatchRow');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  COMMON_RAL.forEach(ral => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.title = `RAL ${ral.code} — ${ral.name}`;
+    const active = document.getElementById('profileColor').value.trim() === ral.code;
+    btn.style.cssText = `width:24px;height:24px;border-radius:6px;background:${ral.hex};cursor:pointer;
+      border:2px solid ${active ? 'var(--accent)' : 'var(--line)'};padding:0;flex:0 0 auto;`;
+    btn.addEventListener('click', () => {
+      document.getElementById('profileColor').value = ral.code;
+      renderRalSwatches();
+      redrawProfile();
+    });
+    wrap.appendChild(btn);
+  });
+}
+renderRalSwatches();
+document.getElementById('profileColor').addEventListener('input', renderRalSwatches);
+
+// Le RAL/thermolaquage ne concerne que l'acier et l'aluminium (le zinc et le
+// cuivre gardent leur teinte naturelle) : on masque les champs sinon.
+function updatePaintAvailability(){
+  const matType = document.getElementById('profileMaterial').value;
+  const canPaint = (matType === 'Acier' || matType === 'Alu');
+  document.getElementById('paintFieldsRow').style.display = canPaint ? 'grid' : 'none';
+  document.getElementById('arrowHintRow').style.display = canPaint ? 'flex' : 'none';
+  document.getElementById('paintUnavailableMsg').style.display = canPaint ? 'none' : 'block';
+}
+updatePaintAvailability();
 
 function setFirstStraightSideArrow(side) {
   const segList = segments;
@@ -1835,6 +2119,19 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (btn.dataset.tab === 'tab-pliage') {
       redrawProfile();
       setTimeout(init3DViewer, 100);
+    }
+    if (btn.dataset.tab === 'tab-assemblage') {
+      renderAssembleAvailableList();
+      renderAssembleComponentsList();
+      setTimeout(() => { initAssemble3D(); update3DAssemble(); fitCameraToAssemble(); }, 100);
+    }
+    if (btn.dataset.tab === 'tab-tasseaux' && window.zincCtrl_tas) {
+      zincCtrl_tas.redraw();
+      setTimeout(() => { zincCtrl_tas.init3D(); zincCtrl_tas.update3D(); zincCtrl_tas.fitCamera(); }, 100);
+    }
+    if (btn.dataset.tab === 'tab-jointdebout' && window.zincCtrl_jd) {
+      zincCtrl_jd.redraw();
+      setTimeout(() => { zincCtrl_jd.init3D(); zincCtrl_jd.update3D(); zincCtrl_jd.fitCamera(); }, 100);
     }
   });
 });
@@ -2656,6 +2953,8 @@ function drawProfileOnCanvas(canvas, isLight = false, profileData = null){
 
   const segList = profileData ? profileData.segments : segments;
   const color = profileData ? profileData.color : document.getElementById('profileColor').value;
+  const matTypeForArrow = profileData ? profileData.mat : document.getElementById('profileMaterial').value;
+  const canShowArrow = (matTypeForArrow === 'Acier' || matTypeForArrow === 'Alu');
   const rotation = profileData ? (profileData.rotation || 0) : currentProfileRotation;
   const activeArrow = profileData ? profileData.customArrow : customArrowData;
 
@@ -2697,6 +2996,10 @@ function drawProfileOnCanvas(canvas, isLight = false, profileData = null){
   if(!profileData){
     offsetX += canvasPanX * 2;
     offsetY += canvasPanY * 2;
+    // Transformation courante mémorisée sur le canvas lui-même : permet à l'outil
+    // de tracé de la flèche (clic + glisser) de convertir un pixel écran en
+    // coordonnée réelle du profil (mm), quels que soient le zoom/pan/rotation actuels.
+    canvas._pfTransform = { scale, offsetX, offsetY, rotation, w, h };
   }
 
   ctx.save();
@@ -2722,10 +3025,16 @@ function drawProfileOnCanvas(canvas, isLight = false, profileData = null){
   });
   ctx.stroke();
 
-  // --- NOUVEAU SYSTÈME DE FLÈCHE RAL AMÉLIORÉ ---
-  if(activeArrow && color && color.trim().length > 0){
-    const ax1 = activeArrow.x1, ay1 = activeArrow.y1;
-    const ax2 = activeArrow.x2, ay2 = activeArrow.y2;
+  // --- SYSTÈME DE FLÈCHE RAL : les coordonnées sont stockées en mm réels du
+  // profil (repère non tourné, échelle 1) — exactement comme les points du
+  // tracé — puis converties ici avec le même scale/offset que le profil, pour
+  // rester justes quel que soit le canvas (écran, plein écran, impression,
+  // email) et quel que soit le zoom, le pan ou la rotation en cours.
+  if(activeArrow && canShowArrow && color && color.trim().length > 0){
+    const ax1 = activeArrow.x1 * scale + offsetX - (w/2);
+    const ay1 = activeArrow.y1 * scale + offsetY - (h/2);
+    const ax2 = activeArrow.x2 * scale + offsetX - (w/2);
+    const ay2 = activeArrow.y2 * scale + offsetY - (h/2);
 
     ctx.save();
     ctx.strokeStyle = '#ff3b30';
@@ -2870,6 +3179,23 @@ const profileCanvas = document.getElementById('profileCanvas');
 let activeCanvasEl = profileCanvas;
 let activeRedraw = () => redrawProfile();
 
+// Convertit un pixel du canvas (espace écran, après zoom/pan/rotation) en
+// coordonnée réelle du profil (mm, repère non tourné) — utilise la transformation
+// mémorisée par le dernier dessin de ce canvas (voir drawProfileOnCanvas).
+function pixelToProfileMm(canvas, px, py){
+  const t = canvas._pfTransform;
+  if(!t) return { x: 0, y: 0 };
+  const rx = px - t.w / 2;
+  const ry = py - t.h / 2;
+  const rad = -t.rotation * Math.PI / 180;
+  const lx = rx * Math.cos(rad) - ry * Math.sin(rad);
+  const ly = rx * Math.sin(rad) + ry * Math.cos(rad);
+  return {
+    x: (lx - t.offsetX + t.w / 2) / t.scale,
+    y: (ly - t.offsetY + t.h / 2) / t.scale
+  };
+}
+
 function bindCanvasInteractions(canvas, redrawFn){
   canvas.addEventListener('click', (e) => {
     if (isPanning) return;
@@ -2936,10 +3262,9 @@ function bindCanvasInteractions(canvas, redrawFn){
     if (e.shiftKey) {
       isDrawingArrow = true;
       const rect = canvas.getBoundingClientRect();
-      arrowStartPoint = {
-        x: (e.clientX - rect.left) * (canvas.width / rect.width),
-        y: (e.clientY - rect.top) * (canvas.height / rect.height)
-      };
+      const pxX = (e.clientX - rect.left) * (canvas.width / rect.width);
+      const pxY = (e.clientY - rect.top) * (canvas.height / rect.height);
+      arrowStartPoint = pixelToProfileMm(canvas, pxX, pxY);
       return;
     }
     if (e.button === 0) {
@@ -2974,14 +3299,15 @@ window.addEventListener('mouseup', (e) => {
   if (isDrawingArrow) {
     isDrawingArrow = false;
     const rect = activeCanvasEl.getBoundingClientRect();
-    const endX = (e.clientX - rect.left) * (activeCanvasEl.width / rect.width);
-    const endY = (e.clientY - rect.top) * (activeCanvasEl.height / rect.height);
+    const pxX = (e.clientX - rect.left) * (activeCanvasEl.width / rect.width);
+    const pxY = (e.clientY - rect.top) * (activeCanvasEl.height / rect.height);
+    const endMm = pixelToProfileMm(activeCanvasEl, pxX, pxY);
 
     customArrowData = {
       x1: arrowStartPoint.x,
       y1: arrowStartPoint.y,
-      x2: endX,
-      y2: endY
+      x2: endMm.x,
+      y2: endMm.y
     };
     showToast('Flèche RAL personnalisée tracée !');
     if (activeRedraw) activeRedraw();
@@ -3085,7 +3411,15 @@ function renderSavedProfiles(){
     return;
   }
 
-  savedProfiles.forEach((p) => {
+  const query = (document.getElementById('savedProfilesSearch')?.value || '').trim().toLowerCase();
+  const filtered = query ? savedProfiles.filter(p => (p.name || '').toLowerCase().includes(query)) : savedProfiles;
+
+  if (!filtered.length) {
+    list.innerHTML = `<div class="empty-note" style="padding:15px;">Aucun schéma ne correspond à "${query}".</div>`;
+    return;
+  }
+
+  filtered.forEach((p) => {
     const card = document.createElement('div');
     card.className = 'profile-card';
     card.innerHTML = `
@@ -3110,8 +3444,10 @@ function renderSavedProfiles(){
         document.getElementById('pieceLength').value = p.len;
         document.getElementById('pieceQty').value = p.qty;
         document.getElementById('profileMaterial').value = p.mat;
+        updatePaintAvailability();
         document.getElementById('profileThickness').value = p.th;
         document.getElementById('profileColor').value = p.color || '';
+        renderRalSwatches();
         currentProfileRotation = p.rotation || 0;
         document.getElementById('rotateDegInput').value = currentProfileRotation;
         customArrowData = p.customArrow || null;
@@ -3135,6 +3471,7 @@ function renderSavedProfiles(){
 }
 
 renderSavedProfiles();
+document.getElementById('savedProfilesSearch').addEventListener('input', renderSavedProfiles);
 
 document.getElementById('exportJsonBtn').addEventListener('click', () => {
   const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(savedProfiles, null, 2));
@@ -3253,7 +3590,7 @@ document.getElementById('fs3dOpenBtn').addEventListener('click', () => {
     renderer3D.setSize(fsContainer.clientWidth, fsContainer.clientHeight);
     camera3D.aspect = fsContainer.clientWidth / fsContainer.clientHeight;
     camera3D.updateProjectionMatrix();
-    renderer3D.render(scene3D, camera3D);
+    renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
   }
 });
 
@@ -3265,11 +3602,27 @@ document.getElementById('fs3dCloseBtn').addEventListener('click', () => {
     renderer3D.setSize(container3D.clientWidth, container3D.clientHeight);
     camera3D.aspect = container3D.clientWidth / container3D.clientHeight;
     camera3D.updateProjectionMatrix();
-    renderer3D.render(scene3D, camera3D);
+    renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
   }
 });
 
 // Impression unique profil
+// Capture un instantané de la vue 3D actuelle (recadrée automatiquement) pour
+// l'impression, avec un encart de cotes clés en dessous (lisible sur papier).
+function build3DSnapshotPrintHTML(sectionTitle, dimsHtml){
+  if (!is3DInitialized) init3DViewer();
+  if (!renderer3D || !scene3D || !camera3D) return '';
+  update3DModel();
+  if (typeof fitCameraToPartMesh === 'function') fitCameraToPartMesh();
+  renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
+  const dataUrl = renderer3D.domElement.toDataURL('image/png');
+  return `
+    <div class="print-section-title">${sectionTitle}</div>
+    <img src="${dataUrl}" class="print-sheet-img" style="background:#f1f5f9;">
+    <div style="color:#000000 !important;font-size:11px;margin-top:4px;line-height:1.5;">${dimsHtml}</div>
+  `;
+}
+
 document.getElementById('printSingleProfileBtn').addEventListener('click', () => {
   const printArea = document.getElementById('printArea');
   const nomProfil = document.getElementById('profileName').value || 'Schéma pliage';
@@ -3305,6 +3658,11 @@ document.getElementById('printSingleProfileBtn').addEventListener('click', () =>
     <div class="print-section-title">Schéma coté & Repérage pliage</div>
     <img src="${dataUrl}" class="print-sheet-img">
   `;
+
+  printArea.innerHTML += build3DSnapshotPrintHTML(
+    'Vue 3D',
+    `<b>Longueur :</b> ${len} mm &nbsp;•&nbsp; <b>Développé à plat :</b> ${dev} mm &nbsp;•&nbsp; <b>Épaisseur :</b> ${th} mm &nbsp;•&nbsp; <b>Matière :</b> ${mat}`
+  );
 
   if (document.getElementById('biaisEnabled').checked) {
     const canvasG = document.createElement('canvas');
@@ -3646,6 +4004,42 @@ function computeSegPlan(totalRaw, segLenWanted, maxSegLen = 4000){
   return { n, L };
 }
 
+// Convertit une position physique brute (0..totalRaw) en fraction d'interpolation
+// de forme (0=pur Gauche, 1=pur Droite). En mode "progressif" les deux sont
+// identiques ; dans les autres modes, la pièce reste constante (pur Gauche ou pur
+// Droite) sur le "mur droit" et concentre toute la transformation sur une zone de
+// transition proche du "mur en biais" (utile quand un seul des deux murs est en biais).
+function biaisPositionToFraction(posRaw, totalRaw){
+  if (!totalRaw) return 0;
+  const mode = document.getElementById('biaisPositionMode').value;
+  const posFrac = Math.max(0, Math.min(1, posRaw / totalRaw));
+  if (mode === 'progressif') return posFrac;
+
+  let transLen = parseFloat(document.getElementById('biaisTransitionLen').value) || 0;
+  transLen = Math.max(1, Math.min(totalRaw, transLen));
+  const transFrac = transLen / totalRaw;
+
+  if (mode === 'droite') {
+    // reste pur Gauche jusqu'au début de la zone de transition, puis bascule vers Droite
+    const start = 1 - transFrac;
+    if (posFrac <= start) return 0;
+    return (posFrac - start) / transFrac;
+  }
+  if (mode === 'gauche') {
+    // bascule vers Droite dès le début, puis reste pur Droite
+    if (posFrac >= transFrac) return 1;
+    return posFrac / transFrac;
+  }
+  if (mode === 'central') {
+    const start = (1 - transFrac) / 2;
+    const end = start + transFrac;
+    if (posFrac <= start) return 0;
+    if (posFrac >= end) return 1;
+    return (posFrac - start) / transFrac;
+  }
+  return posFrac;
+}
+
 function buildBiaisModelGroup(){
   const group = new THREE.Group();
   const val = biaisValidateStructures();
@@ -3661,8 +4055,8 @@ function buildBiaisModelGroup(){
   let zCursor = -(plan.n * plan.L) / 2;
 
   for (let i = 0; i < plan.n; i++) {
-    const fLeft = (i * plan.L) / totalRaw;
-    const fRight = ((i + 1) * plan.L) / totalRaw;
+    const fLeft = biaisPositionToFraction(i * plan.L, totalRaw);
+    const fRight = biaisPositionToFraction((i + 1) * plan.L, totalRaw);
     const crossLeft = computeCrossSectionPoints(interpolateSegmentsAt(fLeft)).centerPoints;
     const crossRight = computeCrossSectionPoints(interpolateSegmentsAt(fRight)).centerPoints;
     const geom = buildTaperedStripGeometry(crossLeft, crossRight, thickness, zCursor, zCursor + plan.L);
@@ -3691,8 +4085,9 @@ function computeBiaisPieceRows(){
 
   const rows = [];
   for (let i = 0; i < plan.n; i++) {
-    const fLeft = (i * plan.L) / totalRaw;
-    const fRight = ((i + 1) * plan.L) / totalRaw;
+    const posLeft = i * plan.L, posRight = (i + 1) * plan.L;
+    const fLeft = biaisPositionToFraction(posLeft, totalRaw);
+    const fRight = biaisPositionToFraction(posRight, totalRaw);
     const segLeft = interpolateSegmentsAt(fLeft);
     const segRight = interpolateSegmentsAt(fRight);
     const devLeft = getDevelopTotal(segLeft);
@@ -3707,14 +4102,18 @@ function computeBiaisPieceRows(){
     if (isLast) { rightType = 'Terminal Droite (référence)'; rightDev = devRight; }
     else { rightType = senseGD ? 'Jonction : femelle' : 'Jonction : mâle'; rightDev = senseGD ? (devRight + jeu) : (devRight - jeu); }
 
+
     rows.push({
-      idx: i + 1, L: plan.L, fLeft, fRight,
+      idx: i + 1, L: plan.L,
+      posFracLeft: posLeft / totalRaw, posFracRight: posRight / totalRaw,
+      fLeft, fRight,
       leftType, leftDev, leftSummary: formatSegSummary(segLeft), segLeft,
       rightType, rightDev, rightSummary: formatSegSummary(segRight), segRight
     });
   }
   return { val, rows, plan, finiCouvert, senseGD, profondeur };
 }
+
 
 function renderBiaisPiecesTable(){
   const wrap = document.getElementById('biaisPiecesTableWrap');
@@ -3754,7 +4153,7 @@ function renderBiaisPiecesTable(){
     rows += `<tr>
       <td>${r.idx}</td>
       <td>${Math.round(r.L)} mm</td>
-      <td>${(r.fLeft*100).toFixed(0)}% → ${(r.fRight*100).toFixed(0)}%</td>
+      <td>${(r.posFracLeft*100).toFixed(0)}% → ${(r.posFracRight*100).toFixed(0)}%</td>
       <td>${r.leftType}<br><span class="dev-mini">${r.leftSummary}</span><br><span class="dev-mini">développé ${Math.round(r.leftDev)} mm</span></td>
       <td>${r.rightType}<br><span class="dev-mini">${r.rightSummary}</span><br><span class="dev-mini">développé ${Math.round(r.rightDev)} mm</span></td>
     </tr>`;
@@ -3777,6 +4176,10 @@ function updateBiaisAll(){
     renderBiaisPiecesTable();
   }
   update3DModel();
+  // La longueur totale / le découpage en pièces peuvent changer radicalement d'une
+  // saisie à l'autre (ex: 2000 mm -> 15000 mm) : sans recadrage, la caméra restait à
+  // une distance fixe et la pièce sortait du cadre ou apparaissait minuscule.
+  if (enabled) fitCameraToPartMesh();
 }
 
 // Petite flèche SVG noire (compatible impression) indiquant le sens d'écoulement.
@@ -3810,7 +4213,7 @@ function buildBiaisCalpinagePrintHTML(){
     rows += `<tr>
       <td>${r.idx}</td>
       <td>${Math.round(r.L)} mm</td>
-      <td>${(r.fLeft*100).toFixed(0)}% → ${(r.fRight*100).toFixed(0)}%</td>
+      <td>${(r.posFracLeft*100).toFixed(0)}% → ${(r.posFracRight*100).toFixed(0)}%</td>
       <td><b>${r.leftType}</b><br>${r.leftSummary}<br>développé ${Math.round(r.leftDev)} mm</td>
       <td><b>${r.rightType}</b><br>${r.rightSummary}<br>développé ${Math.round(r.rightDev)} mm</td>
     </tr>`;
@@ -3825,7 +4228,7 @@ function buildBiaisCalpinagePrintHTML(){
 
     pieceBlocks += `
       <div class="biais-piece-block">
-        <div class="biais-piece-title">Pièce ${r.idx} — ${Math.round(r.L)} mm brut — position ${(r.fLeft*100).toFixed(0)}% → ${(r.fRight*100).toFixed(0)}%</div>
+        <div class="biais-piece-title">Pièce ${r.idx} — ${Math.round(r.L)} mm brut — position ${(r.posFracLeft*100).toFixed(0)}% → ${(r.posFracRight*100).toFixed(0)}%</div>
         <div class="biais-piece-imgs">
           <div class="biais-piece-col">
             <img src="${canvasL.toDataURL('image/png')}">
@@ -3860,6 +4263,9 @@ document.getElementById('printBiaisCalpinageBtn').addEventListener('click', () =
     return;
   }
   const nomProfil = document.getElementById('profileName').value || 'Schéma pliage';
+  const totalRaw = document.getElementById('biaisTotalRaw').value;
+  const devG = getDevelopTotal(biaisSegGauche);
+  const devD = getDevelopTotal(biaisSegDroite);
   const printArea = document.getElementById('printArea');
   printArea.innerHTML = `
     <div class="print-header">
@@ -3871,11 +4277,56 @@ document.getElementById('printBiaisCalpinageBtn').addEventListener('click', () =
     </div>
     ${calp}
   `;
+  printArea.innerHTML += build3DSnapshotPrintHTML(
+    'Vue 3D — pièce biais complète',
+    `<b>Longueur totale (emboîtement compris) :</b> ${totalRaw} mm &nbsp;•&nbsp; <b>Développé Gauche :</b> ${devG} mm &nbsp;•&nbsp; <b>Développé Droite :</b> ${devD} mm`
+  );
   window.print();
 });
 
+document.getElementById('exportBiaisExcelBtn').addEventListener('click', () => {
+  const data = computeBiaisPieceRows();
+  if (!data.val.ok || !data.rows.length) {
+    showToast("Aucun calpinage à exporter (vérifie que les profils Gauche/Droite sont compatibles et que la longueur totale est renseignée).");
+    return;
+  }
+  const nomProfil = document.getElementById('profileName').value || 'Schéma pliage';
+  const mat = document.getElementById('profileMaterial').value;
+  const th = document.getElementById('profileThickness').value;
+  const totalRaw = document.getElementById('biaisTotalRaw').value;
 
-// --- Cadrage automatique de la caméra 3D sur toute la pièce biais ---
+  const rows = data.rows.map(r => ({
+    'Pièce': r.idx,
+    'Longueur brute (mm)': Math.round(r.L),
+    'Position début (%)': Math.round(r.posFracLeft * 100),
+    'Position fin (%)': Math.round(r.posFracRight * 100),
+    'Bout Gauche - type': r.leftType,
+    'Bout Gauche - séquence': r.leftSummary,
+    'Bout Gauche - développé (mm)': Math.round(r.leftDev),
+    'Bout Droite - type': r.rightType,
+    'Bout Droite - séquence': r.rightSummary,
+    'Bout Droite - développé (mm)': Math.round(r.rightDev)
+  }));
+
+  const infoRows = [
+    { 'Info': 'Nom du schéma', 'Valeur': nomProfil },
+    { 'Info': 'Matière', 'Valeur': `${mat} ${th} mm` },
+    { 'Info': 'Longueur totale (emboîtement compris)', 'Valeur': `${totalRaw} mm` },
+    { 'Info': 'Nombre de pièces', 'Valeur': data.plan.n },
+    { 'Info': 'Longueur réelle / pièce', 'Valeur': `${Math.round(data.plan.L)} mm` },
+    { 'Info': 'Portée finie couverte', 'Valeur': `${Math.round(data.finiCouvert)} mm` },
+    { 'Info': 'Sens d\'écoulement', 'Valeur': data.senseGD ? 'Gauche (femelle) → Droite (mâle)' : 'Droite (femelle) → Gauche (mâle)' },
+    { 'Info': 'Jeu d\'emboîtement', 'Valeur': `${computeJeuValue()} mm` }
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  const wsInfo = XLSX.utils.json_to_sheet(infoRows);
+  XLSX.utils.book_append_sheet(workbook, wsInfo, "Résumé");
+  const wsPieces = XLSX.utils.json_to_sheet(rows);
+  XLSX.utils.book_append_sheet(workbook, wsPieces, "Calpinage pièces");
+  XLSX.writeFile(workbook, `calpinage_biais_${nomProfil.replace(/[^a-z0-9]+/gi,'_')}.xlsx`);
+  showToast('Export Excel du calpinage réussi !');
+});
 // (utile car une pièce biais peut être bien plus longue qu'un profil simple :
 // sans ça, la caméra restait à la distance par défaut et on ne voyait qu'un bout
 // de la pièce, donc pas le changement de cote entre la gauche et la droite).
@@ -3888,13 +4339,13 @@ function fitCameraToPartMesh(){
   if (!sphere.radius) return;
   const fovRad = camera3D.fov * Math.PI / 180;
   let dist = (sphere.radius / Math.sin(fovRad / 2)) * 1.35;
-  dist = Math.max(180, Math.min(12000, dist));
+  dist = Math.max(180, Math.min(100000, dist));
   const dir = camera3D.position.clone();
   if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1);
   dir.normalize().multiplyScalar(dist);
   camera3D.position.copy(dir);
   camera3D.lookAt(0, 0, 0);
-  renderer3D.render(scene3D, camera3D);
+  renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
 }
 
 // --- Bascule d'édition Gauche / Droite (réutilise l'éditeur "Séquence du profil") ---
@@ -3927,6 +4378,7 @@ document.getElementById('biaisFitViewBtn').addEventListener('click', () => {
   if (!is3DInitialized) { showToast("Ouvre d'abord la visualisation 3D."); return; }
   fitCameraToPartMesh();
 });
+document.getElementById('biaisShow3DDims').addEventListener('change', updateProfile3DLabels);
 
 document.querySelectorAll('#biaisSideToggle button').forEach(b => {
   b.addEventListener('click', () => biaisSwitchSide(b.dataset.side));
@@ -3948,8 +4400,20 @@ document.getElementById('biaisSensInvertBtn').addEventListener('click', function
   updateBiaisAll();
 });
 
-['biaisEmboitementProfondeur', 'biaisTotalRaw', 'biaisSegLenSouhaitee', 'biaisMaxSegLen', 'profileThickness'].forEach(id => {
+['biaisEmboitementProfondeur', 'biaisTotalRaw', 'biaisSegLenSouhaitee', 'biaisMaxSegLen', 'biaisTransitionLen', 'profileThickness'].forEach(id => {
   document.getElementById(id).addEventListener('input', updateBiaisAll);
+});
+document.getElementById('biaisPositionMode').addEventListener('change', function(){
+  const mode = this.value;
+  document.getElementById('biaisTransitionLenField').style.display = (mode === 'progressif') ? 'none' : 'block';
+  const hints = {
+    progressif: "Le profil se transforme progressivement de Gauche à Droite sur toute la longueur.",
+    droite: "Le profil reste pur Gauche (mur droit) puis se transforme vers Droite sur la longueur de transition, côté droit de la pièce (mur en biais).",
+    gauche: "Le profil se transforme de Gauche vers Droite sur la longueur de transition en début de pièce, puis reste pur Droite (mur droit) jusqu'à la fin.",
+    central: "Le profil reste pur Gauche puis pur Droite aux deux bouts, et se transforme uniquement sur la longueur de transition au centre."
+  };
+  document.getElementById('biaisPositionHint').textContent = hints[mode] || '';
+  updateBiaisAll();
 });
 document.getElementById('biaisJeuOverrideChk').addEventListener('change', function(){
   document.getElementById('biaisJeuOverrideVal').disabled = !this.checked;
@@ -3970,6 +4434,1606 @@ document.getElementById('savedProfilesList').addEventListener('click', (e) => {
   }
 });
 
+
+/* ===================== ASSEMBLAGE DE PLIAGE ===================== */
+// Un composant est soit un "profile" (schéma de pliage enregistré, extrudé sur
+// la longueur commune) soit un "block" (mur/acrotère : un pavé de largeur x
+// hauteur x profondeur, avec sa propre profondeur indépendante).
+let assembleComponents = [];
+let assembleScene, assembleCamera, assembleRenderer, assembleGroup, assembleInit = false;
+let assembleLabelsWrap = null;
+let assembleSelectedUid = null;
+let assembleCompactMode = false;
+const ASSEMBLE_PALETTE_CSS = ['#e63946', '#1d7a8c', '#f4a300', '#2a9d8f', '#6a4c93', '#8d99ae', '#3a86ff', '#c9184a'];
+
+document.getElementById('assembleCompactBtn').addEventListener('click', function(){
+  assembleCompactMode = !assembleCompactMode;
+  this.textContent = assembleCompactMode ? '☰ Vue détaillée' : '☰ Vue compacte';
+  renderAssembleComponentsList();
+});
+
+function renderAssembleAvailableList(){
+  const wrap = document.getElementById('assembleAvailableList');
+  if (!wrap) return;
+  if (!savedProfiles.length) {
+    wrap.innerHTML = '<div style="font-size:11.5px;color:var(--text-dim);padding:6px 0;">Aucun profil enregistré pour le moment. Enregistre un schéma dans "Plan de pliage" d\'abord.</div>';
+    return;
+  }
+  wrap.innerHTML = '';
+  savedProfiles.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'profile-card';
+    card.innerHTML = `
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:12.5px;">${p.name}</div>
+        <div style="font-size:10.5px;color:var(--text-dim);">Développé ${p.dev} mm · ${p.mat}</div>
+      </div>
+      <button type="button" class="add-btn" style="padding:6px 10px;font-size:11px;">+ Ajouter</button>
+    `;
+    card.querySelector('button').addEventListener('click', () => addAssembleProfile(p));
+    wrap.appendChild(card);
+  });
+}
+
+function nextAssembleColor(){
+  return ASSEMBLE_PALETTE_CSS[assembleComponents.length % ASSEMBLE_PALETTE_CSS.length];
+}
+
+function addAssembleProfile(p){
+  assembleComponents.push({
+    uid: 'c' + Date.now() + Math.round(Math.random() * 9999),
+    type: 'profile',
+    name: p.name,
+    segments: JSON.parse(JSON.stringify(p.segments)),
+    th: parseFloat(p.th) || 1.5,
+    length: parseFloat(p.len) || 2000,
+    color: nextAssembleColor(), opacity: 1,
+    posX: 0, posY: 0, posZ: 0, rotationDeg: 0, locked: false
+  });
+  assembleSelectedUid = assembleComponents[assembleComponents.length - 1].uid;
+  renderAssembleComponentsList();
+  updateAssembleAll();
+}
+
+function addAssembleBlock(){
+  assembleComponents.push({
+    uid: 'c' + Date.now() + Math.round(Math.random() * 9999),
+    type: 'block',
+    name: 'Mur / bloc ' + (assembleComponents.filter(c => c.type === 'block').length + 1),
+    blockW: 200, blockH: 1000, blockD: 200,
+    color: nextAssembleColor(), opacity: 0.85,
+    posX: 0, posY: 0, posZ: 0, rotationDeg: 0, locked: false
+  });
+  assembleSelectedUid = assembleComponents[assembleComponents.length - 1].uid;
+  renderAssembleComponentsList();
+  updateAssembleAll();
+}
+document.getElementById('assembleAddBlockBtn').addEventListener('click', addAssembleBlock);
+
+function selectAssembleComponent(uid){
+  assembleSelectedUid = uid;
+  renderAssembleComponentsList();
+  drawAssemble2D();
+}
+
+function renderAssembleComponentsList(){
+  const wrap = document.getElementById('assembleComponentsList');
+  if (!wrap) return;
+  if (!assembleComponents.length) {
+    wrap.innerHTML = '<div style="font-size:11.5px;color:var(--text-dim);padding:6px 0;">Aucun composant ajouté — profil (ci-dessus) ou bloc mur/acrotère.</div>';
+    return;
+  }
+  wrap.innerHTML = '';
+  assembleComponents.forEach(c => {
+    const row = document.createElement('div');
+    row.className = 'biais-sub-panel';
+    row.style.marginTop = '10px';
+    row.style.cursor = 'pointer';
+    if (c.uid === assembleSelectedUid) { row.style.borderColor = c.color; row.style.boxShadow = `0 0 0 1.5px ${c.color}`; }
+
+    const header = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+        <b style="font-size:12px;color:${c.color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.locked ? '🔒 ' : '●'} ${c.type === 'block' ? '🧱' : '▭'} ${c.name}${c.type==='profile' ? ' · '+Math.round(c.length)+' mm' : ''}</b>
+        <div style="display:flex;gap:4px;flex-shrink:0;">
+          <button type="button" data-lock title="${c.locked ? 'Déverrouiller la position' : 'Verrouiller la position'}" style="padding:4px 7px;font-size:10.5px;border:1px solid ${c.locked ? 'var(--accent)' : 'var(--line)'};color:${c.locked ? 'var(--accent)' : 'var(--text-dim)'};background:none;border-radius:5px;cursor:pointer;">${c.locked ? '🔒' : '🔓'}</button>
+          <button type="button" data-duplicate title="Dupliquer" style="padding:4px 7px;font-size:10.5px;border:1px solid var(--line);color:var(--text-dim);background:none;border-radius:5px;cursor:pointer;">⧉</button>
+          <button type="button" data-remove title="Retirer" style="padding:4px 7px;font-size:10.5px;border:1px solid var(--danger);color:var(--danger);background:none;border-radius:5px;cursor:pointer;">✕</button>
+        </div>
+      </div>
+    `;
+
+    if (assembleCompactMode) {
+      row.innerHTML = header;
+    } else {
+      let dimFields = '';
+      if (c.type === 'block') {
+        dimFields = `
+        <div class="sheet-fields">
+          <div class="field"><label>Largeur (mm)</label><input type="number" data-field="blockW" value="${c.blockW}" min="1"></div>
+          <div class="field"><label>Hauteur (mm)</label><input type="number" data-field="blockH" value="${c.blockH}" min="1"></div>
+        </div>
+        <div class="field"><label>Profondeur (mm)</label><input type="number" data-field="blockD" value="${c.blockD}" min="1"></div>
+        `;
+      } else {
+        dimFields = `
+        <div class="field"><label>Longueur du profil (mm)</label><input type="number" data-field="length" value="${c.length}" min="1"></div>
+        `;
+      }
+
+      row.innerHTML = `
+        ${header}
+        <div style="margin-top:8px;">${dimFields}</div>
+        <div class="sheet-fields">
+          <div class="field"><label>Position X (mm)</label><input type="number" data-field="posX" value="${c.posX}" ${c.locked?'disabled':''}></div>
+          <div class="field"><label>Position Y (mm)</label><input type="number" data-field="posY" value="${c.posY}" ${c.locked?'disabled':''}></div>
+        </div>
+        <div class="sheet-fields">
+          <div class="field"><label>Position Z (mm)</label><input type="number" data-field="posZ" value="${c.posZ}" ${c.locked?'disabled':''}></div>
+          <div class="field"><label>Rotation (°)</label><input type="number" data-field="rotationDeg" value="${c.rotationDeg}" step="1" ${c.locked?'disabled':''}></div>
+        </div>
+        <div class="sheet-fields">
+          <div class="field"><label>Couleur</label><input type="color" data-field="color" value="${c.color}" style="height:36px;padding:2px;"></div>
+          <div class="field"><label>Opacité (${Math.round(c.opacity * 100)}%)</label><input type="range" data-field="opacity" min="0.1" max="1" step="0.05" value="${c.opacity}" style="margin-top:10px;"></div>
+        </div>
+      `;
+    }
+
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('input,button,select')) return;
+      selectAssembleComponent(c.uid);
+    });
+    row.querySelector('[data-remove]').addEventListener('click', (e) => {
+      e.stopPropagation();
+      assembleComponents = assembleComponents.filter(x => x.uid !== c.uid);
+      if (assembleSelectedUid === c.uid) assembleSelectedUid = null;
+      renderAssembleComponentsList();
+      updateAssembleAll();
+    });
+    row.querySelector('[data-lock]').addEventListener('click', (e) => {
+      e.stopPropagation();
+      c.locked = !c.locked;
+      renderAssembleComponentsList();
+      updateAssembleAll();
+    });
+    row.querySelector('[data-duplicate]').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const copy = JSON.parse(JSON.stringify(c));
+      copy.uid = 'c' + Date.now() + Math.round(Math.random() * 9999);
+      copy.name = `${c.name} (copie)`;
+      copy.posX = c.posX + 80;
+      copy.posY = c.posY + 80;
+      copy.locked = false;
+      copy.color = nextAssembleColor();
+      assembleComponents.push(copy);
+      assembleSelectedUid = copy.uid;
+      renderAssembleComponentsList();
+      updateAssembleAll();
+      showToast(`Composant "${c.name}" dupliqué.`);
+    });
+    row.querySelectorAll('[data-field]').forEach(inp => {
+      inp.addEventListener('click', e => e.stopPropagation());
+      inp.addEventListener('input', () => {
+        const f = inp.dataset.field;
+        c[f] = (f === 'color') ? inp.value : (parseFloat(inp.value) || 0);
+        if (f === 'opacity') inp.closest('.field').querySelector('label').textContent = `Opacité (${Math.round(c.opacity * 100)}%)`;
+        updateAssembleAll();
+      });
+    });
+    wrap.appendChild(row);
+  });
+}
+
+// Schéma 2D (vue de section) : superpose les profils / blocs de chaque composant
+// à leur position/rotation, comme une coupe transversale de l'assemblage.
+// Chaque pièce est déplaçable directement à la souris (glisser-déposer) ; seule la
+// pièce sélectionnée affiche son nom en surbrillance, pour rester lisible même
+// avec beaucoup de composants superposés.
+let assembleDrag = null; // { uid, startClientX, startClientY, startPosX, startPosY, scale }
+
+function computeAssembleShapePts(c){
+  const rad = c.rotationDeg * Math.PI / 180;
+  let localPts;
+  if (c.type === 'block') {
+    const hw = c.blockW / 2, hh = c.blockH / 2;
+    localPts = [{ x: -hw, y: -hh }, { x: hw, y: -hh }, { x: hw, y: hh }, { x: -hw, y: hh }, { x: -hw, y: -hh }];
+  } else {
+    localPts = computeCrossSectionPoints(c.segments).centerPoints;
+  }
+  return localPts.map(p => [
+    p.x * Math.cos(rad) - p.y * Math.sin(rad) + c.posX,
+    p.x * Math.sin(rad) + p.y * Math.cos(rad) + c.posY
+  ]);
+}
+function ptsToPathD(pts){ return pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0]},${-p[1]}`).join(' '); }
+
+function computeAABB(pts){
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  pts.forEach(p => { minX = Math.min(minX,p[0]); maxX = Math.max(maxX,p[0]); minY = Math.min(minY,p[1]); maxY = Math.max(maxY,p[1]); });
+  return { minX, maxX, minY, maxY };
+}
+function aabbOverlap(a, b){
+  return a.minX < b.maxX && a.maxX > b.minX && a.minY < b.maxY && a.maxY > b.minY;
+}
+// Détection de chevauchement entre composants (approximation par boîte englobante
+// — suffisante pour alerter visuellement, sans imposer une géométrie exacte pour
+// des profils ouverts dont le "volume" réel n'est pas toujours bien défini).
+function computeAssembleCollisions(shapes){
+  const collidingUids = new Set();
+  const pairs = [];
+  for (let i = 0; i < shapes.length; i++) {
+    for (let j = i + 1; j < shapes.length; j++) {
+      if (aabbOverlap(shapes[i].bbox, shapes[j].bbox)) {
+        collidingUids.add(shapes[i].uid); collidingUids.add(shapes[j].uid);
+        pairs.push([shapes[i].name, shapes[j].name]);
+      }
+    }
+  }
+  return { collidingUids, pairs };
+}
+
+function drawAssemble2D(){
+  const wrap = document.getElementById('assemble2DWrap');
+  if (!wrap) return;
+  if (!assembleComponents.length) { wrap.innerHTML = '<div style="padding:30px;color:#999;text-align:center;font-size:12px;">Ajoute des composants pour voir le schéma.</div>'; return; }
+
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  const shapes = assembleComponents.map(c => {
+    const pts = computeAssembleShapePts(c);
+    const bbox = computeAABB(pts);
+    minX = Math.min(minX, bbox.minX); maxX = Math.max(maxX, bbox.maxX);
+    minY = Math.min(minY, bbox.minY); maxY = Math.max(maxY, bbox.maxY);
+    return { uid: c.uid, pts, bbox, color: c.color, name: c.name, filled: c.type === 'block', locked: !!c.locked };
+  });
+  const { collidingUids, pairs } = computeAssembleCollisions(shapes);
+
+  const pad = Math.max(40, (maxX - minX) * 0.1, 40);
+  const w = (maxX - minX) + pad * 2 || 200;
+  const h = (maxY - minY) + pad * 2 || 200;
+  const vbX = minX - pad, vbY = -(maxY + pad);
+  let svg = `<svg id="assemble2DSvg" viewBox="${vbX} ${vbY} ${w} ${h}" style="width:100%;height:420px;touch-action:none;">`;
+  shapes.forEach(s => {
+    const selected = s.uid === assembleSelectedUid;
+    const colliding = collidingUids.has(s.uid);
+    const d = ptsToPathD(s.pts);
+    const sw = Math.max(2, w / 250) * (selected ? 1.8 : 1);
+    const fillOp = selected ? 0.5 : 0.35;
+    const cursor = s.locked ? 'not-allowed' : 'grab';
+    const dash = s.locked ? ` stroke-dasharray="3,3"` : '';
+    svg += `<path class="asm2d-shape" data-uid="${s.uid}" d="${d}" fill="${s.filled ? s.color : 'none'}" fill-opacity="${s.filled ? fillOp : 0}" stroke="${s.color}" stroke-width="${sw}"${dash} style="cursor:${cursor};" pointer-events="visibleStroke"></path>`;
+    if (s.filled) svg += `<path class="asm2d-shape-fill" data-uid="${s.uid}" d="${d}" fill="${s.color}" fill-opacity="0.001" stroke="none" style="cursor:${cursor};" pointer-events="fill"></path>`;
+    if (colliding) svg += `<path class="asm2d-collision" data-uid="${s.uid}" d="${d}" fill="none" stroke="#ff3b30" stroke-width="${sw + 2.5}" stroke-dasharray="6,5" pointer-events="none"></path>`;
+    const cx = s.pts.reduce((a,p)=>a+p[0],0) / s.pts.length;
+    const cy = -s.pts.reduce((a,p)=>a+p[1],0) / s.pts.length;
+    svg += `<text class="asm2d-label" data-uid="${s.uid}" x="${cx}" y="${cy}" text-anchor="middle" font-family="Inter, sans-serif" font-size="${w/45}" font-weight="700" fill="${s.color}" pointer-events="none" style="display:${selected?'block':'none'};">${s.locked ? '🔒 ' : ''}${s.name}</text>`;
+  });
+  svg += `</svg>`;
+
+  let legend = '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;">';
+  shapes.forEach(s => {
+    const selected = s.uid === assembleSelectedUid;
+    legend += `<div data-uid="${s.uid}" style="display:flex;align-items:center;gap:6px;font-size:11px;color:#1c1b1a;cursor:pointer;${selected?'font-weight:700;':''}"><span style="width:12px;height:12px;border-radius:3px;background:${s.color};display:inline-block;"></span>${s.name}</div>`;
+  });
+  legend += '</div>';
+
+  let collisionMsg = '';
+  if (pairs.length) {
+    collisionMsg = `<div style="margin-top:10px;padding:8px 12px;background:#fdecea;border:1px solid #ff3b30;border-radius:7px;color:#8a1c14;font-size:11.5px;">⚠ Chevauchement détecté : ${pairs.map(p => `${p[0]} ↔ ${p[1]}`).join(' · ')}</div>`;
+  }
+
+  wrap.innerHTML = svg + legend + collisionMsg;
+
+  wrap.querySelectorAll('div[data-uid]').forEach(el => {
+    el.addEventListener('click', () => selectAssembleComponent(el.dataset.uid));
+  });
+
+  const svgEl = document.getElementById('assemble2DSvg');
+
+  function updateDragVisuals(c){
+    const pts = computeAssembleShapePts(c);
+    const d = ptsToPathD(pts);
+    svgEl.querySelectorAll(`[data-uid="${c.uid}"]`).forEach(el => {
+      if (el.tagName === 'path') el.setAttribute('d', d);
+      else if (el.tagName === 'text') {
+        const cx = pts.reduce((a,p)=>a+p[0],0) / pts.length;
+        const cy = -pts.reduce((a,p)=>a+p[1],0) / pts.length;
+        el.setAttribute('x', cx); el.setAttribute('y', cy);
+      }
+    });
+    // Retour visuel de collision en direct pendant le glisser (comparé aux boîtes
+    // englobantes des AUTRES pièces, calculées au dernier rendu complet).
+    const bbox = computeAABB(pts);
+    const collidingNow = shapes.some(s => s.uid !== c.uid && aabbOverlap(bbox, s.bbox));
+    let collisionEl = svgEl.querySelector(`.asm2d-collision[data-uid="${c.uid}"]`);
+    if (collidingNow) {
+      const sw = Math.max(2, w / 250) * 1 + 2.5;
+      if (!collisionEl) {
+        collisionEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        collisionEl.setAttribute('class', 'asm2d-collision');
+        collisionEl.setAttribute('data-uid', c.uid);
+        collisionEl.setAttribute('fill', 'none');
+        collisionEl.setAttribute('stroke', '#ff3b30');
+        collisionEl.setAttribute('stroke-dasharray', '6,5');
+        collisionEl.setAttribute('pointer-events', 'none');
+        svgEl.appendChild(collisionEl);
+      }
+      collisionEl.setAttribute('d', d);
+      collisionEl.setAttribute('stroke-width', sw);
+    } else if (collisionEl) {
+      collisionEl.remove();
+    }
+  }
+
+  svgEl.querySelectorAll('.asm2d-shape, .asm2d-shape-fill').forEach(el => {
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      const c = assembleComponents.find(x => x.uid === el.dataset.uid);
+      if (!c) return;
+      if (c.uid !== assembleSelectedUid) selectAssembleComponent(c.uid);
+      if (c.locked) { showToast('Pièce verrouillée — déverrouille-la pour la déplacer.'); return; }
+      const rect = svgEl.getBoundingClientRect();
+      const vb = svgEl.viewBox.baseVal;
+      const scale = Math.min(rect.width / vb.width, rect.height / vb.height);
+      assembleDrag = { uid: c.uid, startClientX: e.clientX, startClientY: e.clientY, startPosX: c.posX, startPosY: c.posY, scale };
+      el.setPointerCapture?.(e.pointerId);
+      el.style.cursor = 'grabbing';
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (!assembleDrag || assembleDrag.uid !== el.dataset.uid) return;
+      const c = assembleComponents.find(x => x.uid === assembleDrag.uid);
+      if (!c) return;
+      const dxPx = e.clientX - assembleDrag.startClientX;
+      const dyPx = e.clientY - assembleDrag.startClientY;
+      c.posX = assembleDrag.startPosX + dxPx / assembleDrag.scale;
+      c.posY = assembleDrag.startPosY - dyPx / assembleDrag.scale;
+      updateDragVisuals(c);
+    });
+    ['pointerup', 'pointercancel'].forEach(evt => el.addEventListener(evt, () => {
+      if (!assembleDrag) return;
+      assembleDrag = null;
+      el.style.cursor = 'grab';
+      drawAssemble2D();
+      if (!assembleCompactMode) renderAssembleComponentsList();
+      update3DAssemble();
+    }));
+  });
+}
+
+function initAssemble3D(){
+  const container = document.getElementById('assembleCanvas3dContainer');
+  if (!container || assembleInit || !container.clientWidth || !container.clientHeight) return;
+
+  assembleScene = new THREE.Scene();
+  assembleScene.background = new THREE.Color(0xe8ecf1);
+  assembleCamera = new THREE.PerspectiveCamera(45, Math.max(1, container.clientWidth) / Math.max(1, container.clientHeight), 0.1, 30000);
+  assembleCamera.position.set(900, 700, 1800);
+  assembleCamera.lookAt(0, 0, 0);
+
+  assembleRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  assembleRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  assembleRenderer.outputColorSpace = THREE.SRGBColorSpace;
+  assembleRenderer.setSize(container.clientWidth, container.clientHeight);
+  assembleRenderer.domElement.style.width = '100%';
+  assembleRenderer.domElement.style.height = '100%';
+  assembleRenderer.domElement.style.cursor = 'grab';
+  container.appendChild(assembleRenderer.domElement);
+
+  assembleLabelsWrap = document.createElement('div');
+  assembleLabelsWrap.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;';
+  container.appendChild(assembleLabelsWrap);
+
+  assembleScene.add(new THREE.AmbientLight(0xffffff, 0.7));
+  const dir1 = new THREE.DirectionalLight(0xffffff, 0.8); dir1.position.set(400, 600, 800); assembleScene.add(dir1);
+  const dir2 = new THREE.DirectionalLight(0xffffff, 0.4); dir2.position.set(-400, -300, -600); assembleScene.add(dir2);
+
+  assembleGroup = new THREE.Group();
+  assembleScene.add(assembleGroup);
+
+  let dragging = false, lastX = 0, lastY = 0;
+  const canvas = assembleRenderer.domElement;
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  canvas.addEventListener('pointerdown', e => { dragging = true; lastX = e.clientX; lastY = e.clientY; canvas.style.cursor = 'grabbing'; canvas.setPointerCapture?.(e.pointerId); });
+  canvas.addEventListener('pointerup', () => { dragging = false; canvas.style.cursor = 'grab'; });
+  canvas.addEventListener('pointercancel', () => { dragging = false; canvas.style.cursor = 'grab'; });
+  canvas.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    assembleGroup.rotation.y += dx * 0.008;
+    assembleGroup.rotation.x += dy * 0.008;
+    lastX = e.clientX; lastY = e.clientY;
+    renderAssembleFrame();
+  });
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    const factor = Math.exp(e.deltaY * 0.0012);
+    assembleCamera.position.multiplyScalar(factor);
+    renderAssembleFrame();
+  }, { passive: false });
+
+  window.addEventListener('resize', () => {
+    if (!assembleInit) return;
+    const c = document.getElementById('assembleCanvas3dContainer');
+    if (!c || !c.clientWidth) return;
+    assembleCamera.aspect = c.clientWidth / c.clientHeight;
+    assembleCamera.updateProjectionMatrix();
+    assembleRenderer.setSize(c.clientWidth, c.clientHeight);
+    renderAssembleFrame();
+  });
+
+  assembleInit = true;
+}
+
+// --- Vue réaliste (optionnelle) : sol, ombres portées douces et reflets
+// d'environnement. Pas un rendu photoréaliste (pas de ray-tracing ni de vraies
+// textures), mais une nette amélioration du rendu WebGL standard, activable/
+// désactivable sans recharger la scène.
+let assembleRealisticMode = false;
+let assembleEnvTexture = null;
+let assembleShadowLight = null;
+let assembleGroundMesh = null;
+
+function buildAssembleEnvTexture(renderer){
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  pmrem.compileEquirectangularShader();
+  const envScene = new THREE.Scene();
+  const geo = new THREE.SphereGeometry(50, 16, 16);
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { topColor: { value: new THREE.Color(0xbfd4e6) }, bottomColor: { value: new THREE.Color(0x8f867a) } },
+    vertexShader: `varying vec3 vWorldPosition; void main(){ vec4 wp = modelMatrix*vec4(position,1.0); vWorldPosition = wp.xyz; gl_Position = projectionMatrix*viewMatrix*wp; }`,
+    fragmentShader: `varying vec3 vWorldPosition; uniform vec3 topColor; uniform vec3 bottomColor; void main(){ float h = normalize(vWorldPosition).y*0.5+0.5; gl_FragColor = vec4(mix(bottomColor, topColor, h), 1.0); }`,
+    side: THREE.BackSide
+  });
+  envScene.add(new THREE.Mesh(geo, mat));
+  const rt = pmrem.fromScene(envScene, 0.05);
+  pmrem.dispose();
+  return rt.texture;
+}
+
+function setAssembleRealistic(on){
+  if (!assembleInit) initAssemble3D();
+  if (!assembleRenderer) return;
+  assembleRealisticMode = on;
+  const btn = document.getElementById('assembleRealisticBtn');
+  if (btn) { btn.textContent = on ? '✨ Vue réaliste (activée — cliquer pour revenir en standard)' : '✨ Vue réaliste (sol, ombres, reflets)'; btn.style.borderColor = on ? 'var(--accent)' : ''; btn.style.color = on ? 'var(--accent)' : ''; }
+
+  assembleRenderer.shadowMap.enabled = on;
+  assembleRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  if (on) {
+    if (!assembleEnvTexture) assembleEnvTexture = buildAssembleEnvTexture(assembleRenderer);
+    assembleScene.background = assembleEnvTexture;
+  } else {
+    assembleScene.background = new THREE.Color(0xe8ecf1);
+  }
+
+  if (!assembleShadowLight) {
+    assembleShadowLight = new THREE.DirectionalLight(0xffffff, 1.15);
+    assembleShadowLight.position.set(700, 1000, 600);
+    assembleShadowLight.shadow.mapSize.set(1024, 1024);
+    assembleShadowLight.shadow.camera.left = -2500;
+    assembleShadowLight.shadow.camera.right = 2500;
+    assembleShadowLight.shadow.camera.top = 2500;
+    assembleShadowLight.shadow.camera.bottom = -2500;
+    assembleShadowLight.shadow.camera.near = 10;
+    assembleShadowLight.shadow.camera.far = 8000;
+    assembleShadowLight.shadow.bias = -0.0015;
+    assembleScene.add(assembleShadowLight);
+    assembleScene.add(assembleShadowLight.target);
+  }
+  assembleShadowLight.castShadow = on;
+  assembleShadowLight.visible = on;
+
+  update3DAssemble();
+  fitCameraToAssemble();
+}
+document.getElementById('assembleRealisticBtn').addEventListener('click', () => setAssembleRealistic(!assembleRealisticMode));
+
+function fitCameraToAssemble(){
+  if (!assembleGroup || !assembleCamera || !assembleRenderer) return;
+  const box = new THREE.Box3().setFromObject(assembleGroup);
+  if (box.isEmpty()) return;
+  const sphere = new THREE.Sphere();
+  box.getBoundingSphere(sphere);
+  if (!sphere.radius) return;
+  const fovRad = assembleCamera.fov * Math.PI / 180;
+  let dist = (sphere.radius / Math.sin(fovRad / 2)) * 1.4;
+  dist = Math.max(150, Math.min(20000, dist));
+  const dirVec = assembleCamera.position.clone().normalize();
+  if (dirVec.lengthSq() < 1e-6) dirVec.set(0.5, 0.4, 1).normalize();
+  assembleCamera.position.copy(dirVec.multiplyScalar(dist));
+  assembleCamera.lookAt(0, 0, 0);
+  renderAssembleFrame();
+}
+
+// Vues préréglées (identiques dans l'esprit au viewer du profil simple).
+function setAssembleView(preset){
+  if (!assembleGroup) return;
+  const box = new THREE.Box3().setFromObject(assembleGroup);
+  const sphere = new THREE.Sphere();
+  if (!box.isEmpty()) box.getBoundingSphere(sphere); else sphere.radius = 800;
+  const dist = Math.max(300, sphere.radius * 2.6);
+  assembleGroup.rotation.set(0, 0, 0);
+  if (preset === 'iso') assembleCamera.position.set(dist * 0.6, dist * 0.5, dist * 0.6);
+  else if (preset === 'face') assembleCamera.position.set(0, 0, dist);
+  else if (preset === 'profil') assembleCamera.position.set(dist, 0, 0);
+  else if (preset === 'dessus') assembleCamera.position.set(0, dist, 0.001);
+  assembleCamera.lookAt(0, 0, 0);
+  renderAssembleFrame();
+}
+document.querySelectorAll('#assembleViewToggle button').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('#assembleViewToggle button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    setAssembleView(b.dataset.view);
+  });
+});
+document.getElementById('assembleShowDims').addEventListener('change', renderAssembleFrame);
+
+// Projette un point 3D en coordonnées écran (px) dans le conteneur du viewer.
+function project3DToScreen(vec3, camera, container){
+  const v = vec3.clone().project(camera);
+  return {
+    x: (v.x * 0.5 + 0.5) * container.clientWidth,
+    y: (-v.y * 0.5 + 0.5) * container.clientHeight,
+    visible: v.z < 1
+  };
+}
+
+function updateAssembleLabels(){
+  if (!assembleLabelsWrap) return;
+  assembleLabelsWrap.innerHTML = '';
+  const showDims = document.getElementById('assembleShowDims').checked;
+  if (!showDims) return;
+  const container = document.getElementById('assembleCanvas3dContainer');
+
+  assembleComponents.forEach(c => {
+    let labelText, anchorLocal;
+    if (c.type === 'block') {
+      labelText = `${c.name} — ${Math.round(c.blockW)}×${Math.round(c.blockH)}×${Math.round(c.blockD)} mm`;
+      anchorLocal = new THREE.Vector3(0, c.blockH / 2 + 30, 0);
+    } else {
+      const dev = getDevelopTotal(c.segments);
+      const length = parseFloat(c.length) || 2000;
+      labelText = `${c.name} — développé ${dev} mm, longueur ${Math.round(length)} mm`;
+      const cross = computeCrossSectionPoints(c.segments).centerPoints;
+      let topY = -Infinity;
+      cross.forEach(p => { if (p.y > topY) topY = p.y; });
+      anchorLocal = new THREE.Vector3(0, (isFinite(topY) ? topY : 0) + 25, length / 2);
+    }
+    const rad = c.rotationDeg * Math.PI / 180;
+    const worldPos = new THREE.Vector3(
+      anchorLocal.x * Math.cos(rad) - anchorLocal.y * Math.sin(rad) + c.posX,
+      anchorLocal.x * Math.sin(rad) + anchorLocal.y * Math.cos(rad) + c.posY,
+      anchorLocal.z + c.posZ
+    );
+    worldPos.applyEuler(assembleGroup.rotation);
+    const screen = project3DToScreen(worldPos, assembleCamera, container);
+    if (!screen.visible || screen.x < -50 || screen.x > container.clientWidth + 50) return;
+
+    const lbl = document.createElement('div');
+    lbl.textContent = labelText;
+    lbl.style.cssText = `position:absolute;left:${screen.x}px;top:${screen.y}px;transform:translate(-50%,-100%);
+      background:rgba(20,20,20,0.82);color:#fff;font-family:'JetBrains Mono',monospace;font-size:10.5px;
+      padding:3px 7px;border-radius:4px;white-space:nowrap;border:1px solid ${c.color};`;
+    assembleLabelsWrap.appendChild(lbl);
+  });
+}
+
+function renderAssembleFrame(){
+  if (!assembleRenderer) return;
+  assembleRenderer.render(assembleScene, assembleCamera);
+  updateAssembleLabels();
+}
+
+function update3DAssemble(){
+  if (!assembleInit) initAssemble3D();
+  if (!assembleGroup) return;
+
+  while (assembleGroup.children.length) {
+    const m = assembleGroup.children.pop();
+    if (m.geometry) m.geometry.dispose();
+    if (m.material) m.material.dispose();
+  }
+
+  const meshEntries = [];
+  assembleComponents.forEach(c => {
+    let mesh;
+    const mat = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(c.color), metalness: c.type === 'block' ? 0.05 : 0.6, roughness: c.type === 'block' ? 0.9 : 0.35,
+      side: THREE.DoubleSide, transparent: c.opacity < 1, opacity: c.opacity,
+      envMap: assembleRealisticMode ? assembleEnvTexture : null, envMapIntensity: 0.9
+    });
+    if (c.type === 'block') {
+      const geom = new THREE.BoxGeometry(c.blockW, c.blockH, c.blockD);
+      mesh = new THREE.Mesh(geom, mat);
+    } else {
+      const length = parseFloat(c.length) || 2000;
+      const cross = computeCrossSectionPoints(c.segments).centerPoints;
+      const geom = buildTaperedStripGeometry(cross, cross, c.th, -length / 2, length / 2);
+      mesh = new THREE.Mesh(geom, mat);
+    }
+    mesh.position.set(c.posX, c.posY, c.posZ);
+    mesh.rotation.z = c.rotationDeg * Math.PI / 180;
+    mesh.castShadow = assembleRealisticMode;
+    mesh.receiveShadow = assembleRealisticMode;
+    assembleGroup.add(mesh);
+    meshEntries.push({ mesh, mat });
+  });
+
+  // Détection de collision en 3D (boîtes englobantes réelles, après positionnement
+  // et rotation PROPRES de chaque pièce — en repère local de l'assemblage, pas en
+  // repère écran, pour que ça ne dépende pas de la rotation de vue à la souris).
+  const boxes = meshEntries.map(e => computeLocalMeshBox(e.mesh));
+  for (let i = 0; i < meshEntries.length; i++) {
+    for (let j = i + 1; j < meshEntries.length; j++) {
+      if (boxes[i].intersectsBox(boxes[j])) {
+        meshEntries[i].mat.emissive = new THREE.Color(0xff3b30);
+        meshEntries[i].mat.emissiveIntensity = 0.55;
+        meshEntries[j].mat.emissive = new THREE.Color(0xff3b30);
+        meshEntries[j].mat.emissiveIntensity = 0.55;
+      }
+    }
+  }
+
+  // Sol + cadrage de l'ombre portée, uniquement en vue réaliste.
+  if (assembleRealisticMode && boxes.length) {
+    const overall = boxes[0].clone();
+    for (let i = 1; i < boxes.length; i++) overall.union(boxes[i]);
+    const sphere = new THREE.Sphere();
+    overall.getBoundingSphere(sphere);
+    const groundSize = Math.max(1000, sphere.radius * 6);
+    const groundGeom = new THREE.PlaneGeometry(groundSize, groundSize);
+    const groundMat = new THREE.MeshStandardMaterial({ color: 0xcfcac0, roughness: 0.95, metalness: 0.02 });
+    assembleGroundMesh = new THREE.Mesh(groundGeom, groundMat);
+    assembleGroundMesh.rotation.x = -Math.PI / 2;
+    assembleGroundMesh.position.set(0, overall.min.y - 2, 0);
+    assembleGroundMesh.receiveShadow = true;
+    assembleGroup.add(assembleGroundMesh);
+
+    if (assembleShadowLight) assembleShadowLight.target.position.set(0, overall.min.y, 0);
+  }
+
+  renderAssembleFrame();
+}
+function computeLocalMeshBox(mesh){
+  if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+  const box = mesh.geometry.boundingBox.clone();
+  const q = new THREE.Quaternion().setFromEuler(mesh.rotation);
+  const m = new THREE.Matrix4().compose(mesh.position, q, new THREE.Vector3(1, 1, 1));
+  box.applyMatrix4(m);
+  return box;
+}
+
+function updateAssembleAll(){
+  drawAssemble2D();
+  update3DAssemble();
+}
+
+document.getElementById('printAssembleBtn').addEventListener('click', () => {
+  if (!assembleComponents.length) { showToast('Ajoute au moins un composant à assembler.'); return; }
+  fitCameraToAssemble();
+  const snap3D = assembleRenderer.domElement.toDataURL('image/png');
+  const svg2D = document.getElementById('assemble2DWrap').querySelector('svg');
+  const svgData = svg2D ? new XMLSerializer().serializeToString(svg2D) : '';
+  const printArea = document.getElementById('printArea');
+  let compRows = '';
+  assembleComponents.forEach(c => {
+    const dims = c.type === 'block' ? `${c.blockW}×${c.blockH}×${c.blockD} mm` : `développé ${getDevelopTotal(c.segments)} mm, longueur ${Math.round(c.length)} mm`;
+    compRows += `<tr><td>${c.type === 'block' ? 'Bloc' : 'Profil'}</td><td>${c.name}</td><td>X=${c.posX} / Y=${c.posY} / Z=${c.posZ} mm</td><td>${c.rotationDeg}°</td><td>${dims}</td></tr>`;
+  });
+  printArea.innerHTML = `
+    <div class="print-header">
+      <div class="print-title">ALFEMA • Plan d'Assemblage</div>
+      <div style="font-size:12px;">Date : ${new Date().toLocaleDateString()}</div>
+    </div>
+    <div class="print-section-title">Composants</div>
+    <table class="recap-table">
+      <tr><th>Type</th><th>Nom</th><th>Position</th><th>Rotation</th><th>Dimensions</th></tr>
+      ${compRows}
+    </table>
+    <div class="print-section-title">Schéma d'assemblage (vue de section)</div>
+    <div style="border:1px solid #000;background:#fff;">${svgData}</div>
+    <div class="print-section-title">Vue 3D</div>
+    <img src="${snap3D}" class="print-sheet-img" style="background:#e8ecf1;">
+  `;
+  window.print();
+});
+
+/* ===================== ZINC — TOITURE (tracé libre) : module générique ===================== */
+/* Un seul contrôleur est instancié deux fois (tasseaux / joint debout), chacun avec son
+   propre état, son propre tracé de versant et sa propre géométrie de relief 3D. */
+
+function createZincController(suffix, kind){
+  const isTasseaux = kind === 'tasseaux';
+  const id = (base) => `${base}_${suffix}`;
+  const $ = (base) => document.getElementById(id(base));
+
+  const root = document.getElementById(`zincRoot_${suffix}`);
+
+  root.innerHTML = `
+    <div>
+      <div class="panel">
+        <div class="panel-title"><span>Forme du versant</span></div>
+        <div class="dir-toggle male-toggle" id="${id('shapeModeToggle')}" style="margin-bottom:12px;">
+          <button type="button" class="active" data-mode="rect">Rectangle (dimensions)</button>
+          <button type="button" data-mode="free">Tracé libre (clic)</button>
+        </div>
+
+        <div id="${id('rectModeWrap')}">
+          <div class="biais-hint">Renseigne simplement les dimensions du versant. Mets une largeur au faîtage différente de celle à l'égout pour obtenir un versant trapézoïdal.</div>
+          <div class="sheet-fields">
+            <div class="field">
+              <label>Largeur à l'égout (mm)</label>
+              <input type="number" id="${id('rectEgout')}" value="5000" min="1">
+            </div>
+            <div class="field">
+              <label>Largeur au faîtage (mm)</label>
+              <input type="number" id="${id('rectFaitage')}" value="5000" min="1">
+            </div>
+          </div>
+          <div class="field">
+            <label>Longueur de rampant (mm)</label>
+            <input type="number" id="${id('rectRampant')}" value="8000" min="1">
+          </div>
+        </div>
+
+        <div id="${id('freeModeWrap')}" style="display:none;">
+          <div class="biais-hint">Clique pour poser les sommets du versant (dans l'ordre), puis clique sur "Fermer le tracé". Renseigne ensuite la longueur réelle et le rôle (égout / faîtage / rive / autre) de chaque arête — la forme se recalcule automatiquement à l'échelle exacte.</div>
+          <div id="${id('drawWrap')}" style="background:#0a0c0e;border-radius:8px;padding:8px;">
+            <svg id="${id('drawSvg')}" viewBox="0 0 700 460" style="width:100%;height:360px;display:block;cursor:crosshair;background:#12151a;border-radius:6px;"></svg>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+            <button class="add-btn" id="${id('undoPtBtn')}" type="button" style="flex:1;">↺ Annuler dernier point (Ctrl+Z)</button>
+            <button class="add-btn" id="${id('closeBtn')}" type="button" style="flex:1;">✓ Fermer le tracé</button>
+            <button class="add-btn" id="${id('resetBtn')}" type="button" style="flex:1;border-color:var(--danger);color:var(--danger);">✕ Recommencer</button>
+          </div>
+          <div class="biais-hint" id="${id('closureMsg')}" style="margin-top:8px;"></div>
+
+          <div id="${id('edgesWrap')}" style="margin-top:10px;display:none;">
+            <div class="panel-title" style="font-size:12px;">Arêtes du versant</div>
+            <div id="${id('edgesList')}"></div>
+            <button class="add-btn" id="${id('fermAutoBtn')}" type="button" style="margin-top:8px;">🔧 Fermeture auto (ajuste la dernière arête)</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:16px;">
+        <div class="panel-title"><span>Pente & matière</span></div>
+        <div class="sheet-fields">
+          <div class="field">
+            <label>Pente (°)</label>
+            <input type="number" id="${id('pente')}" value="25" min="0" max="90" step="0.5">
+          </div>
+          <div class="field">
+            <label>Épaisseur zinc (mm)</label>
+            <input type="number" id="${id('epaisseur')}" value="0.65" min="0.1" step="0.05">
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:16px;">
+        <div class="panel-title"><span>Ouvertures (Velux, cheminée...)</span></div>
+        <div id="${id('openingsList')}"></div>
+        <button class="add-btn" id="${id('addOpeningBtn')}" type="button" style="margin-top:8px;">+ Ajouter une ouverture</button>
+      </div>
+
+      <div class="panel" style="margin-top:16px;">
+        <div class="panel-title"><span>${isTasseaux ? 'Bac à tasseaux' : 'Joint debout'} — calepinage</span></div>
+        <div class="sheet-fields">
+          <div class="field">
+            <label>Largeur utile / bac (mm)</label>
+            <input type="number" id="${id('largeurBac')}" value="500" min="50">
+          </div>
+          <div class="field">
+            <label>${isTasseaux ? 'Largeur tasseau (mm)' : 'Largeur relief joint debout (mm)'}</label>
+            <input type="number" id="${id('largeurTasseau')}" value="${isTasseaux ? 40 : 25}" min="10">
+          </div>
+        </div>
+        <div class="develop-summary" id="${id('bacStats')}">
+          <div class="stat"><div class="label">Nombre de bacs</div><div class="value accent" id="${id('bacN')}">0</div></div>
+          <div class="stat"><div class="label">${isTasseaux ? 'Nombre de tasseaux' : 'Nombre de joints debout'}</div><div class="value" id="${id('tasseauN')}">0</div></div>
+          <div class="stat"><div class="label">Largeur bac (égout → faîtage)</div><div class="value good" id="${id('bacRive')}">0 mm</div></div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:16px;">
+        <div class="panel-title"><span>Joint de bout — dilatation</span></div>
+        <div class="biais-hint">La longueur max avant joint de bout dépend de la nuance de zinc et de l'exposition (à ajuster selon le DTU 40.41 ou tes propres règles d'atelier).</div>
+        <div class="sheet-fields">
+          <div class="field">
+            <label>Longueur max avant joint (mm)</label>
+            <input type="number" id="${id('maxAvantJoint')}" value="6000" min="500">
+          </div>
+          <div class="field">
+            <label>Recouvrement du joint (mm)</label>
+            <input type="number" id="${id('recouvrementJoint')}" value="80" min="0">
+          </div>
+        </div>
+        <div class="develop-summary" id="${id('jointStats')}">
+          <div class="stat"><div class="label">Nombre de lés</div><div class="value accent" id="${id('jointN')}">0</div></div>
+          <div class="stat"><div class="label">Longueur réelle / lé</div><div class="value" id="${id('jointL')}">0 mm</div></div>
+          <div class="stat"><div class="label">Nombre de joints</div><div class="value good" id="${id('jointCount')}">0</div></div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:16px;">
+        <div class="panel-title"><span>Accessoires (rive, égout, faîtage)</span></div>
+        <div id="${id('accessoiresWrap')}"></div>
+      </div>
+
+      <button class="print-btn" id="${id('printBtn')}" type="button" style="margin-top:16px;">
+        🖨 Imprimer l'étude toiture — ${isTasseaux ? 'bac à tasseaux' : 'joint debout'}
+      </button>
+    </div>
+
+    <div>
+      <div id="${id('schemaWrap')}" style="background:#fff;border-radius:10px;padding:14px;margin-bottom:16px;">
+        <div class="canvas-head" style="margin-bottom:8px;">
+          <span class="canvas-title" style="color:#1c1b1a;">Plan du versant (bacs, lés, ouvertures)</span>
+        </div>
+        <div id="${id('schemaSvgWrap')}"></div>
+      </div>
+
+      <div class="panel">
+        <div class="canvas-head">
+          <span class="canvas-title">Simulation 3D de la couverture</span>
+        </div>
+        <div class="dir-toggle male-toggle" id="${id('viewToggle')}" style="margin-top:10px;">
+          <button type="button" class="active" data-view="iso">Isométrique</button>
+          <button type="button" data-view="face">Face</button>
+          <button type="button" data-view="profil">Profil</button>
+          <button type="button" data-view="dessus">Dessus</button>
+        </div>
+        <div class="toggle-row" style="margin:10px 0 0;">
+          <input type="checkbox" id="${id('showDims')}" checked>
+          <span>Afficher les cotes déportées sur la 3D</span>
+        </div>
+        <div id="${id('canvas3d')}" style="width:100%;height:460px;border-radius:6px;background:#e8ecf1;position:relative;overflow:hidden;margin-top:10px;"></div>
+      </div>
+    </div>
+  `;
+
+  /* ---------- État du tracé ---------- */
+  let shapeMode = 'rect';   // 'rect' (dimensions simples) | 'free' (tracé au clic)
+  let drawPoints = [];      // sommets bruts cliqués (coord SVG)
+  let drawHistory = [];     // pile pour Ctrl+Z pendant le dessin
+  let mode = 'draw';        // 'draw' | 'edit' (tracé libre uniquement)
+  let roofEdges = [];       // [{len, angle, role}] — description du versant, quel que soit le mode
+  let openings = [];        // {uid, type, w, h, x, y}
+
+  const ROLE_LABELS = { egout: 'Égout', faitage: 'Faîtage', rive: 'Rive', autre: 'Autre' };
+  const ROLE_COLORS = { egout: '#3a86ff', faitage: '#e63946', rive: '#2a9d8f', autre: '#8d99ae' };
+
+  // Construit un rectangle (ou trapèze si largeurs égout/faîtage différentes) à
+  // partir des 3 dimensions saisies : bas = égout, droite = rive, haut = faîtage
+  // (inversé, donc de droite à gauche), gauche = rive.
+  function buildRectEdges(){
+    const wEgout = parseFloat($('rectEgout').value) || 1;
+    const wFaitage = parseFloat($('rectFaitage').value) || 1;
+    const rampant = parseFloat($('rectRampant').value) || 1;
+    const demiEcart = (wEgout - wFaitage) / 2;
+    const riveLen = Math.sqrt(rampant * rampant + demiEcart * demiEcart);
+    const riveAngleUp = Math.atan2(rampant, -demiEcart) * 180 / Math.PI;    // montée (bas -> haut)
+    const riveAngleDown = Math.atan2(-rampant, -demiEcart) * 180 / Math.PI; // descente (haut -> bas)
+    roofEdges = [
+      { len: wEgout, angle: 0, role: 'egout' },
+      { len: riveLen, angle: riveAngleUp, role: 'rive' },
+      { len: wFaitage, angle: 180, role: 'faitage' },
+      { len: riveLen, angle: riveAngleDown, role: 'rive' }
+    ];
+  }
+
+  function setShapeMode(next){
+    shapeMode = next;
+    root.querySelectorAll(`#${id('shapeModeToggle')} button`).forEach(b => b.classList.toggle('active', b.dataset.mode === next));
+    $('rectModeWrap').style.display = (next === 'rect') ? 'block' : 'none';
+    $('freeModeWrap').style.display = (next === 'free') ? 'block' : 'none';
+    if (next === 'rect') {
+      buildRectEdges();
+      redraw();
+    } else {
+      drawPoints = []; drawHistory = []; roofEdges = [];
+      mode = 'draw';
+      $('edgesWrap').style.display = 'none';
+      renderDrawSvg();
+      updateDrawButtons();
+      redraw();
+    }
+  }
+  root.querySelectorAll(`#${id('shapeModeToggle')} button`).forEach(b => {
+    b.addEventListener('click', () => setShapeMode(b.dataset.mode));
+  });
+  ['rectEgout', 'rectFaitage', 'rectRampant'].forEach(base => {
+    $(base).addEventListener('input', () => { buildRectEdges(); redraw(); });
+  });
+
+  const svg = $('drawSvg');
+
+  function svgPointFromEvent(e){
+    const rect = svg.getBoundingClientRect();
+    const vb = svg.viewBox.baseVal;
+    const x = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
+    const y = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
+    return { x, y };
+  }
+
+  function renderDrawSvg(){
+    if (mode !== 'draw') return;
+    let s = '';
+    drawPoints.forEach((p, i) => {
+      s += `<circle cx="${p.x}" cy="${p.y}" r="5" fill="#ffce00"/>`;
+      s += `<text x="${p.x+8}" y="${p.y-8}" font-size="11" fill="#eeece7" font-family="JetBrains Mono, monospace">${i+1}</text>`;
+    });
+    if (drawPoints.length > 1) {
+      const d = drawPoints.map((p,i)=>`${i===0?'M':'L'}${p.x},${p.y}`).join(' ');
+      s += `<path d="${d}" fill="none" stroke="#ffce00" stroke-width="2"/>`;
+    }
+    svg.innerHTML = s;
+  }
+
+  svg.addEventListener('click', (e) => {
+    if (mode !== 'draw') return;
+    drawHistory.push(drawPoints.map(p => ({...p})));
+    drawPoints.push(svgPointFromEvent(e));
+    renderDrawSvg();
+    updateDrawButtons();
+  });
+
+  function updateDrawButtons(){
+    $('closeBtn').disabled = drawPoints.length < 3;
+    $('closeBtn').style.opacity = drawPoints.length < 3 ? .45 : 1;
+  }
+
+  function undoPoint(){
+    if (mode !== 'draw' || !drawHistory.length) return;
+    drawPoints = drawHistory.pop();
+    renderDrawSvg();
+    updateDrawButtons();
+  }
+  $('undoPtBtn').addEventListener('click', undoPoint);
+
+  // Ctrl+Z limité à l'onglet actif et au mode dessin de ce contrôleur
+  document.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z') return;
+    const panel = document.getElementById(suffix === 'tas' ? 'tab-tasseaux' : 'tab-jointdebout');
+    if (!panel || !panel.classList.contains('active')) return;
+    if (mode !== 'draw') return;
+    e.preventDefault();
+    undoPoint();
+  });
+
+  function pointsToEdges(pts){
+    const edges = [];
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i+1) % pts.length];
+      const len = Math.hypot(b.x - a.x, b.y - a.y) * 20; // conversion approx px -> mm de départ
+      const angle = Math.atan2(-(b.y - a.y), b.x - a.x) * 180 / Math.PI;
+      edges.push({ len: Math.round(len / 10) * 10, angle: Math.round(angle), role: 'autre' });
+    }
+    return edges;
+  }
+
+  function edgesToPolygon(edges){
+    const pts = [{ x: 0, y: 0 }];
+    let cx = 0, cy = 0;
+    edges.forEach(ed => {
+      cx += ed.len * Math.cos(ed.angle * Math.PI / 180);
+      cy += ed.len * Math.sin(ed.angle * Math.PI / 180);
+      pts.push({ x: cx, y: cy });
+    });
+    return pts; // pts.length === edges.length + 1 ; pts[last] devrait ≈ pts[0]
+  }
+
+  $('closeBtn').addEventListener('click', () => {
+    if (drawPoints.length < 3) return;
+    roofEdges = pointsToEdges(drawPoints);
+    // Devine automatiquement égout (arête la plus basse / horizontale du bas) et faîtage (opposée)
+    let egoutIdx = 0, maxYAvg = -Infinity;
+    const pts = edgesToPolygon(roofEdges);
+    roofEdges.forEach((ed, i) => {
+      const yAvg = (pts[i].y + pts[i+1].y) / 2;
+      if (yAvg > maxYAvg) { maxYAvg = yAvg; egoutIdx = i; }
+    });
+    roofEdges[egoutIdx].role = 'egout';
+    if (roofEdges.length > 2) {
+      const faitageIdx = (egoutIdx + Math.floor(roofEdges.length/2)) % roofEdges.length;
+      if (faitageIdx !== egoutIdx) roofEdges[faitageIdx].role = 'faitage';
+    }
+    roofEdges.forEach((ed, i) => { if (i !== egoutIdx && ed.role !== 'faitage') ed.role = 'rive'; });
+
+    mode = 'edit';
+    $('edgesWrap').style.display = 'block';
+    renderEdgesTable();
+    redraw();
+  });
+
+  $('resetBtn').addEventListener('click', () => {
+    drawPoints = []; drawHistory = []; roofEdges = [];
+    mode = 'draw';
+    $('edgesWrap').style.display = 'none';
+    renderDrawSvg();
+    updateDrawButtons();
+    redraw();
+  });
+
+  function renderEdgesTable(){
+    const wrap = $('edgesList');
+    wrap.innerHTML = '';
+    roofEdges.forEach((ed, i) => {
+      const row = document.createElement('div');
+      row.className = 'seg-row';
+      row.style.gridTemplateColumns = '16px 1fr 22px';
+      row.innerHTML = `
+        <div class="seg-icon" style="background:${ROLE_COLORS[ed.role]};">${i+1}</div>
+        <div class="seg-body">
+          <select data-i="${i}" data-k="role" style="background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:5px;font-size:11px;padding:4px;">
+            ${Object.keys(ROLE_LABELS).map(r => `<option value="${r}" ${ed.role===r?'selected':''}>${ROLE_LABELS[r]}</option>`).join('')}
+          </select>
+          <span class="seg-label">Long.</span><input type="number" data-i="${i}" data-k="len" value="${Math.round(ed.len)}">
+          <span class="seg-label">mm</span>
+          <span class="seg-label">Orient.</span><input type="number" data-i="${i}" data-k="angle" value="${Math.round(ed.angle)}">
+          <span class="seg-label">°</span>
+        </div>
+        <span></span>
+      `;
+      wrap.appendChild(row);
+    });
+    wrap.querySelectorAll('select,input').forEach(el => {
+      el.addEventListener('input', () => {
+        const i = Number(el.dataset.i), k = el.dataset.k;
+        roofEdges[i][k] = (k === 'role') ? el.value : (Number(el.value) || 0);
+        renderEdgesTable();
+        redraw();
+      });
+    });
+  }
+
+  $('fermAutoBtn').addEventListener('click', () => {
+    if (roofEdges.length < 2) return;
+    let vx = 0, vy = 0;
+    for (let i = 0; i < roofEdges.length - 1; i++) {
+      vx += roofEdges[i].len * Math.cos(roofEdges[i].angle * Math.PI / 180);
+      vy += roofEdges[i].len * Math.sin(roofEdges[i].angle * Math.PI / 180);
+    }
+    // Le dernier vecteur doit ramener (vx,vy) à (0,0)
+    const lastVx = -vx, lastVy = -vy;
+    const last = roofEdges[roofEdges.length - 1];
+    last.len = Math.round(Math.hypot(lastVx, lastVy));
+    last.angle = Math.round(Math.atan2(lastVy, lastVx) * 180 / Math.PI);
+    renderEdgesTable();
+    redraw();
+    showToast('Dernière arête ajustée pour fermer le tracé.');
+  });
+
+  /* ---------- Calculs géométriques dérivés du tracé ---------- */
+  function computeRoofGeometry(){
+    if (!roofEdges.length) return null;
+    const pts = edgesToPolygon(roofEdges);
+    const egoutEdges = roofEdges.filter(e => e.role === 'egout');
+    const faitageEdges = roofEdges.filter(e => e.role === 'faitage');
+    const riveEdges = roofEdges.filter(e => e.role === 'rive');
+    const autreEdges = roofEdges.filter(e => e.role === 'autre');
+
+    const egoutLen = egoutEdges.reduce((s,e)=>s+e.len,0);
+    const faitageLen = faitageEdges.reduce((s,e)=>s+e.len,0);
+    const riveLen = riveEdges.reduce((s,e)=>s+e.len,0);
+    const autreLen = autreEdges.reduce((s,e)=>s+e.len,0);
+
+    let rampant;
+    if (riveEdges.length) rampant = riveLen / riveEdges.length;
+    else {
+      let minY=Infinity, maxY=-Infinity;
+      pts.forEach(p=>{ minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y); });
+      rampant = (maxY - minY) || 1;
+    }
+    const largeurMoy = (egoutLen && faitageLen) ? (egoutLen + faitageLen) / 2 : (egoutLen || faitageLen || autreLen || 1000);
+
+    let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+    pts.forEach(p=>{ minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y); });
+
+    return { pts, egoutLen: egoutLen || largeurMoy, faitageLen: faitageLen || largeurMoy, riveLen, rampant, largeurMoy, bbox:{minX,maxX,minY,maxY} };
+  }
+
+  function computeZincLes(rampant, maxLen, recouvrement){
+    if (rampant <= maxLen) return { n: 1, L: rampant };
+    const denom = Math.max(1, maxLen - recouvrement);
+    const n = Math.max(1, Math.ceil((rampant - recouvrement) / denom));
+    const L = (rampant + (n - 1) * recouvrement) / n;
+    return { n, L };
+  }
+
+  function computeZincCalc(){
+    const geo = computeRoofGeometry();
+    if (!geo) return null;
+    const largeurBac = parseFloat($('largeurBac').value) || 1;
+    const maxAvantJoint = parseFloat($('maxAvantJoint').value) || 1;
+    const recouvrementJoint = parseFloat($('recouvrementJoint').value) || 0;
+
+    const nBacs = Math.max(1, Math.round(geo.largeurMoy / largeurBac) || 1);
+    const largeurBacEgout = geo.egoutLen / nBacs;
+    const largeurBacFaitage = geo.faitageLen / nBacs;
+    const largeurBacReelle = (largeurBacEgout + largeurBacFaitage) / 2;
+    const nTasseaux = nBacs + 1;
+
+    const les = computeZincLes(geo.rampant, maxAvantJoint, recouvrementJoint);
+
+    return { geo, largeurBac, nBacs, largeurBacEgout, largeurBacFaitage, largeurBacReelle, nTasseaux, les };
+  }
+
+  function computeAccessoires(data){
+    const geo = data.geo;
+    let openingsTotal = 0;
+    const openingsRows = openings.map(o => {
+      const perim = 2 * (o.w + o.h);
+      openingsTotal += perim;
+      return Object.assign({}, o, { perim });
+    });
+    return { riveTotal: geo.riveLen, egoutTotal: geo.egoutLen, faitageTotal: geo.faitageLen, openingsRows, openingsTotal };
+  }
+
+  /* ---------- Ouvertures ---------- */
+  function renderOpenings(){
+    const wrap = $('openingsList');
+    if (!openings.length) { wrap.innerHTML = '<div style="font-size:11.5px;color:var(--text-dim);">Aucune ouverture ajoutée.</div>'; return; }
+    wrap.innerHTML = '';
+    openings.forEach(o => {
+      const row = document.createElement('div');
+      row.className = 'biais-sub-panel';
+      row.style.marginTop = '10px';
+      row.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;">
+          <select data-field="type" style="max-width:150px;">
+            <option value="velux" ${o.type === 'velux' ? 'selected' : ''}>Vélux</option>
+            <option value="cheminee" ${o.type === 'cheminee' ? 'selected' : ''}>Cheminée</option>
+          </select>
+          <button type="button" data-remove style="padding:4px 8px;font-size:10.5px;border:1px solid var(--danger);color:var(--danger);background:none;border-radius:5px;cursor:pointer;">Retirer</button>
+        </div>
+        <div class="sheet-fields">
+          <div class="field"><label>Largeur (mm)</label><input type="number" data-field="w" value="${o.w}" min="1"></div>
+          <div class="field"><label>Hauteur (mm)</label><input type="number" data-field="h" value="${o.h}" min="1"></div>
+        </div>
+        <div class="sheet-fields">
+          <div class="field"><label>X depuis rive gauche (mm)</label><input type="number" data-field="x" value="${o.x}" min="0"></div>
+          <div class="field"><label>Y depuis l'égout (mm)</label><input type="number" data-field="y" value="${o.y}" min="0"></div>
+        </div>
+      `;
+      row.querySelector('[data-remove]').addEventListener('click', () => {
+        openings = openings.filter(x => x.uid !== o.uid);
+        renderOpenings();
+        redraw();
+      });
+      row.querySelectorAll('[data-field]').forEach(inp => {
+        const evt = inp.tagName === 'SELECT' ? 'change' : 'input';
+        inp.addEventListener(evt, () => {
+          o[inp.dataset.field] = (inp.dataset.field === 'type') ? inp.value : (parseFloat(inp.value) || 0);
+          redraw();
+        });
+      });
+      wrap.appendChild(row);
+    });
+  }
+  $('addOpeningBtn').addEventListener('click', () => {
+    openings.push({ uid: 'o' + Date.now() + Math.round(Math.random() * 999), type: 'velux', w: 780, h: 1180, x: 1000, y: 2000 });
+    renderOpenings();
+    redraw();
+  });
+
+  function renderAccessoires(data){
+    const acc = computeAccessoires(data);
+    const wrap = $('accessoiresWrap');
+    let openingRows = '';
+    acc.openingsRows.forEach((o, i) => {
+      openingRows += `<tr><td>${o.type === 'velux' ? 'Vélux' : 'Cheminée'} ${i + 1}</td><td>${o.w}×${o.h} mm</td><td>${Math.round(o.perim)} mm</td></tr>`;
+    });
+    wrap.innerHTML = `
+      <table class="biais-seg-table">
+        <thead><tr><th>Accessoire</th><th>Longueur</th></tr></thead>
+        <tbody>
+          <tr><td>Rive</td><td>${Math.round(acc.riveTotal)} mm</td></tr>
+          <tr><td>Bande d'égout</td><td>${Math.round(acc.egoutTotal)} mm</td></tr>
+          <tr><td>Faîtage</td><td>${Math.round(acc.faitageTotal)} mm</td></tr>
+          ${openingRows}
+        </tbody>
+      </table>
+      <div class="seg-summary-line">Total accessoires (hors ouvertures) : <b style="color:var(--text);">${Math.round(acc.riveTotal + acc.egoutTotal + acc.faitageTotal)} mm</b>${acc.openingsRows.length ? ` · Solins ouvertures : <b style="color:var(--text);">${Math.round(acc.openingsTotal)} mm</b>` : ''}</div>
+    `;
+  }
+
+  /* ---------- Schéma 2D du plan de versant ---------- */
+  function drawSchema(){
+    const data = computeZincCalc();
+    const wrap = $('schemaSvgWrap');
+    if (!data) {
+      $('closureMsg').textContent = '';
+      wrap.innerHTML = '<div style="padding:30px;color:#999;text-align:center;font-size:12px;">Trace le versant ci-contre pour voir le plan apparaître ici.</div>';
+      $('bacN').textContent = '0'; $('tasseauN').textContent = '0'; $('bacRive').textContent = '0 mm';
+      $('jointN').textContent = '0'; $('jointL').textContent = '0 mm'; $('jointCount').textContent = '0';
+      return;
+    }
+    $('bacN').textContent = data.nBacs;
+    $('tasseauN').textContent = data.nTasseaux;
+    $('bacRive').textContent = `${Math.round(data.largeurBacEgout)} → ${Math.round(data.largeurBacFaitage)} mm`;
+    $('jointN').textContent = data.les.n;
+    $('jointL').textContent = `${Math.round(data.les.L)} mm`;
+    $('jointCount').textContent = Math.max(0, data.les.n - 1);
+    renderAccessoires(data);
+
+    // Message de fermeture du tracé
+    const pts = data.geo.pts;
+    const gap = Math.hypot(pts[pts.length-1].x - pts[0].x, pts[pts.length-1].y - pts[0].y);
+    const msg = $('closureMsg');
+    if (gap > 15) {
+      msg.style.color = 'var(--danger)';
+      msg.textContent = `⚠ Le tracé ne se referme pas exactement (écart ${Math.round(gap)} mm) — utilise "Fermeture auto" ou ajuste les longueurs/orientations.`;
+    } else {
+      msg.style.color = 'var(--good)';
+      msg.textContent = `Tracé fermé (écart ${Math.round(gap)} mm).`;
+    }
+
+    const bbox = data.geo.bbox;
+    const W = (bbox.maxX - bbox.minX) || 1000, H = (bbox.maxY - bbox.minY) || 1000;
+    const scale = 520 / Math.max(W, H);
+    const pad = 50;
+    const toSvg = (p) => [ (p.x - bbox.minX) * scale + pad, (bbox.maxY - p.y) * scale + pad ];
+
+    let svgStr = `<svg viewBox="0 0 ${W*scale+pad*2} ${H*scale+pad*2}" style="width:100%;max-height:600px;">`;
+    svgStr += `<defs><clipPath id="zclip_${suffix}"><polygon points="${pts.slice(0,-1).map(p=>toSvg(p).join(',')).join(' ')}"/></clipPath></defs>`;
+    svgStr += `<polygon points="${pts.slice(0,-1).map(p=>toSvg(p).join(',')).join(' ')}" fill="#dfe6ec" stroke="#1c1b1a" stroke-width="2"/>`;
+
+    // Bandes de rôle colorées + longueur
+    for (let i = 0; i < roofEdges.length; i++) {
+      const a = toSvg(pts[i]), b = toSvg(pts[i+1]);
+      svgStr += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${ROLE_COLORS[roofEdges[i].role]}" stroke-width="5"/>`;
+      const mx = (a[0]+b[0])/2, my = (a[1]+b[1])/2;
+      svgStr += `<text x="${mx}" y="${my-6}" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" fill="#1c1b1a">${ROLE_LABELS[roofEdges[i].role]} ${Math.round(roofEdges[i].len)}mm</text>`;
+    }
+
+    // Lignes de bacs (approx, entre égout et faîtage moyens)
+    svgStr += `<g clip-path="url(#zclip_${suffix})">`;
+    const egoutP0 = toSvg(pts[0]);
+    for (let i = 1; i < data.nBacs; i++) {
+      const t = i / data.nBacs;
+      // ligne approximative parallèle aux rives, interpolée sur la largeur
+      const xA = bbox.minX + t * W, xB = xA;
+      const [sx1,sy1] = toSvg({x:xA, y:bbox.minY});
+      const [sx2,sy2] = toSvg({x:xB, y:bbox.maxY});
+      svgStr += `<line x1="${sx1}" y1="${sy1}" x2="${sx2}" y2="${sy2}" stroke="#8a6d00" stroke-width="1.5"/>`;
+    }
+    if (data.les.n > 1) {
+      for (let i = 1; i < data.les.n; i++) {
+        const t = i / data.les.n;
+        const [sx1,sy1] = toSvg({x:bbox.minX, y: bbox.minY + t*H});
+        const [sx2,sy2] = toSvg({x:bbox.maxX, y: bbox.minY + t*H});
+        svgStr += `<line x1="${sx1}" y1="${sy1}" x2="${sx2}" y2="${sy2}" stroke="#1c1b1a" stroke-width="2.5"/>`;
+      }
+    }
+    openings.forEach(o => {
+      const [ox,oy] = toSvg({x: bbox.minX + o.x, y: bbox.minY + o.y + o.h});
+      svgStr += `<rect x="${ox}" y="${oy}" width="${o.w*scale}" height="${o.h*scale}" fill="${o.type === 'velux' ? '#3a86ff' : '#c0392b'}" fill-opacity="0.35" stroke="${o.type === 'velux' ? '#3a86ff' : '#c0392b'}" stroke-width="2"/>`;
+    });
+    svgStr += `</g></svg>`;
+    wrap.innerHTML = svgStr;
+
+    update3D();
+  }
+
+  /* ---------- 3D ---------- */
+  let scene3d, camera3d, renderer3d, group3d, init3dDone = false, labelsWrap3d = null;
+
+  function buildCrossSection(nBacs, largeurBac, reliefW, reliefH){
+    if (isTasseaux) {
+      // Bac à tasseaux : capot large et plat (relief rectangulaire = tasseau + capot)
+      const pts = [];
+      const totalW = nBacs * largeurBac;
+      for (let i = 0; i < nBacs; i++) {
+        const x0 = i * largeurBac - totalW / 2;
+        pts.push({ x: x0, y: 0 });
+        pts.push({ x: x0 + largeurBac - reliefW, y: 0 });
+        pts.push({ x: x0 + largeurBac - reliefW, y: reliefH });
+        pts.push({ x: x0 + largeurBac, y: reliefH });
+        pts.push({ x: x0 + largeurBac, y: 0 });
+      }
+      return pts;
+    } else {
+      // Joint debout : agrafure fine et haute, pincée en tête (double pli)
+      const pts = [];
+      const totalW = nBacs * largeurBac;
+      for (let i = 0; i < nBacs; i++) {
+        const x0 = i * largeurBac - totalW / 2;
+        const seamCenter = x0 + largeurBac;
+        const halfBase = reliefW / 2;
+        const halfTop = reliefW * 0.22;
+        pts.push({ x: x0, y: 0 });
+        pts.push({ x: seamCenter - halfBase, y: 0 });
+        pts.push({ x: seamCenter - halfTop, y: reliefH });
+        pts.push({ x: seamCenter + halfTop, y: reliefH });
+        pts.push({ x: seamCenter + halfBase, y: 0 });
+      }
+      return pts;
+    }
+  }
+
+  function init3D(){
+    const container = $('canvas3d');
+    if (!container || init3dDone || !container.clientWidth || !container.clientHeight) return;
+
+    scene3d = new THREE.Scene();
+    scene3d.background = new THREE.Color(0xe8ecf1);
+    camera3d = new THREE.PerspectiveCamera(45, Math.max(1, container.clientWidth) / Math.max(1, container.clientHeight), 0.1, 40000);
+    camera3d.position.set(1500, 1200, 2600);
+    camera3d.lookAt(0, 0, 0);
+
+    renderer3d = new THREE.WebGLRenderer({ antialias: true });
+    renderer3d.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer3d.outputColorSpace = THREE.SRGBColorSpace;
+    renderer3d.setSize(container.clientWidth, container.clientHeight);
+    renderer3d.domElement.style.width = '100%';
+    renderer3d.domElement.style.height = '100%';
+    renderer3d.domElement.style.cursor = 'grab';
+    container.appendChild(renderer3d.domElement);
+
+    labelsWrap3d = document.createElement('div');
+    labelsWrap3d.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;';
+    container.appendChild(labelsWrap3d);
+
+    scene3d.add(new THREE.AmbientLight(0xffffff, 0.75));
+    const dir1 = new THREE.DirectionalLight(0xffffff, 0.8); dir1.position.set(500, 900, 700); scene3d.add(dir1);
+    const dir2 = new THREE.DirectionalLight(0xffffff, 0.35); dir2.position.set(-500, -400, -700); scene3d.add(dir2);
+
+    group3d = new THREE.Group();
+    scene3d.add(group3d);
+
+    let dragging = false, lastX = 0, lastY = 0;
+    const canvas = renderer3d.domElement;
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+    canvas.addEventListener('pointerdown', e => { dragging = true; lastX = e.clientX; lastY = e.clientY; canvas.style.cursor = 'grabbing'; canvas.setPointerCapture?.(e.pointerId); });
+    canvas.addEventListener('pointerup', () => { dragging = false; canvas.style.cursor = 'grab'; });
+    canvas.addEventListener('pointercancel', () => { dragging = false; canvas.style.cursor = 'grab'; });
+    canvas.addEventListener('pointermove', e => {
+      if (!dragging) return;
+      const dx = e.clientX - lastX, dy = e.clientY - lastY;
+      group3d.rotation.y += dx * 0.008;
+      group3d.rotation.x += dy * 0.008;
+      lastX = e.clientX; lastY = e.clientY;
+      renderFrame();
+    });
+    canvas.addEventListener('wheel', e => {
+      e.preventDefault();
+      const factor = Math.exp(e.deltaY * 0.0012);
+      camera3d.position.multiplyScalar(factor);
+      renderFrame();
+    }, { passive: false });
+
+    window.addEventListener('resize', () => {
+      if (!init3dDone) return;
+      const c = $('canvas3d');
+      if (!c || !c.clientWidth) return;
+      camera3d.aspect = c.clientWidth / c.clientHeight;
+      camera3d.updateProjectionMatrix();
+      renderer3d.setSize(c.clientWidth, c.clientHeight);
+      renderFrame();
+    });
+
+    init3dDone = true;
+  }
+
+  function fitCamera(){
+    if (!group3d || !camera3d || !renderer3d) return;
+    const box = new THREE.Box3().setFromObject(group3d);
+    if (box.isEmpty()) return;
+    const sphere = new THREE.Sphere();
+    box.getBoundingSphere(sphere);
+    if (!sphere.radius) return;
+    const fovRad = camera3d.fov * Math.PI / 180;
+    let dist = (sphere.radius / Math.sin(fovRad / 2)) * 1.4;
+    dist = Math.max(200, Math.min(30000, dist));
+    const dirVec = new THREE.Vector3(0.55, 0.45, 1).normalize().multiplyScalar(dist);
+    camera3d.position.copy(dirVec);
+    camera3d.lookAt(0, 0, 0);
+    renderFrame();
+  }
+
+  function setView(preset){
+    if (!group3d) return;
+    const box = new THREE.Box3().setFromObject(group3d);
+    const sphere = new THREE.Sphere();
+    if (!box.isEmpty()) box.getBoundingSphere(sphere); else sphere.radius = 1500;
+    const dist = Math.max(400, sphere.radius * 2.6);
+    group3d.rotation.set(0, 0, 0);
+    if (preset === 'iso') camera3d.position.set(dist * 0.6, dist * 0.5, dist * 0.6);
+    else if (preset === 'face') camera3d.position.set(0, 0, dist);
+    else if (preset === 'profil') camera3d.position.set(dist, 0, 0);
+    else if (preset === 'dessus') camera3d.position.set(0, dist, 0.001);
+    camera3d.lookAt(0, 0, 0);
+    renderFrame();
+  }
+  root.querySelectorAll(`#${id('viewToggle')} button`).forEach(b => {
+    b.addEventListener('click', () => {
+      root.querySelectorAll(`#${id('viewToggle')} button`).forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      setView(b.dataset.view);
+    });
+  });
+  $('showDims').addEventListener('change', renderFrame);
+
+  function project3DToScreen(vec3, camera, container){
+    const v = vec3.clone().project(camera);
+    return { x: (v.x * 0.5 + 0.5) * container.clientWidth, y: (-v.y * 0.5 + 0.5) * container.clientHeight, visible: v.z < 1 };
+  }
+
+  let currentMesh = null;
+
+  function updateLabels(data){
+    if (!labelsWrap3d) return;
+    labelsWrap3d.innerHTML = '';
+    if (!$('showDims').checked || !data || !currentMesh) return;
+    const container = $('canvas3d');
+    currentMesh.updateMatrixWorld(true);
+    const box = currentMesh.geometry.boundingBox;
+    if (!box) return;
+
+    // Ordre = priorité d'affichage si l'espace manque (égout/faîtage toujours
+    // gardées, les autres peuvent être masquées par l'anti-collision ci-dessous).
+    const labelDefs = [
+      { local: new THREE.Vector3(0, box.max.y + 35, -data.geo.rampant / 2), text: `Égout : ${Math.round(data.geo.egoutLen)} mm`, anchor: new THREE.Vector3(0, box.max.y, -data.geo.rampant / 2) },
+      { local: new THREE.Vector3(0, box.max.y + 35, data.geo.rampant / 2), text: `Faîtage : ${Math.round(data.geo.faitageLen)} mm`, anchor: new THREE.Vector3(0, box.max.y, data.geo.rampant / 2) },
+      { local: new THREE.Vector3(box.min.x - 15, (box.min.y + box.max.y) / 2, 0), text: `Rive : ${Math.round(data.geo.rampant)} mm`, anchor: new THREE.Vector3(box.min.x, (box.min.y + box.max.y) / 2, 0) },
+      { local: new THREE.Vector3(0, box.max.y + 70, 0), text: `${data.nBacs} bac(s) de ${Math.round(data.largeurBacEgout)}→${Math.round(data.largeurBacFaitage)} mm · ${data.les.n} lé(s)`, anchor: null }
+    ];
+
+    // Anti-collision à l'écran : on ne garde une cote que si elle reste à distance
+    // suffisante de celles déjà affichées (les 2 premières — égout/faîtage — sont
+    // toujours prioritaires).
+    const MIN_DIST = 46;
+    const accepted = [];
+    labelDefs.forEach((L, i) => {
+      const world = L.local.clone().applyMatrix4(currentMesh.matrixWorld);
+      const screen = project3DToScreen(world, camera3d, container);
+      if (!screen.visible || screen.x < -80 || screen.x > container.clientWidth + 80) return;
+      const isPriority = i < 2;
+      const tooClose = !isPriority && accepted.some(q => Math.hypot(q.x - screen.x, q.y - screen.y) < MIN_DIST);
+      if (tooClose) return;
+      accepted.push(screen);
+
+      if (L.anchor) {
+        const aw = L.anchor.clone().applyMatrix4(currentMesh.matrixWorld);
+        const as = project3DToScreen(aw, camera3d, container);
+        if (as.visible) {
+          const dot = document.createElement('div');
+          dot.style.cssText = `position:absolute;left:${as.x}px;top:${as.y}px;width:5px;height:5px;margin:-2.5px;border-radius:50%;background:var(--accent);`;
+          labelsWrap3d.appendChild(dot);
+        }
+      }
+      const lbl = document.createElement('div');
+      lbl.textContent = L.text;
+      lbl.style.cssText = `position:absolute;left:${screen.x}px;top:${screen.y}px;transform:translate(-50%,-50%);
+        background:rgba(20,20,20,0.82);color:#fff;font-family:'JetBrains Mono',monospace;font-size:10.5px;
+        padding:3px 7px;border-radius:4px;white-space:nowrap;border:1px solid var(--accent);`;
+      labelsWrap3d.appendChild(lbl);
+    });
+  }
+
+  let lastComputedData = null;
+  function renderFrame(){
+    if (!renderer3d) return;
+    renderer3d.render(scene3d, camera3d);
+    updateLabels(lastComputedData);
+  }
+
+  function update3D(){
+    if (!init3dDone) init3D();
+    if (!group3d) return;
+
+    while (group3d.children.length) {
+      const m = group3d.children.pop();
+      if (m.geometry) m.geometry.dispose();
+      if (m.material) m.material.dispose();
+    }
+
+    const data = computeZincCalc();
+    lastComputedData = data;
+    if (!data) { currentMesh = null; renderFrame(); return; }
+
+    const epaisseur = parseFloat($('epaisseur').value) || 0.65;
+    let reliefW = parseFloat($('largeurTasseau').value) || (isTasseaux ? 40 : 25);
+    const reliefH = isTasseaux ? Math.max(30, reliefW) : Math.max(28, reliefW * 1.3);
+    reliefW = Math.min(reliefW, Math.min(data.largeurBacEgout, data.largeurBacFaitage) * 0.6);
+
+    // Coupe côté égout ET côté faîtage : géométries DIFFÉRENTES si le versant est en biais
+    // (c'est ce qui fait apparaître le rétrécissement des bacs dans la vue 3D).
+    const crossEgout = buildCrossSection(data.nBacs, data.largeurBacEgout, reliefW, reliefH);
+    const crossFaitage = buildCrossSection(data.nBacs, data.largeurBacFaitage, reliefW, reliefH);
+    const geom = buildTaperedStripGeometry(crossEgout, crossFaitage, epaisseur, -data.geo.rampant / 2, data.geo.rampant / 2);
+    const mat = new THREE.MeshPhysicalMaterial({
+      color: isTasseaux ? 0xb9c2cc : 0xc7cdd3,
+      metalness: 0.75, roughness: isTasseaux ? 0.32 : 0.22, side: THREE.DoubleSide
+    });
+    const mesh = new THREE.Mesh(geom, mat);
+
+    const pente = parseFloat($('pente').value) || 0;
+    mesh.rotation.x = -pente * Math.PI / 180;
+    group3d.add(mesh);
+    currentMesh = mesh;
+
+    renderFrame();
+  }
+
+  function redraw(){
+    drawSchema();
+  }
+
+  ['pente','epaisseur','largeurBac','largeurTasseau','maxAvantJoint','recouvrementJoint'].forEach(base => {
+    $(base).addEventListener('input', redraw);
+  });
+
+  /* ---------- Impression ---------- */
+  $('printBtn').addEventListener('click', () => {
+    const data = computeZincCalc();
+    if (!data) { showToast('Trace et ferme le versant avant d\'imprimer.'); return; }
+    const acc = computeAccessoires(data);
+    const svgEl = $('schemaSvgWrap').querySelector('svg');
+    const svgData = svgEl ? new XMLSerializer().serializeToString(svgEl) : '';
+    const pente = $('pente').value;
+    const epaisseur = $('epaisseur').value;
+    const typeLabel = isTasseaux ? 'Bac à tasseaux' : 'Joint debout';
+
+    fitCamera();
+    const snap3D = renderer3d ? renderer3d.domElement.toDataURL('image/png') : '';
+
+    let openingRows = '';
+    acc.openingsRows.forEach((o, i) => {
+      openingRows += `<tr><td>${o.type === 'velux' ? 'Vélux' : 'Cheminée'} ${i + 1}</td><td>${o.w}×${o.h} mm</td><td>${Math.round(o.perim)} mm</td></tr>`;
+    });
+
+    const printArea = document.getElementById('printArea');
+    printArea.innerHTML = `
+      <div class="print-header">
+        <div class="print-title">ALFEMA • Étude Toiture Zinc — ${typeLabel}</div>
+        <div style="font-size:12px;">Date : ${new Date().toLocaleDateString()}</div>
+      </div>
+      <div class="recap-block">
+        <table class="recap-table">
+          <tr><th>Rampant</th><th>Largeur égout</th><th>Largeur faîtage</th><th>Pente</th><th>Épaisseur</th></tr>
+          <tr><td>${Math.round(data.geo.rampant)} mm</td><td>${Math.round(data.geo.egoutLen)} mm</td><td>${Math.round(data.geo.faitageLen)} mm</td><td>${pente}°</td><td>${epaisseur} mm</td></tr>
+        </table>
+      </div>
+      <div class="print-section-title">${typeLabel} — calepinage</div>
+      <table class="recap-table">
+        <tr><th>Nombre de bacs</th><th>Largeur / bac (égout → faîtage)</th><th>${isTasseaux ? 'Nombre de tasseaux' : 'Nombre de joints debout'}</th></tr>
+        <tr><td>${data.nBacs}</td><td>${Math.round(data.largeurBacEgout)} → ${Math.round(data.largeurBacFaitage)} mm</td><td>${data.nTasseaux}</td></tr>
+      </table>
+      <div class="print-section-title">Joints de bout</div>
+      <table class="recap-table">
+        <tr><th>Nombre de lés</th><th>Longueur / lé</th><th>Nombre de joints</th></tr>
+        <tr><td>${data.les.n}</td><td>${Math.round(data.les.L)} mm</td><td>${Math.max(0, data.les.n - 1)}</td></tr>
+      </table>
+      <div class="print-section-title">Accessoires</div>
+      <table class="recap-table">
+        <tr><th>Accessoire</th><th>Longueur</th></tr>
+        <tr><td>Rive</td><td>${Math.round(acc.riveTotal)} mm</td></tr>
+        <tr><td>Bande d'égout</td><td>${Math.round(acc.egoutTotal)} mm</td></tr>
+        <tr><td>Faîtage</td><td>${Math.round(acc.faitageTotal)} mm</td></tr>
+        ${openingRows}
+      </table>
+      <div class="print-section-title">Plan du versant</div>
+      <div style="border:1px solid #000;background:#fff;">${svgData}</div>
+      <div class="print-section-title">Simulation 3D</div>
+      <img src="${snap3D}" class="print-sheet-img" style="background:#e8ecf1;">
+    `;
+    window.print();
+  });
+
+  buildRectEdges();
+  updateDrawButtons();
+  renderOpenings();
+  drawSchema();
+
+  return { redraw, init3D, update3D: () => { update3D(); drawSchema(); }, fitCamera };
+}
+
+window.zincCtrl_tas = createZincController('tas', 'tasseaux');
+window.zincCtrl_jd = createZincController('jd', 'jointdebout');
+
+
 (function initInteractiveTutorial(){
   const overlay = document.getElementById('tutorialOverlay');
   if(!overlay) return;
@@ -3987,14 +6051,22 @@ document.getElementById('savedProfilesList').addEventListener('click', (e) => {
 
   // Chaque étape pointe volontairement vers la zone qui correspond à son titre,
   // plutôt que vers un élément voisin. Pour les champs, on encadre leur bloc complet.
+  // Le champ "tab" force le bon onglet à être actif avant de localiser la cible.
   const steps = [
-    { getTarget:()=>document.getElementById('profileName')?.closest('.field') || document.getElementById('profileName'), title:'Nommer la pièce', text:'Donne un nom clair au profil. Il sera repris dans les schémas enregistrés et les impressions.', hint:'Ici : Nom du schéma' },
-    { getTarget:()=>document.getElementById('segList')?.closest('.panel'), title:'Construire le profil', text:'Ajoute les éléments avec Droit, Pli, Arrondi ou Boudin. Cette zone contient toute la séquence de fabrication.', hint:'Ici : Séquence du profil' },
-    { getTarget:()=>document.getElementById('profileMaterial')?.closest('.sheet-fields'), title:'Choisir matière et épaisseur', text:'Choisis la matière et l’épaisseur de la tôle. Les deux champs sont regroupés et mis en évidence ensemble.', hint:'Ici : Matière + Épaisseur' },
-    { getTarget:()=>document.getElementById('profileCanvasWrap'), title:'Contrôler le schéma 2D', text:'Vérifie les longueurs, angles et rayons directement sur le dessin. Les cotes permettent de contrôler la géométrie.', hint:'Ici : Schéma 2D' },
-    { getTarget:()=>document.getElementById('canvas3dContainer'), title:'Manipuler la 3D', text:'Clic gauche + glisser : rotation. Clic droit ou Shift : déplacement. Molette : zoom. Double-clic : recentrage.', hint:'Ici : Vue 3D' },
-    { getTarget:()=>document.getElementById('fs3dOpenBtn'), title:'Ouvrir le plein écran 3D', text:'Passe la visualisation 3D en plein écran pour travailler plus confortablement. Les commandes restent identiques.', hint:'Ici : Plein écran 3D' },
-    { getTarget:()=>document.getElementById('saveProfileBtn'), title:'Enregistrer le schéma', text:'Enregistre le profil pour le conserver en mémoire et le retrouver ensuite dans tes schémas.', hint:'Ici : Enregistrer ce schéma' }
+    { tab:'tab-pliage', getTarget:()=>document.getElementById('profileName')?.closest('.field') || document.getElementById('profileName'), title:'Nommer la pièce', text:'Donne un nom clair au profil. Il sera repris dans les schémas enregistrés et les impressions.', hint:'Ici : Nom du schéma' },
+    { tab:'tab-pliage', getTarget:()=>document.getElementById('segList')?.closest('.panel'), title:'Construire le profil', text:'Ajoute les éléments avec Droit, Pli, Arrondi ou Boudin. Cette zone contient toute la séquence de fabrication.', hint:'Ici : Séquence du profil' },
+    { tab:'tab-pliage', getTarget:()=>document.getElementById('profileMaterial')?.closest('.sheet-fields'), title:'Choisir matière et épaisseur', text:'Choisis la matière et l’épaisseur de la tôle. Les deux champs sont regroupés et mis en évidence ensemble.', hint:'Ici : Matière + Épaisseur' },
+    { tab:'tab-pliage', getTarget:()=>document.getElementById('ralSwatchRow'), title:'Choisir un RAL rapidement', text:'Clique directement sur une pastille pour appliquer un RAL courant, sans avoir à taper le code. Le champ texte reste disponible pour un code moins courant.', hint:'Ici : Pastilles RAL' },
+    { tab:'tab-pliage', getTarget:()=>document.getElementById('profileCanvasWrap'), title:'Contrôler le schéma 2D', text:'Vérifie les longueurs, angles et rayons directement sur le dessin. Les cotes permettent de contrôler la géométrie.', hint:'Ici : Schéma 2D' },
+    { tab:'tab-pliage', getTarget:()=>document.getElementById('canvas3dContainer'), title:'Manipuler la 3D', text:'Clic gauche + glisser : rotation. Clic droit ou Shift : déplacement. Molette : zoom. Double-clic : recentrage. La case "Afficher les cotes déportées" juste au-dessus permet de les masquer si besoin.', hint:'Ici : Vue 3D' },
+    { tab:'tab-pliage', getTarget:()=>document.getElementById('fs3dOpenBtn'), title:'Ouvrir le plein écran 3D', text:'Passe la visualisation 3D en plein écran pour travailler plus confortablement. Les commandes restent identiques.', hint:'Ici : Plein écran 3D' },
+    { tab:'tab-pliage', getTarget:()=>document.getElementById('biaisEnabled')?.closest('.toggle-row'), title:'Schéma biais (pièce en biais)', text:'Active cette case pour dessiner une pièce qui passe progressivement d\'un profil Gauche à un profil Droite. Le panneau qui apparaît propose le calpinage en pièces, l\'impression du plan, et un bouton "Exporter le calpinage (Excel)" pour transmettre les cotes à l\'atelier ou au chiffrage.', hint:'Ici : Activer le schéma biais' },
+    { tab:'tab-pliage', getTarget:()=>document.getElementById('saveProfileBtn'), title:'Enregistrer le schéma', text:'Enregistre le profil pour le conserver en mémoire et le retrouver ensuite dans tes schémas.', hint:'Ici : Enregistrer ce schéma' },
+    { tab:'tab-pliage', getTarget:()=>document.getElementById('savedProfilesSearch'), title:'Retrouver un schéma', text:'Tape quelques lettres du nom pour filtrer instantanément la liste des schémas enregistrés — pratique dès qu\'il y en a beaucoup.', hint:'Ici : Rechercher un schéma' },
+    { tab:'tab-tasseaux', getTarget:()=>document.getElementById('shapeModeToggle_tas'), title:'Dessiner le versant', text:'Par défaut, choisis "Rectangle" et renseigne juste les 3 dimensions (égout, faîtage, rampant) — mets des largeurs différentes pour obtenir un versant trapézoïdal. Pour une forme irrégulière, passe en "Tracé libre" : clique pour poser les sommets, puis ferme le tracé et ajuste les cotes de chaque arête.', hint:'Ici : Rectangle / Tracé libre (identique sur l\'onglet Joint debout)' },
+    { tab:'tab-assemblage', getTarget:()=>document.getElementById('assembleComponentsList'), title:'Composer l\'assemblage', text:'Chaque profil a sa propre longueur, indépendante des autres. Sur chaque composant : 🔓 verrouille sa position (pour éviter de le déplacer par erreur) et ⧉ le duplique. Le bouton "Vue compacte" juste au-dessus réduit la liste à l\'essentiel quand il y a beaucoup de composants.', hint:'Ici : Composants de l\'assemblage' },
+    { tab:'tab-assemblage', getTarget:()=>document.getElementById('assemble2DWrap'), title:'Positionner et vérifier', text:'Glisse directement une pièce sur le schéma pour la repositionner (clique dessus pour la sélectionner). Si deux pièces se chevauchent, elles sont automatiquement surlignées en rouge — sur ce schéma comme sur la vue 3D.', hint:'Ici : Schéma d\'assemblage' },
+    { tab:'tab-assemblage', getTarget:()=>document.getElementById('assembleRealisticBtn'), title:'Vue réaliste', text:'Ajoute un sol, des ombres portées douces et des reflets d\'environnement à la 3D — une bonne façon de présenter l\'assemblage sans être un rendu photoréaliste. Un second clic revient à la vue standard, plus rapide à manipuler.', hint:'Ici : Vue réaliste' }
   ];
   let index = 0;
 
@@ -4047,6 +6119,12 @@ document.getElementById('savedProfilesList').addEventListener('click', (e) => {
 
   function renderStep(){
     const st=steps[index];
+    if (st.tab) {
+      const activePanel = document.querySelector('.tab-panel.active');
+      if (!activePanel || activePanel.id !== st.tab) {
+        document.querySelector(`.tab-btn[data-tab="${st.tab}"]`)?.click();
+      }
+    }
     const el=st.getTarget();
     kicker.textContent=`Étape ${index+1} / ${steps.length}`;
     title.textContent=st.title;
