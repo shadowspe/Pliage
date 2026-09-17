@@ -685,6 +685,19 @@
   #fs3dOverlay.show { display: flex; }
   #fs3dContainer { flex: 1; width: 100%; height: 100%; border-radius: 8px; position: relative; }
 
+  /* Tracé à main levée -> import de profil */
+  #freehandOverlay{display:none;position:fixed;inset:0;background:#0a0c0e;z-index:1000;padding:20px;flex-direction:column;}
+  #freehandOverlay.show{display:flex;}
+  #freehandBody{flex:1;display:flex;gap:16px;min-height:0;margin-top:14px;}
+  #freehandCanvasWrap{flex:1;min-width:0;}
+  #freehandCanvas{width:100%;height:100%;display:block;background:#12151a;border-radius:8px;touch-action:none;cursor:crosshair;}
+  #freehandSidebar{width:300px;flex:0 0 auto;display:flex;flex-direction:column;gap:12px;overflow-y:auto;}
+  @media (max-width:700px){
+    #freehandBody{flex-direction:column;}
+    #freehandSidebar{width:100%;}
+    #freehandCanvasWrap{height:45vh;}
+  }
+
   #printArea{display:none;}
   @media print{
     @page {
@@ -877,6 +890,82 @@
   .dev-mini{color:var(--text-dim);font-family:'JetBrains Mono',monospace;font-size:10.5px;}
   .badge-male{color:var(--accent);}
   .badge-femelle{color:var(--cyan);}
+  /* ===================== ADAPTATION MOBILE ===================== */
+  @media (max-width:700px){
+    body{padding:14px 10px 40px;}
+    header{gap:14px;margin-bottom:18px;padding-bottom:14px;}
+    h1{font-size:21px;}
+    .subtitle{font-size:12.5px;}
+    .brand-eyebrow{font-size:10px;}
+
+    .tabs-nav{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;padding-bottom:2px;margin-bottom:16px;}
+    .tabs-nav::-webkit-scrollbar{height:4px;}
+    .tab-btn{white-space:nowrap;margin-right:16px;font-size:12px;padding:9px 2px;}
+
+    .panel{padding:14px 12px 16px;}
+    .panel-title{font-size:12.5px;}
+
+    .sheet-fields{grid-template-columns:1fr;}
+    .develop-summary{grid-template-columns:1fr 1fr;}
+    .develop-summary .stat:only-child,
+    .develop-summary .stat:nth-child(3):last-child{grid-column:1 / -1;}
+    .stats-bar{grid-template-columns:1fr 1fr;}
+
+    .col-heads{display:none;} /* remplacé par les placeholders des champs sur mobile */
+    .cut-row{grid-template-columns:16px 1fr 1fr 46px;grid-template-areas:"c n n rm" "c w h q";row-gap:6px;padding:9px 8px;}
+    .cut-row input[type=color]{grid-area:c;}
+    .cut-row input[data-field="name"]{grid-area:n;}
+    .cut-row input[data-field="w"]{grid-area:w;}
+    .cut-row input[data-field="h"]{grid-area:h;}
+    .cut-row .qty-cell{grid-area:q;}
+    .cut-row .rm-btn{grid-area:rm;}
+
+    .action-row-group{grid-template-columns:1fr;}
+
+    .seg-row{grid-template-columns:16px 1fr 22px;}
+    .seg-body{gap:5px;}
+    .seg-body input[type=number]{width:50px;font-size:12px;padding:5px;}
+    .add-seg-row{grid-template-columns:1fr 1fr;}
+
+    #profileCanvas, #fsCanvas{cursor:default;}
+    #profileCanvasWrap{padding:12px;}
+    .canvas-head{flex-wrap:wrap;gap:8px;}
+    .head-actions{width:100%;justify-content:flex-start;flex-wrap:wrap;}
+    .rotate-controls{left:12px;bottom:14px;}
+    .rotate-degree-box{height:38px;}
+    .profile-rotate-icon-btn{width:38px;height:38px;}
+
+    #canvas3dContainer{height:280px;}
+    #assembleCanvas3dContainer, #zincCanvas3dContainer{height:320px;}
+    [id^="canvas3d_"]{height:320px;}
+
+    .recap-table, .biais-seg-table{font-size:10.5px;}
+    .recap-table th, .recap-table td{padding:6px 6px;}
+    .recap-block{overflow-x:auto;}
+    .recap-block table{min-width:520px;}
+
+    .fs-head{flex-wrap:wrap;gap:10px;}
+    .fs-toolbar-hint{display:none;} /* geste tactile, pas de survol souris sur mobile */
+    .fs-title{font-size:14px;}
+
+    #fsOverlay, #fs3dOverlay, #freehandOverlay{padding:10px;}
+    .fs-sidebar{width:100%;max-height:35vh;}
+    #fsOverlay{flex-direction:column;}
+
+    .view3d-presets, .dir-toggle.male-toggle{flex-wrap:wrap;}
+    .view3d-btn{padding:6px 8px;font-size:10px;}
+
+    .toggle-row{padding:9px 10px;}
+    .develop-summary .stat .value{font-size:16px;}
+
+    .profile-card{flex-wrap:wrap;gap:8px;}
+    .biais-piece-imgs{flex-direction:column;}
+  }
+  @media (max-width:420px){
+    .develop-summary{grid-template-columns:1fr;}
+    .stats-bar{grid-template-columns:1fr;}
+    .cut-row{grid-template-columns:16px 1fr 40px;grid-template-areas:"c n rm" "c w q" "c h q";}
+  }
 </style>
 </head>
 <body>
@@ -985,6 +1074,7 @@
             <button class="add-btn" data-add="boudin">+ Boudin (spirale)</button>
           </div>
           <button class="add-btn" id="clearSegBtn" style="border-color:var(--line-soft);">Effacer le profil</button>
+          <button class="add-btn" id="freehandOpenBtn" style="margin-top:8px;border-color:var(--accent-dim);color:var(--accent);">✏️ Dessiner à main levée (import auto)</button>
         </div>
 
         <div class="panel">
@@ -1027,6 +1117,10 @@
                 <button type="button" class="add-btn" id="arrowRightBtn" style="padding:8px;font-size:11px;" title="Pointer flèche sur le côté droit du 1er droit">Flèche Droite</button>
               </div>
             </div>
+          </div>
+          <div class="field" id="paintedFaceRow" style="margin-top:2px;">
+            <label>Face peinte (RAL) sur la 3D</label>
+            <button type="button" class="add-btn" id="paintedFaceToggleBtn" style="width:100%;text-align:center;">Face extérieure peinte 🔄 cliquer pour inverser</button>
           </div>
           <div class="biais-hint" id="paintUnavailableMsg" style="display:none;">Le thermolaquage (RAL) ne s'applique qu'à l'acier et à l'aluminium — le zinc et le cuivre gardent leur teinte naturelle.</div>
           <div class="field" id="arrowHintRow" style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
@@ -1196,7 +1290,8 @@
             <input type="checkbox" id="profile3dShowDims" checked>
             <span>Afficher les cotes déportées sur la 3D</span>
           </div>
-          <div id="canvas3dContainer" style="width:100%;height:350px;border-radius:6px;background:#e8ecf1;position:relative;overflow:hidden;"></div>
+          <button class="add-btn" id="profileRealisticBtn" type="button" style="margin-bottom:10px;">✨ Vue réaliste (sol, ombres, reflets)</button>
+          <div id="canvas3dContainer" style="width:100%;height:350px;border-radius:6px;background:linear-gradient(180deg,#a9cdec 0%,#d6e6f0 55%,#eef1ee 100%);position:relative;overflow:hidden;"></div>
         </div>
 
         <div class="develop-summary">
@@ -1285,7 +1380,7 @@
             <span>Afficher les cotes sur la 3D</span>
           </div>
           <button class="add-btn" id="assembleRealisticBtn" type="button" style="margin-top:10px;">✨ Vue réaliste (sol, ombres, reflets)</button>
-          <div id="assembleCanvas3dContainer" style="width:100%;height:460px;border-radius:6px;background:#e8ecf1;position:relative;overflow:hidden;margin-top:10px;"></div>
+          <div id="assembleCanvas3dContainer" style="width:100%;height:460px;border-radius:6px;background:linear-gradient(180deg,#a9cdec 0%,#d6e6f0 55%,#eef1ee 100%);position:relative;overflow:hidden;margin-top:10px;"></div>
         </div>
       </div>
     </div>
@@ -1345,6 +1440,33 @@
     </div>
   </div>
   <div id="fs3dContainer"></div>
+</div>
+
+<!-- Tracé à main levée -> import de profil -->
+<div id="freehandOverlay">
+  <div class="fs-head">
+    <span class="fs-title">Tracé à main levée → Profil</span>
+    <button class="fs-close" id="freehandCloseBtn">✕ Fermer</button>
+  </div>
+  <div id="freehandBody">
+    <div id="freehandCanvasWrap">
+      <canvas id="freehandCanvas"></canvas>
+    </div>
+    <div id="freehandSidebar">
+      <div class="biais-hint" style="margin:0;">Dessine le profil au doigt ou à la souris, en un seul tracé continu (comme sur une feuille de papier), puis clique sur "Convertir en profil". Tu pourras ajuster chaque cote ensuite dans "Séquence du profil".</div>
+      <div class="field">
+        <label>Simplification (finesse du tracé)</label>
+        <input type="range" id="freehandTolerance" min="4" max="40" value="14">
+      </div>
+      <div class="field">
+        <label>Largeur totale du tracé (mm)</label>
+        <input type="number" id="freehandScaleWidth" value="300" min="1">
+      </div>
+      <button class="add-btn" id="freehandUndoBtn" type="button">↺ Effacer le tracé</button>
+      <button class="calc-btn" id="freehandConvertBtn" type="button" style="margin-top:0;">✓ Convertir en profil</button>
+      <div class="biais-hint" id="freehandStatusMsg" style="margin:0;"></div>
+    </div>
+  </div>
 </div>
 
 
@@ -1480,12 +1602,32 @@ function updateProfile3DLabels(){
   });
 }
 
+// Fond "ciel" léger (dégradé, sans image externe) utilisé par défaut dans toutes
+// les vues 3D — juste un fond, sans reflets (contrairement à l'environnement PMREM
+// de la "Vue réaliste").
+let SKY_TEXTURE = null;
+function getSkyTexture(){
+  if (SKY_TEXTURE) return SKY_TEXTURE;
+  const canvas = document.createElement('canvas');
+  canvas.width = 2; canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0, '#a9cdec');
+  grad.addColorStop(0.55, '#d6e6f0');
+  grad.addColorStop(1, '#eef1ee');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 2, 256);
+  SKY_TEXTURE = new THREE.CanvasTexture(canvas);
+  if (THREE.SRGBColorSpace) SKY_TEXTURE.colorSpace = THREE.SRGBColorSpace;
+  return SKY_TEXTURE;
+}
+
 function init3DViewer() {
   const container = document.getElementById('canvas3dContainer');
   if (!container || is3DInitialized) return;
 
   scene3D = new THREE.Scene();
-  scene3D.background = new THREE.Color(0xf1f5f9);
+  scene3D.background = getSkyTexture();
 
   camera3D = new THREE.PerspectiveCamera(45, Math.max(1, container.clientWidth) / Math.max(1, container.clientHeight), 0.1, 120000);
   camera3D.position.set(0, 0, 1800);
@@ -1694,6 +1836,52 @@ function getRalPaintMaterial(ralCode){
   });
 }
 
+// --- Vue réaliste (profil) : même principe que l'assemblage — sol, ombres
+// portées douces et reflet d'environnement, activables/désactivables sans
+// recharger la scène. Pas un rendu photoréaliste, mais un net mieux visuel.
+let profileRealisticMode = false;
+let profileEnvTexture = null;
+let profileShadowLight = null;
+let paintedFaceSide = 'ext'; // 'ext' (extérieure) | 'int' (intérieure)
+
+function setProfileRealistic(on){
+  if (!is3DInitialized) init3DViewer();
+  if (!renderer3D) return;
+  profileRealisticMode = on;
+  const btn = document.getElementById('profileRealisticBtn');
+  if (btn) { btn.textContent = on ? '✨ Vue réaliste (activée — cliquer pour revenir en standard)' : '✨ Vue réaliste (sol, ombres, reflets)'; btn.style.borderColor = on ? 'var(--accent)' : ''; btn.style.color = on ? 'var(--accent)' : ''; }
+
+  renderer3D.shadowMap.enabled = on;
+  renderer3D.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  if (on) {
+    if (!profileEnvTexture) profileEnvTexture = build3DEnvTexture(renderer3D);
+    scene3D.background = profileEnvTexture;
+  } else {
+    scene3D.background = getSkyTexture();
+  }
+
+  if (!profileShadowLight) {
+    profileShadowLight = new THREE.DirectionalLight(0xffffff, 1.15);
+    profileShadowLight.position.set(500, 800, 500);
+    profileShadowLight.shadow.mapSize.set(1024, 1024);
+    profileShadowLight.shadow.camera.left = -1500;
+    profileShadowLight.shadow.camera.right = 1500;
+    profileShadowLight.shadow.camera.top = 1500;
+    profileShadowLight.shadow.camera.bottom = -1500;
+    profileShadowLight.shadow.camera.near = 10;
+    profileShadowLight.shadow.camera.far = 6000;
+    profileShadowLight.shadow.bias = -0.0015;
+    scene3D.add(profileShadowLight);
+    scene3D.add(profileShadowLight.target);
+  }
+  profileShadowLight.castShadow = on;
+  profileShadowLight.visible = on;
+
+  update3DModel();
+}
+document.getElementById('profileRealisticBtn').addEventListener('click', () => setProfileRealistic(!profileRealisticMode));
+
 function update3DModel() {
   if (!is3DInitialized) return;
 
@@ -1707,16 +1895,23 @@ function update3DModel() {
     scene3D.remove(partMesh3D);
     const disposeObj3D = (obj) => {
       if (obj.geometry) obj.geometry.dispose();
-      if (obj.material) obj.material.dispose();
+      if (obj.material) {
+        if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+        else obj.material.dispose();
+      }
       if (obj.children) obj.children.forEach(disposeObj3D);
     };
     disposeObj3D(partMesh3D);
   }
 
   const biaisChk = document.getElementById('biaisEnabled');
+  // Réaffirmé à chaque appel (donc aussi en mode biais) plutôt qu'une seule fois à
+  // l'initialisation, pour ne jamais se retrouver avec un fond non défini.
+  scene3D.background = profileRealisticMode ? (profileEnvTexture || getSkyTexture()) : getSkyTexture();
   if (biaisChk && biaisChk.checked) {
     partMesh3D = buildBiaisModelGroup();
     partMesh3D.rotation.set(prevRotation.x, prevRotation.y, prevRotation.z);
+    applyProfileRealisticExtras(partMesh3D);
     scene3D.add(partMesh3D);
     renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
     return;
@@ -1857,17 +2052,20 @@ function update3DModel() {
   const quadInto = (arr, a,b,c,d) => { arr.push(a,b,c, a,c,d); };
 
   // Faces principales : surfaces parfaitement planes et continues.
-  // Seule la face "extérieure" (côté visible/exposé) reçoit la peinture RAL ;
-  // le reste (face intérieure, bouts) garde l'aspect brut de la matière.
+  // Seule une des deux faces (extérieure ou intérieure, au choix via le bouton
+  // "Face peinte") reçoit la peinture RAL ; le reste (autre face, bouts) garde
+  // l'aspect brut de la matière.
+  const extArr = paintedFaceSide === 'int' ? indicesRaw : indicesPaint;
+  const intArr = paintedFaceSide === 'int' ? indicesPaint : indicesRaw;
   for (let i = 0; i < n - 1; i++) {
     // dessous
     quadInto(indicesRaw, i, i + 1, n + i + 1, n + i);
     // dessus
     quadInto(indicesRaw, 2*n + i, 3*n + i, 3*n + i + 1, 2*n + i + 1);
-    // bord extérieur (face peinte)
-    quadInto(indicesPaint, i, 2*n + i, 2*n + i + 1, i + 1);
+    // bord extérieur
+    quadInto(extArr, i, 2*n + i, 2*n + i + 1, i + 1);
     // bord intérieur
-    quadInto(indicesRaw, n + i, n + i + 1, 3*n + i + 1, 3*n + i);
+    quadInto(intArr, n + i, n + i + 1, 3*n + i + 1, 3*n + i);
   }
   // Bouts de la pièce
   quadInto(indicesRaw, 0, n, 3*n, 2*n);
@@ -1898,8 +2096,38 @@ function update3DModel() {
 
   partMesh3D = new THREE.Mesh(geometry, material);
   partMesh3D.rotation.set(prevRotation.x, prevRotation.y, prevRotation.z);
+  applyProfileRealisticExtras(partMesh3D);
   scene3D.add(partMesh3D);
   renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
+}
+
+// Ajoute un sol + configure les ombres (mesh et lumière) quand la "Vue réaliste"
+// est active. `obj` peut être un Mesh simple ou un Group (pièce biais).
+function applyProfileRealisticExtras(obj){
+  if (!profileRealisticMode || !obj) return;
+  obj.traverse(child => {
+    if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
+  });
+
+  const prevRot = { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z };
+  obj.rotation.set(0, 0, 0);
+  obj.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(obj);
+  obj.rotation.set(prevRot.x, prevRot.y, prevRot.z);
+  if (box.isEmpty()) return;
+
+  const sphere = new THREE.Sphere();
+  box.getBoundingSphere(sphere);
+  const groundSize = Math.max(600, sphere.radius * 6);
+  const groundGeom = new THREE.PlaneGeometry(groundSize, groundSize);
+  const groundMat = new THREE.MeshStandardMaterial({ color: 0xd8d3c8, roughness: 0.95, metalness: 0.02 });
+  const ground = new THREE.Mesh(groundGeom, groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.set(0, box.min.y - 5, 0);
+  ground.receiveShadow = true;
+  obj.add(ground);
+
+  if (profileShadowLight) profileShadowLight.target.position.set(0, box.min.y, 0);
 }
 
 const VIEW3D_PRESETS = {
@@ -1986,9 +2214,24 @@ function updatePaintAvailability(){
   const canPaint = (matType === 'Acier' || matType === 'Alu');
   document.getElementById('paintFieldsRow').style.display = canPaint ? 'grid' : 'none';
   document.getElementById('arrowHintRow').style.display = canPaint ? 'flex' : 'none';
+  document.getElementById('paintedFaceRow').style.display = canPaint ? 'block' : 'none';
   document.getElementById('paintUnavailableMsg').style.display = canPaint ? 'none' : 'block';
 }
 updatePaintAvailability();
+
+function updatePaintedFaceBtnLabel(){
+  const btn = document.getElementById('paintedFaceToggleBtn');
+  if (!btn) return;
+  btn.textContent = paintedFaceSide === 'ext'
+    ? 'Face extérieure peinte 🔄 cliquer pour inverser'
+    : 'Face intérieure peinte 🔄 cliquer pour inverser';
+}
+document.getElementById('paintedFaceToggleBtn').addEventListener('click', () => {
+  paintedFaceSide = (paintedFaceSide === 'ext') ? 'int' : 'ext';
+  updatePaintedFaceBtnLabel();
+  update3DModel();
+  showToast(`Peinture RAL appliquée sur la face ${paintedFaceSide === 'ext' ? 'extérieure' : 'intérieure'}.`);
+});
 
 function setFirstStraightSideArrow(side) {
   const segList = segments;
@@ -3641,7 +3884,7 @@ document.getElementById('printSingleProfileBtn').addEventListener('click', () =>
 
   printArea.innerHTML = `
     <div class="print-header">
-      <div class="print-title">ALFEMA • Fiche Technique de Pliage</div>
+      <div class="print-title">ALTEMA • Fiche Technique de Pliage</div>
       <div style="font-size:12px;">Date : ${new Date().toLocaleDateString()}</div>
     </div>
     <div class="recap-block">
@@ -3697,7 +3940,7 @@ document.getElementById('printCombinedBtn').addEventListener('click', () => {
   const printArea = document.getElementById('printArea');
   let html = `
     <div class="print-header">
-      <div class="print-title">ALFEMA • Dossier Complet Débit & Schémas</div>
+      <div class="print-title">ALTEMA • Dossier Complet Débit & Schémas</div>
       <div style="font-size:12px;">Date : ${new Date().toLocaleDateString()}</div>
     </div>
   `;
@@ -3733,7 +3976,7 @@ document.getElementById('printAllProfilesBtn').addEventListener('click', () => {
   const printArea = document.getElementById('printArea');
   let html = `
     <div class="print-header">
-      <div class="print-title">ALFEMA • Dossier des Schémas de Pliage Enregistrés</div>
+      <div class="print-title">ALTEMA • Dossier des Schémas de Pliage Enregistrés</div>
       <div style="font-size:12px;">Date : ${new Date().toLocaleDateString()}</div>
     </div>
   `;
@@ -4269,7 +4512,7 @@ document.getElementById('printBiaisCalpinageBtn').addEventListener('click', () =
   const printArea = document.getElementById('printArea');
   printArea.innerHTML = `
     <div class="print-header">
-      <div class="print-title">ALFEMA • Plan de Calpinage Biais</div>
+      <div class="print-title">ALTEMA • Plan de Calpinage Biais</div>
       <div style="font-size:12px;">Date : ${new Date().toLocaleDateString()}</div>
     </div>
     <div class="recap-block">
@@ -4803,7 +5046,7 @@ function initAssemble3D(){
   if (!container || assembleInit || !container.clientWidth || !container.clientHeight) return;
 
   assembleScene = new THREE.Scene();
-  assembleScene.background = new THREE.Color(0xe8ecf1);
+  assembleScene.background = getSkyTexture();
   assembleCamera = new THREE.PerspectiveCamera(45, Math.max(1, container.clientWidth) / Math.max(1, container.clientHeight), 0.1, 30000);
   assembleCamera.position.set(900, 700, 1800);
   assembleCamera.lookAt(0, 0, 0);
@@ -4871,7 +5114,10 @@ let assembleEnvTexture = null;
 let assembleShadowLight = null;
 let assembleGroundMesh = null;
 
-function buildAssembleEnvTexture(renderer){
+// Fabrique une texture d'environnement simple (dégradé ciel/sol, sans image
+// externe) via PMREM — utilisée pour les reflets en "Vue réaliste", partagée
+// entre le viewer du profil et celui de l'assemblage.
+function build3DEnvTexture(renderer){
   const pmrem = new THREE.PMREMGenerator(renderer);
   pmrem.compileEquirectangularShader();
   const envScene = new THREE.Scene();
@@ -4899,10 +5145,10 @@ function setAssembleRealistic(on){
   assembleRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   if (on) {
-    if (!assembleEnvTexture) assembleEnvTexture = buildAssembleEnvTexture(assembleRenderer);
+    if (!assembleEnvTexture) assembleEnvTexture = build3DEnvTexture(assembleRenderer);
     assembleScene.background = assembleEnvTexture;
   } else {
-    assembleScene.background = new THREE.Color(0xe8ecf1);
+    assembleScene.background = getSkyTexture();
   }
 
   if (!assembleShadowLight) {
@@ -4985,7 +5231,7 @@ function updateAssembleLabels(){
   if (!showDims) return;
   const container = document.getElementById('assembleCanvas3dContainer');
 
-  assembleComponents.forEach(c => {
+  const candidates = assembleComponents.map(c => {
     let labelText, anchorLocal;
     if (c.type === 'block') {
       labelText = `${c.name} — ${Math.round(c.blockW)}×${Math.round(c.blockH)}×${Math.round(c.blockD)} mm`;
@@ -5007,13 +5253,29 @@ function updateAssembleLabels(){
     );
     worldPos.applyEuler(assembleGroup.rotation);
     const screen = project3DToScreen(worldPos, assembleCamera, container);
-    if (!screen.visible || screen.x < -50 || screen.x > container.clientWidth + 50) return;
+    return { uid: c.uid, color: c.color, text: labelText, screen, selected: c.uid === assembleSelectedUid };
+  }).filter(L => L.screen.visible && L.screen.x > -50 && L.screen.x < container.clientWidth + 50);
+
+  // Anti-collision à l'écran : au-delà d'une certaine densité, deux étiquettes trop
+  // proches deviennent illisibles (superposées). On garde la pièce sélectionnée en
+  // priorité, puis on ne conserve les autres que si elles restent bien espacées.
+  const MIN_DIST = 50;
+  candidates.sort((a, b) => (b.selected ? 1 : 0) - (a.selected ? 1 : 0));
+  const accepted = [];
+  candidates.forEach(L => {
+    const tooClose = !L.selected && accepted.some(q => Math.hypot(q.screen.x - L.screen.x, q.screen.y - L.screen.y) < MIN_DIST);
+    if (tooClose) return;
+    accepted.push(L);
+
+    const dot = document.createElement('div');
+    dot.style.cssText = `position:absolute;left:${L.screen.x}px;top:${L.screen.y}px;width:5px;height:5px;margin:-2.5px;border-radius:50%;background:${L.color};`;
+    assembleLabelsWrap.appendChild(dot);
 
     const lbl = document.createElement('div');
-    lbl.textContent = labelText;
-    lbl.style.cssText = `position:absolute;left:${screen.x}px;top:${screen.y}px;transform:translate(-50%,-100%);
+    lbl.textContent = L.text;
+    lbl.style.cssText = `position:absolute;left:${L.screen.x}px;top:${L.screen.y - 8}px;transform:translate(-50%,-100%);
       background:rgba(20,20,20,0.82);color:#fff;font-family:'JetBrains Mono',monospace;font-size:10.5px;
-      padding:3px 7px;border-radius:4px;white-space:nowrap;border:1px solid ${c.color};`;
+      padding:3px 7px;border-radius:4px;white-space:nowrap;border:1px solid ${L.color};`;
     assembleLabelsWrap.appendChild(lbl);
   });
 }
@@ -5122,7 +5384,7 @@ document.getElementById('printAssembleBtn').addEventListener('click', () => {
   });
   printArea.innerHTML = `
     <div class="print-header">
-      <div class="print-title">ALFEMA • Plan d'Assemblage</div>
+      <div class="print-title">ALTEMA • Plan d'Assemblage</div>
       <div style="font-size:12px;">Date : ${new Date().toLocaleDateString()}</div>
     </div>
     <div class="print-section-title">Composants</div>
@@ -5287,7 +5549,7 @@ function createZincController(suffix, kind){
           <input type="checkbox" id="${id('showDims')}" checked>
           <span>Afficher les cotes déportées sur la 3D</span>
         </div>
-        <div id="${id('canvas3d')}" style="width:100%;height:460px;border-radius:6px;background:#e8ecf1;position:relative;overflow:hidden;margin-top:10px;"></div>
+        <div id="${id('canvas3d')}" style="width:100%;height:460px;border-radius:6px;background:linear-gradient(180deg,#a9cdec 0%,#d6e6f0 55%,#eef1ee 100%);position:relative;overflow:hidden;margin-top:10px;"></div>
       </div>
     </div>
   `;
@@ -5757,7 +6019,7 @@ function createZincController(suffix, kind){
     if (!container || init3dDone || !container.clientWidth || !container.clientHeight) return;
 
     scene3d = new THREE.Scene();
-    scene3d.background = new THREE.Color(0xe8ecf1);
+    scene3d.background = getSkyTexture();
     camera3d = new THREE.PerspectiveCamera(45, Math.max(1, container.clientWidth) / Math.max(1, container.clientHeight), 0.1, 40000);
     camera3d.position.set(1500, 1200, 2600);
     camera3d.lookAt(0, 0, 0);
@@ -5987,7 +6249,7 @@ function createZincController(suffix, kind){
     const printArea = document.getElementById('printArea');
     printArea.innerHTML = `
       <div class="print-header">
-        <div class="print-title">ALFEMA • Étude Toiture Zinc — ${typeLabel}</div>
+        <div class="print-title">ALTEMA • Étude Toiture Zinc — ${typeLabel}</div>
         <div style="font-size:12px;">Date : ${new Date().toLocaleDateString()}</div>
       </div>
       <div class="recap-block">
@@ -6034,6 +6296,197 @@ window.zincCtrl_tas = createZincController('tas', 'tasseaux');
 window.zincCtrl_jd = createZincController('jd', 'jointdebout');
 
 
+/* ===================== TRACÉ À MAIN LEVÉE -> PROFIL ===================== */
+// Dessine un profil au doigt/à la souris, simplifie le tracé (Douglas-Peucker +
+// fusion des points quasi-alignés) puis le convertit en séquence de segments
+// Droit/Pli, réutilisable directement dans "Séquence du profil".
+(function initFreehandImport(){
+  const overlay = document.getElementById('freehandOverlay');
+  const canvas = document.getElementById('freehandCanvas');
+  const ctx = canvas.getContext('2d');
+  let points = [];
+  let drawing = false;
+  let smoothPos = null;
+
+  // Lissage exponentiel de la position pendant le tracé (réduit le tremblement de
+  // la main) + distance minimale plus grande avant d'enregistrer un nouveau point
+  // (moins sensible aux micro-mouvements).
+  const SMOOTH_ALPHA = 0.35;
+  const MIN_POINT_DIST = 9;
+
+  function resizeCanvas(){
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.max(1, rect.width) * 2;
+    canvas.height = Math.max(1, rect.height) * 2;
+    redraw();
+  }
+
+  function redraw(){
+    ctx.fillStyle = '#12151a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (points.length > 1) {
+      ctx.strokeStyle = '#ffce00';
+      ctx.lineWidth = 5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      // Courbe lissée (quadratique passant par les milieux) plutôt que des
+      // segments droits bruts : rend le tracé visuellement doux à l'écran,
+      // même si les points enregistrés restent légèrement anguleux.
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length - 1; i++) {
+        const midX = (points[i].x + points[i + 1].x) / 2;
+        const midY = (points[i].y + points[i + 1].y) / 2;
+        ctx.quadraticCurveTo(points[i].x, points[i].y, midX, midY);
+      }
+      const last = points[points.length - 1];
+      ctx.lineTo(last.x, last.y);
+      ctx.stroke();
+    }
+    points.forEach((p, i) => {
+      if (i > 0 && i < points.length - 1) return;
+      ctx.fillStyle = i === 0 ? '#7cd68a' : '#ff6b6b';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  function canvasPointFromEvent(e){
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    drawing = true;
+    const p = canvasPointFromEvent(e);
+    smoothPos = { x: p.x, y: p.y };
+    points = [{ x: p.x, y: p.y }];
+    canvas.setPointerCapture?.(e.pointerId);
+    redraw();
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!drawing) return;
+    const raw = canvasPointFromEvent(e);
+    smoothPos.x += (raw.x - smoothPos.x) * SMOOTH_ALPHA;
+    smoothPos.y += (raw.y - smoothPos.y) * SMOOTH_ALPHA;
+    const last = points[points.length - 1];
+    if (!last || Math.hypot(smoothPos.x - last.x, smoothPos.y - last.y) > MIN_POINT_DIST) {
+      points.push({ x: smoothPos.x, y: smoothPos.y });
+      redraw();
+    }
+  });
+  ['pointerup', 'pointercancel'].forEach(evt => canvas.addEventListener(evt, () => { drawing = false; }));
+
+  document.getElementById('freehandUndoBtn').addEventListener('click', () => { points = []; redraw(); });
+
+  document.getElementById('freehandOpenBtn').addEventListener('click', () => {
+    overlay.classList.add('show');
+    points = [];
+    document.getElementById('freehandStatusMsg').textContent = '';
+    setTimeout(resizeCanvas, 30);
+  });
+  document.getElementById('freehandCloseBtn').addEventListener('click', () => overlay.classList.remove('show'));
+  window.addEventListener('resize', () => { if (overlay.classList.contains('show')) resizeCanvas(); });
+
+  // Douglas-Peucker : réduit un tracé dense à ses sommets significatifs.
+  function perpendicularDistance(p, a, b){
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (len === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+    const t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / (len * len);
+    const projX = a.x + t * dx, projY = a.y + t * dy;
+    return Math.hypot(p.x - projX, p.y - projY);
+  }
+  function rdpSimplify(pts, epsilon){
+    if (pts.length < 3) return pts.slice();
+    let dmax = 0, idx = 0;
+    const a = pts[0], b = pts[pts.length - 1];
+    for (let i = 1; i < pts.length - 1; i++) {
+      const d = perpendicularDistance(pts[i], a, b);
+      if (d > dmax) { dmax = d; idx = i; }
+    }
+    if (dmax > epsilon) {
+      const left = rdpSimplify(pts.slice(0, idx + 1), epsilon);
+      const right = rdpSimplify(pts.slice(idx), epsilon);
+      return left.slice(0, -1).concat(right);
+    }
+    return [a, b];
+  }
+  // Fusionne les sommets qui ne marquent pas un vrai changement de direction
+  // (résidus de bruit du tracé à main levée).
+  function mergeNearlyCollinear(pts, minAngleDeg){
+    if (pts.length < 3) return pts.slice();
+    const out = [pts[0]];
+    for (let i = 1; i < pts.length - 1; i++) {
+      const a = pts[i - 1], b = pts[i], c = pts[i + 1];
+      const ang1 = Math.atan2(b.y - a.y, b.x - a.x);
+      const ang2 = Math.atan2(c.y - b.y, c.x - b.x);
+      let diff = (ang2 - ang1) * 180 / Math.PI;
+      while (diff > 180) diff -= 360;
+      while (diff < -180) diff += 360;
+      if (Math.abs(diff) > minAngleDeg) out.push(b);
+    }
+    out.push(pts[pts.length - 1]);
+    return out;
+  }
+  // Convertit une polyligne simplifiée (repère canvas, y vers le bas) en
+  // séquence Droit/Pli (repère profil, y vers le haut) — même convention que
+  // le reste de l'outil (curAngle, dir +1/-1).
+  function pointsToProfileSegments(pts, scale){
+    const segs = [];
+    let prevAngle = null;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i], b = pts[i + 1];
+      const dx = (b.x - a.x) * scale;
+      const dy = -(b.y - a.y) * scale;
+      const len = Math.hypot(dx, dy);
+      if (len < 1) continue;
+      const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+      if (prevAngle !== null) {
+        let turn = angle - prevAngle;
+        while (turn > 180) turn -= 360;
+        while (turn < -180) turn += 360;
+        if (Math.abs(turn) > 1) {
+          segs.push({ type: 'bend', angle: Math.round(Math.abs(turn)), dir: turn >= 0 ? 1 : -1, hemType: 'aucun', hemGap: 6 });
+        }
+      }
+      segs.push({ type: 'straight', len: Math.max(1, Math.round(len)) });
+      prevAngle = angle;
+    }
+    return segs;
+  }
+
+  document.getElementById('freehandConvertBtn').addEventListener('click', () => {
+    const msg = document.getElementById('freehandStatusMsg');
+    if (points.length < 2) { msg.textContent = 'Dessine d\'abord un tracé.'; msg.style.color = 'var(--danger)'; return; }
+
+    const tol = (Number(document.getElementById('freehandTolerance').value) || 14) * 2; // *2 car canvas en 2x (devicePixelRatio logique)
+    const scaleWidthMM = Number(document.getElementById('freehandScaleWidth').value) || 300;
+
+    let simplified = rdpSimplify(points, tol);
+    simplified = mergeNearlyCollinear(simplified, 5);
+    if (simplified.length < 2) { msg.textContent = 'Tracé trop simple à convertir, redessine-le.'; msg.style.color = 'var(--danger)'; return; }
+
+    let minX = Infinity, maxX = -Infinity;
+    simplified.forEach(p => { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); });
+    const bboxW = Math.max(1, maxX - minX);
+    const scale = scaleWidthMM / bboxW;
+
+    const newSegs = pointsToProfileSegments(simplified, scale);
+    if (!newSegs.length) { msg.textContent = 'Impossible de convertir ce tracé — redessine-le.'; msg.style.color = 'var(--danger)'; return; }
+
+    segments = newSegs;
+    renderSegments();
+    redrawProfile();
+    overlay.classList.remove('show');
+    showToast(`Profil importé (${newSegs.length} éléments) — ajuste les cotes si besoin.`);
+  });
+})();
+
 (function initInteractiveTutorial(){
   const overlay = document.getElementById('tutorialOverlay');
   if(!overlay) return;
@@ -6055,11 +6508,13 @@ window.zincCtrl_jd = createZincController('jd', 'jointdebout');
   const steps = [
     { tab:'tab-pliage', getTarget:()=>document.getElementById('profileName')?.closest('.field') || document.getElementById('profileName'), title:'Nommer la pièce', text:'Donne un nom clair au profil. Il sera repris dans les schémas enregistrés et les impressions.', hint:'Ici : Nom du schéma' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('segList')?.closest('.panel'), title:'Construire le profil', text:'Ajoute les éléments avec Droit, Pli, Arrondi ou Boudin. Cette zone contient toute la séquence de fabrication.', hint:'Ici : Séquence du profil' },
+    { tab:'tab-pliage', getTarget:()=>document.getElementById('freehandOpenBtn'), title:'Importer un tracé à main levée', text:'Dessine directement la forme du profil au doigt ou à la souris (un seul tracé continu), puis clique sur "Convertir en profil" : les droits et les plis sont générés automatiquement. Ajuste ensuite les cotes exactes une par une.', hint:'Ici : Dessiner à main levée' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('profileMaterial')?.closest('.sheet-fields'), title:'Choisir matière et épaisseur', text:'Choisis la matière et l’épaisseur de la tôle. Les deux champs sont regroupés et mis en évidence ensemble.', hint:'Ici : Matière + Épaisseur' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('ralSwatchRow'), title:'Choisir un RAL rapidement', text:'Clique directement sur une pastille pour appliquer un RAL courant, sans avoir à taper le code. Le champ texte reste disponible pour un code moins courant.', hint:'Ici : Pastilles RAL' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('profileCanvasWrap'), title:'Contrôler le schéma 2D', text:'Vérifie les longueurs, angles et rayons directement sur le dessin. Les cotes permettent de contrôler la géométrie.', hint:'Ici : Schéma 2D' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('canvas3dContainer'), title:'Manipuler la 3D', text:'Clic gauche + glisser : rotation. Clic droit ou Shift : déplacement. Molette : zoom. Double-clic : recentrage. La case "Afficher les cotes déportées" juste au-dessus permet de les masquer si besoin.', hint:'Ici : Vue 3D' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('fs3dOpenBtn'), title:'Ouvrir le plein écran 3D', text:'Passe la visualisation 3D en plein écran pour travailler plus confortablement. Les commandes restent identiques.', hint:'Ici : Plein écran 3D' },
+    { tab:'tab-pliage', getTarget:()=>document.getElementById('profileRealisticBtn'), title:'Vue réaliste', text:'Ajoute un sol, des ombres portées douces et des reflets d\'environnement à la pièce en 3D. Un second clic revient à la vue standard, plus rapide à manipuler pendant que tu ajustes le profil.', hint:'Ici : Vue réaliste' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('biaisEnabled')?.closest('.toggle-row'), title:'Schéma biais (pièce en biais)', text:'Active cette case pour dessiner une pièce qui passe progressivement d\'un profil Gauche à un profil Droite. Le panneau qui apparaît propose le calpinage en pièces, l\'impression du plan, et un bouton "Exporter le calpinage (Excel)" pour transmettre les cotes à l\'atelier ou au chiffrage.', hint:'Ici : Activer le schéma biais' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('saveProfileBtn'), title:'Enregistrer le schéma', text:'Enregistre le profil pour le conserver en mémoire et le retrouver ensuite dans tes schémas.', hint:'Ici : Enregistrer ce schéma' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('savedProfilesSearch'), title:'Retrouver un schéma', text:'Tape quelques lettres du nom pour filtrer instantanément la liste des schémas enregistrés — pratique dès qu\'il y en a beaucoup.', hint:'Ici : Rechercher un schéma' },
