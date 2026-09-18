@@ -8,6 +8,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <!-- SheetJS pour la lecture et l'écriture des fichiers Excel -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- jsPDF pour les exports PDF (plan de débit, calpinage biais) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <!-- Three.js pour la modélisation 3D exacte -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
@@ -698,6 +700,15 @@
     #freehandCanvasWrap{height:45vh;}
   }
 
+  /* Bibliothèque de profils types */
+  #libraryOverlay{display:none;position:fixed;inset:0;background:#0a0c0e;z-index:1000;padding:20px;flex-direction:column;}
+  #libraryOverlay.show{display:flex;}
+  #libraryGrid{flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-top:14px;padding-right:4px;}
+  .library-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;}
+  .library-card canvas{width:100%;height:120px;background:#0a0c0e;border-radius:6px;}
+  .library-card .lib-name{font-family:'Oswald',sans-serif;font-size:13px;color:var(--accent);text-transform:uppercase;letter-spacing:.03em;}
+  .library-card .lib-desc{font-size:11px;color:var(--text-dim);line-height:1.4;flex:1;}
+
   #printArea{display:none;}
   @media print{
     @page {
@@ -1041,6 +1052,8 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg>
             Imprimer Tout (Débit, Récapitulatif & Schémas)
           </button>
+          <button class="mail-btn" id="exportDebitPdfBtn" type="button" style="margin-top:10px;">📄 Exporter en PDF (avec plans imagés)</button>
+          <button class="mail-btn" id="exportDebitExcelBtn" type="button" style="margin-top:10px;">📊 Exporter le récapitulatif (Excel)</button>
         </div>
       </div>
 
@@ -1075,6 +1088,7 @@
           </div>
           <button class="add-btn" id="clearSegBtn" style="border-color:var(--line-soft);">Effacer le profil</button>
           <button class="add-btn" id="freehandOpenBtn" style="margin-top:8px;border-color:var(--accent-dim);color:var(--accent);">✏️ Dessiner à main levée (import auto)</button>
+          <button class="add-btn" id="libraryOpenBtn" style="margin-top:8px;">📚 Bibliothèque de profils types</button>
         </div>
 
         <div class="panel">
@@ -1234,6 +1248,9 @@
             </button>
             <button class="mail-btn" id="exportBiaisExcelBtn" type="button" style="margin-top:10px;">
               📊 Exporter le calpinage (Excel)
+            </button>
+            <button class="mail-btn" id="exportBiaisPdfBtn" type="button" style="margin-top:10px;">
+              📄 Exporter le calpinage (PDF, avec schémas)
             </button>
 
           </div>
@@ -1467,6 +1484,17 @@
       <div class="biais-hint" id="freehandStatusMsg" style="margin:0;"></div>
     </div>
   </div>
+</div>
+
+
+<!-- Bibliothèque de profils types -->
+<div id="libraryOverlay">
+  <div class="fs-head">
+    <span class="fs-title">Bibliothèque de profils types</span>
+    <button class="fs-close" id="libraryCloseBtn">✕ Fermer</button>
+  </div>
+  <div class="biais-hint" style="margin:10px 0 0;">Clique sur "Charger" pour partir de ce profil dans "Séquence du profil" — les cotes sont des valeurs de départ à ajuster ensuite.</div>
+  <div id="libraryGrid"></div>
 </div>
 
 
@@ -3968,6 +3996,112 @@ document.getElementById('printCombinedBtn').addEventListener('click', () => {
   window.print();
 });
 
+// Reconstruit le récapitulatif de débit (même logique que l'affichage écran) —
+// réutilisé par les exports PDF et Excel.
+function computeDebitRecapItems(){
+  const recapMap = {};
+  lastPackedResult.sheets.forEach(s => {
+    s.placed.forEach(p => {
+      const keyName = p.name || 'Pièce sans nom';
+      const dimsStr = `${p.origW} x ${p.origH} mm`;
+      const uniqueKey = keyName + "_" + dimsStr;
+      if (!recapMap[uniqueKey]) recapMap[uniqueKey] = { name: keyName, dims: dimsStr, qty: 0, totalArea: 0, totalLinear: 0 };
+      recapMap[uniqueKey].qty++;
+      recapMap[uniqueKey].totalArea += (p.origW * p.origH);
+      recapMap[uniqueKey].totalLinear += p.origH;
+    });
+  });
+  return Object.values(recapMap).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+document.getElementById('exportDebitExcelBtn').addEventListener('click', () => {
+  if (!lastPackedResult || !lastPackedResult.sheets.length) {
+    showToast('Lance d\'abord le calcul du plan de découpe.');
+    return;
+  }
+  const items = computeDebitRecapItems();
+  const recapRows = items.map(item => ({
+    'Pièce': item.name, 'Dimensions': item.dims, 'Quantité': item.qty,
+    'Linéaire (m)': +(item.totalLinear / 1000).toFixed(2), 'Surface (m²)': +(item.totalArea / 1000000).toFixed(2)
+  }));
+
+  const sheetRows = [];
+  lastPackedResult.sheets.forEach((s, idx) => {
+    s.placed.forEach(p => {
+      sheetRows.push({ 'Tôle': idx + 1, 'Pièce': p.name || '', 'X (mm)': Math.round(p.x), 'Y (mm)': Math.round(p.y), 'Largeur (mm)': p.origW, 'Hauteur (mm)': p.origH, 'Tournée': p.rotated ? 'Oui' : 'Non' });
+    });
+  });
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(recapRows), 'Récapitulatif');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(sheetRows), 'Détail par tôle');
+  XLSX.writeFile(workbook, 'plan_de_debit_altema.xlsx');
+  showToast('Export Excel du plan de débit réussi !');
+});
+
+document.getElementById('exportDebitPdfBtn').addEventListener('click', () => {
+  if (!lastPackedResult || !lastPackedResult.sheets.length) {
+    showToast('Lance d\'abord le calcul du plan de découpe.');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 14;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.text('ALTEMA — Dossier de débit', margin, margin);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text(`Date : ${new Date().toLocaleDateString()}`, pageW - margin, margin, { align: 'right' });
+
+  let y = margin + 12;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text('Récapitulatif de débit', margin, y);
+  y += 8;
+  const colX = { name: margin, dims: margin + 75, qty: margin + 140, lin: margin + 165, surf: margin + 200 };
+  doc.setFontSize(9);
+  doc.text('Pièce', colX.name, y); doc.text('Dimensions', colX.dims, y); doc.text('Qté', colX.qty, y);
+  doc.text('Linéaire', colX.lin, y); doc.text('Surface', colX.surf, y);
+  y += 2;
+  doc.setDrawColor(180);
+  doc.line(margin, y, pageW - margin, y);
+  y += 5;
+  doc.setFont('helvetica', 'normal');
+
+  computeDebitRecapItems().forEach(item => {
+    if (y > pageH - margin) { doc.addPage(); y = margin; }
+    doc.text(String(item.name).slice(0, 42), colX.name, y);
+    doc.text(item.dims, colX.dims, y);
+    doc.text(String(item.qty), colX.qty, y);
+    doc.text((item.totalLinear / 1000).toFixed(2) + ' m', colX.lin, y);
+    doc.text((item.totalArea / 1000000).toFixed(2) + ' m²', colX.surf, y);
+    y += 6;
+  });
+
+  lastPackedResult.sheets.forEach((s, idx) => {
+    doc.addPage();
+    const tempCanvas = document.createElement('canvas');
+    drawSheetCanvas(tempCanvas, s, lastPackedResult.sW, lastPackedResult.sH, true);
+    const imgData = tempCanvas.toDataURL('image/png');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text(`Tôle ${idx + 1} — ${lastPackedResult.sW} x ${lastPackedResult.sH} mm`, margin, margin);
+    const availW = pageW - margin * 2;
+    const availH = pageH - margin * 2 - 10;
+    const imgRatio = lastPackedResult.sH / lastPackedResult.sW;
+    let imgW = availW, imgH = imgW * imgRatio;
+    if (imgH > availH) { imgH = availH; imgW = imgH / imgRatio; }
+    doc.addImage(imgData, 'PNG', margin, margin + 10, imgW, imgH);
+  });
+
+  doc.save('plan_de_debit_altema.pdf');
+  showToast('Export PDF du plan de débit réussi !');
+});
+
 document.getElementById('printAllProfilesBtn').addEventListener('click', () => {
   if (!savedProfiles.length) {
     showToast('Aucun schéma enregistré.');
@@ -4569,6 +4703,87 @@ document.getElementById('exportBiaisExcelBtn').addEventListener('click', () => {
   XLSX.utils.book_append_sheet(workbook, wsPieces, "Calpinage pièces");
   XLSX.writeFile(workbook, `calpinage_biais_${nomProfil.replace(/[^a-z0-9]+/gi,'_')}.xlsx`);
   showToast('Export Excel du calpinage réussi !');
+});
+
+document.getElementById('exportBiaisPdfBtn').addEventListener('click', () => {
+  const data = computeBiaisPieceRows();
+  if (!data.val.ok || !data.rows.length) {
+    showToast("Aucun calpinage à exporter (vérifie que les profils Gauche/Droite sont compatibles et que la longueur totale est renseignée).");
+    return;
+  }
+  const nomProfil = document.getElementById('profileName').value || 'Schéma pliage';
+  const mat = document.getElementById('profileMaterial').value;
+  const th = document.getElementById('profileThickness').value;
+  const totalRaw = document.getElementById('biaisTotalRaw').value;
+  const color = document.getElementById('profileColor').value;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 14;
+
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
+  doc.text('ALTEMA — Plan de calpinage biais', margin, margin);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+  doc.text(`Date : ${new Date().toLocaleDateString()}`, pageW - margin, margin, { align: 'right' });
+
+  let y = margin + 12;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+  doc.text(nomProfil, margin, y);
+  y += 7;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
+  [
+    `Matière : ${mat} ${th} mm`,
+    `Longueur totale (emboîtement compris) : ${totalRaw} mm`,
+    `Nombre de pièces : ${data.plan.n}  ·  Longueur réelle / pièce : ${Math.round(data.plan.L)} mm  ·  Portée finie couverte : ${Math.round(data.finiCouvert)} mm`,
+    `Sens d'écoulement : ${data.senseGD ? 'Gauche (femelle) → Droite (mâle)' : 'Droite (femelle) → Gauche (mâle)'}  ·  Jeu d'emboîtement : ${computeJeuValue()} mm`
+  ].forEach(line => { doc.text(line, margin, y); y += 5.5; });
+
+  y += 3;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+  doc.text('Tableau des pièces', margin, y);
+  y += 7;
+  const colX = { idx: margin, len: margin + 14, pos: margin + 36, left: margin + 70, right: margin + 175 };
+  doc.setFontSize(8.5);
+  doc.text('#', colX.idx, y); doc.text('Long.', colX.len, y); doc.text('Position', colX.pos, y);
+  doc.text('Bout Gauche', colX.left, y); doc.text('Bout Droite', colX.right, y);
+  y += 2; doc.setDrawColor(180); doc.line(margin, y, pageW - margin, y); y += 4.5;
+  doc.setFont('helvetica', 'normal');
+  data.rows.forEach(r => {
+    if (y > pageH - margin) { doc.addPage(); y = margin; }
+    doc.text(String(r.idx), colX.idx, y);
+    doc.text(`${Math.round(r.L)}mm`, colX.len, y);
+    doc.text(`${(r.posFracLeft*100).toFixed(0)}→${(r.posFracRight*100).toFixed(0)}%`, colX.pos, y);
+    doc.text(`${r.leftType} · ${Math.round(r.leftDev)}mm`, colX.left, y);
+    doc.text(`${r.rightType} · ${Math.round(r.rightDev)}mm`, colX.right, y);
+    y += 5.5;
+  });
+
+  // Une page par pièce avec les schémas Gauche/Droite cotés.
+  data.rows.forEach(r => {
+    doc.addPage();
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+    doc.text(`Pièce ${r.idx} — ${Math.round(r.L)} mm brut — position ${(r.posFracLeft*100).toFixed(0)}% → ${(r.posFracRight*100).toFixed(0)}%`, margin, margin);
+
+    const canvasL = document.createElement('canvas'); canvasL.width = 1000; canvasL.height = 600;
+    drawProfileOnCanvas(canvasL, true, { segments: r.segLeft, color, rotation: 0, customArrow: null });
+    const canvasR = document.createElement('canvas'); canvasR.width = 1000; canvasR.height = 600;
+    drawProfileOnCanvas(canvasR, true, { segments: r.segRight, color, rotation: 0, customArrow: null });
+
+    const halfW = (pageW - margin * 2 - 6) / 2;
+    const imgH = halfW * 0.6;
+    const imgY = margin + 14;
+    doc.addImage(canvasL.toDataURL('image/png'), 'PNG', margin, imgY, halfW, imgH);
+    doc.addImage(canvasR.toDataURL('image/png'), 'PNG', margin + halfW + 6, imgY, halfW, imgH);
+
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
+    doc.text(`Bout Gauche — ${r.leftType} · ${r.leftSummary} · développé ${Math.round(r.leftDev)} mm`, margin, imgY + imgH + 7);
+    doc.text(`Bout Droite — ${r.rightType} · ${r.rightSummary} · développé ${Math.round(r.rightDev)} mm`, margin + halfW + 6, imgY + imgH + 7);
+  });
+
+  doc.save(`calpinage_biais_${nomProfil.replace(/[^a-z0-9]+/gi,'_')}.pdf`);
+  showToast('Export PDF du calpinage réussi !');
 });
 // (utile car une pièce biais peut être bien plus longue qu'un profil simple :
 // sans ça, la caméra restait à la distance par défaut et on ne voyait qu'un bout
@@ -5459,6 +5674,22 @@ function createZincController(suffix, kind){
       </div>
 
       <div class="panel" style="margin-top:16px;">
+        <div class="panel-title"><span>Versants du projet <span class="num" id="${id('versantCount')}">0</span></span></div>
+        <div class="biais-hint">Un même chantier peut avoir plusieurs pans (2 versants, croupe...). Configure un versant ci-dessus, enregistre-le, puis repars sur un nouveau — la "Vue globale du projet" plus bas cumule tous les versants enregistrés.</div>
+        <div class="sheet-fields" style="margin-top:8px;">
+          <div class="field" style="grid-column:1 / -1;">
+            <label>Nom du versant</label>
+            <input type="text" id="${id('versantName')}" value="Versant 1">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="add-btn" id="${id('versantSaveBtn')}" type="button" style="flex:1;">💾 Enregistrer ce versant</button>
+          <button class="add-btn" id="${id('versantNewBtn')}" type="button" style="flex:1;border-color:var(--line-soft);">➕ Nouveau versant (vierge)</button>
+        </div>
+        <div id="${id('versantList')}" class="saved-profiles-list" style="margin-top:10px;"></div>
+      </div>
+
+      <div class="panel" style="margin-top:16px;">
         <div class="panel-title"><span>Pente & matière</span></div>
         <div class="sheet-fields">
           <div class="field">
@@ -5518,6 +5749,25 @@ function createZincController(suffix, kind){
       </div>
 
       <div class="panel" style="margin-top:16px;">
+        <div class="panel-title"><span>Besoins en matière (ce versant)</span></div>
+        <div class="sheet-fields">
+          <div class="field">
+            <label>Marge de chute (%)</label>
+            <input type="number" id="${id('margeChute')}" value="8" min="0" step="0.5">
+          </div>
+          <div class="field">
+            <label>Métrage par bobine (m)</label>
+            <input type="number" id="${id('metrageBobine')}" value="20" min="1">
+          </div>
+        </div>
+        <div class="develop-summary" id="${id('matiereStats')}">
+          <div class="stat"><div class="label">Surface couverture</div><div class="value accent" id="${id('matiereSurface')}">0 m²</div></div>
+          <div class="stat"><div class="label">Métrage à commander</div><div class="value" id="${id('matiereLineaire')}">0 m</div></div>
+          <div class="stat"><div class="label">Nombre de bobines</div><div class="value good" id="${id('matiereBobines')}">0</div></div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:16px;">
         <div class="panel-title"><span>Accessoires (rive, égout, faîtage)</span></div>
         <div id="${id('accessoiresWrap')}"></div>
       </div>
@@ -5551,6 +5801,13 @@ function createZincController(suffix, kind){
         </div>
         <div id="${id('canvas3d')}" style="width:100%;height:460px;border-radius:6px;background:linear-gradient(180deg,#a9cdec 0%,#d6e6f0 55%,#eef1ee 100%);position:relative;overflow:hidden;margin-top:10px;"></div>
       </div>
+
+      <div class="panel" style="margin-top:16px;">
+        <div class="panel-title"><span>Vue globale du projet (tous les versants)</span></div>
+        <div class="biais-hint">Cumule tous les versants enregistrés ci-dessus — pratique pour une toiture à plusieurs pans.</div>
+        <div id="${id('globalPlanWrap')}" style="background:#fff;border-radius:8px;padding:10px;margin-top:10px;"></div>
+        <div id="${id('globalStatsWrap')}" style="margin-top:12px;overflow-x:auto;"></div>
+      </div>
     </div>
   `;
 
@@ -5561,6 +5818,8 @@ function createZincController(suffix, kind){
   let mode = 'draw';        // 'draw' | 'edit' (tracé libre uniquement)
   let roofEdges = [];       // [{len, angle, role}] — description du versant, quel que soit le mode
   let openings = [];        // {uid, type, w, h, x, y}
+  let roofVersants = [];    // versants enregistrés dans le projet (multi-pans)
+  let currentVersantId = null;
 
   const ROLE_LABELS = { egout: 'Égout', faitage: 'Faîtage', rive: 'Rive', autre: 'Autre' };
   const ROLE_COLORS = { egout: '#3a86ff', faitage: '#e63946', rive: '#2a9d8f', autre: '#8d99ae' };
@@ -5584,11 +5843,18 @@ function createZincController(suffix, kind){
     ];
   }
 
-  function setShapeMode(next){
+  // Bascule juste l'affichage rectangle/tracé-libre, SANS toucher aux données
+  // (roofEdges, points...) — utilisée quand on restaure un versant enregistré.
+  function setShapeModeUI(next){
     shapeMode = next;
     root.querySelectorAll(`#${id('shapeModeToggle')} button`).forEach(b => b.classList.toggle('active', b.dataset.mode === next));
     $('rectModeWrap').style.display = (next === 'rect') ? 'block' : 'none';
     $('freeModeWrap').style.display = (next === 'free') ? 'block' : 'none';
+  }
+  // Bascule "utilisateur" (clic sur le sélecteur) : réinitialise les données du
+  // mode qu'on quitte, puisqu'on part d'une nouvelle forme.
+  function setShapeMode(next){
+    setShapeModeUI(next);
     if (next === 'rect') {
       buildRectEdges();
       redraw();
@@ -5767,13 +6033,14 @@ function createZincController(suffix, kind){
   });
 
   /* ---------- Calculs géométriques dérivés du tracé ---------- */
-  function computeRoofGeometry(){
-    if (!roofEdges.length) return null;
-    const pts = edgesToPolygon(roofEdges);
-    const egoutEdges = roofEdges.filter(e => e.role === 'egout');
-    const faitageEdges = roofEdges.filter(e => e.role === 'faitage');
-    const riveEdges = roofEdges.filter(e => e.role === 'rive');
-    const autreEdges = roofEdges.filter(e => e.role === 'autre');
+  function computeRoofGeometry(edgesOverride){
+    const edges = edgesOverride || roofEdges;
+    if (!edges.length) return null;
+    const pts = edgesToPolygon(edges);
+    const egoutEdges = edges.filter(e => e.role === 'egout');
+    const faitageEdges = edges.filter(e => e.role === 'faitage');
+    const riveEdges = edges.filter(e => e.role === 'rive');
+    const autreEdges = edges.filter(e => e.role === 'autre');
 
     const egoutLen = egoutEdges.reduce((s,e)=>s+e.len,0);
     const faitageLen = faitageEdges.reduce((s,e)=>s+e.len,0);
@@ -5792,7 +6059,13 @@ function createZincController(suffix, kind){
     let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
     pts.forEach(p=>{ minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y); });
 
-    return { pts, egoutLen: egoutLen || largeurMoy, faitageLen: faitageLen || largeurMoy, riveLen, rampant, largeurMoy, bbox:{minX,maxX,minY,maxY} };
+    // Aire réelle du polygone (formule du lacet) — plus précise que largeurMoy×rampant
+    // pour les formes non rectangulaires, utilisée pour les besoins en matière.
+    let area = 0;
+    for (let i = 0; i < pts.length - 1; i++) area += pts[i].x * pts[i+1].y - pts[i+1].x * pts[i].y;
+    area = Math.abs(area) / 2;
+
+    return { pts, egoutLen: egoutLen || largeurMoy, faitageLen: faitageLen || largeurMoy, riveLen, rampant, largeurMoy, areaMm2: area, bbox:{minX,maxX,minY,maxY} };
   }
 
   function computeZincLes(rampant, maxLen, recouvrement){
@@ -5803,12 +6076,12 @@ function createZincController(suffix, kind){
     return { n, L };
   }
 
-  function computeZincCalc(){
-    const geo = computeRoofGeometry();
+  function computeZincCalc(overrideParams){
+    const geo = computeRoofGeometry(overrideParams ? overrideParams.roofEdges : undefined);
     if (!geo) return null;
-    const largeurBac = parseFloat($('largeurBac').value) || 1;
-    const maxAvantJoint = parseFloat($('maxAvantJoint').value) || 1;
-    const recouvrementJoint = parseFloat($('recouvrementJoint').value) || 0;
+    const largeurBac = overrideParams ? overrideParams.largeurBac : (parseFloat($('largeurBac').value) || 1);
+    const maxAvantJoint = overrideParams ? overrideParams.maxAvantJoint : (parseFloat($('maxAvantJoint').value) || 1);
+    const recouvrementJoint = overrideParams ? overrideParams.recouvrementJoint : (parseFloat($('recouvrementJoint').value) || 0);
 
     const nBacs = Math.max(1, Math.round(geo.largeurMoy / largeurBac) || 1);
     const largeurBacEgout = geo.egoutLen / nBacs;
@@ -5819,6 +6092,19 @@ function createZincController(suffix, kind){
     const les = computeZincLes(geo.rampant, maxAvantJoint, recouvrementJoint);
 
     return { geo, largeurBac, nBacs, largeurBacEgout, largeurBacFaitage, largeurBacReelle, nTasseaux, les };
+  }
+
+  // Besoins en matière (surface, métrage de bobine à commander) à partir d'un
+  // résultat de computeZincCalc — réutilisé pour le versant courant et pour
+  // chaque versant enregistré dans la vue globale du projet.
+  function computeMatiereNeeds(data, margePct, metragePerBobine){
+    if (!data) return null;
+    const surfaceM2 = data.geo.areaMm2 / 1e6;
+    const lineaireMm = data.nBacs * data.les.n * data.les.L;
+    const lineaireM = lineaireMm / 1000;
+    const avecMarge = lineaireM * (1 + (margePct || 0) / 100);
+    const nBobines = metragePerBobine > 0 ? Math.ceil(avecMarge / metragePerBobine) : 0;
+    return { surfaceM2, lineaireM, avecMarge, nBobines };
   }
 
   function computeAccessoires(data){
@@ -5909,6 +6195,7 @@ function createZincController(suffix, kind){
       wrap.innerHTML = '<div style="padding:30px;color:#999;text-align:center;font-size:12px;">Trace le versant ci-contre pour voir le plan apparaître ici.</div>';
       $('bacN').textContent = '0'; $('tasseauN').textContent = '0'; $('bacRive').textContent = '0 mm';
       $('jointN').textContent = '0'; $('jointL').textContent = '0 mm'; $('jointCount').textContent = '0';
+      $('matiereSurface').textContent = '0 m²'; $('matiereLineaire').textContent = '0 m'; $('matiereBobines').textContent = '0';
       return;
     }
     $('bacN').textContent = data.nBacs;
@@ -5918,6 +6205,13 @@ function createZincController(suffix, kind){
     $('jointL').textContent = `${Math.round(data.les.L)} mm`;
     $('jointCount').textContent = Math.max(0, data.les.n - 1);
     renderAccessoires(data);
+
+    const margePct = parseFloat($('margeChute').value) || 0;
+    const metrageBobine = parseFloat($('metrageBobine').value) || 0;
+    const matiere = computeMatiereNeeds(data, margePct, metrageBobine);
+    $('matiereSurface').textContent = `${matiere.surfaceM2.toFixed(2)} m²`;
+    $('matiereLineaire').textContent = `${matiere.avecMarge.toFixed(1)} m`;
+    $('matiereBobines').textContent = matiere.nBobines;
 
     // Message de fermeture du tracé
     const pts = data.geo.pts;
@@ -5976,6 +6270,7 @@ function createZincController(suffix, kind){
     wrap.innerHTML = svgStr;
 
     update3D();
+    renderGlobalProject();
   }
 
   /* ---------- 3D ---------- */
@@ -6223,7 +6518,7 @@ function createZincController(suffix, kind){
     drawSchema();
   }
 
-  ['pente','epaisseur','largeurBac','largeurTasseau','maxAvantJoint','recouvrementJoint'].forEach(base => {
+  ['pente','epaisseur','largeurBac','largeurTasseau','maxAvantJoint','recouvrementJoint','margeChute','metrageBobine'].forEach(base => {
     $(base).addEventListener('input', redraw);
   });
 
@@ -6284,10 +6579,173 @@ function createZincController(suffix, kind){
     window.print();
   });
 
+  /* ---------- Versants du projet (multi-pans) ---------- */
+  function captureCurrentVersantConfig(name){
+    return {
+      id: currentVersantId || ('v' + Date.now() + Math.round(Math.random() * 9999)),
+      name: name || $('versantName').value || 'Versant',
+      shapeMode, roofEdges: JSON.parse(JSON.stringify(roofEdges)),
+      rectEgout: $('rectEgout').value, rectFaitage: $('rectFaitage').value, rectRampant: $('rectRampant').value,
+      largeurBac: parseFloat($('largeurBac').value) || 500,
+      largeurTasseau: parseFloat($('largeurTasseau').value) || 40,
+      maxAvantJoint: parseFloat($('maxAvantJoint').value) || 6000,
+      recouvrementJoint: parseFloat($('recouvrementJoint').value) || 80,
+      pente: $('pente').value, epaisseur: $('epaisseur').value,
+      openings: JSON.parse(JSON.stringify(openings))
+    };
+  }
+
+  function applyVersantConfig(v){
+    currentVersantId = v.id;
+    $('versantName').value = v.name;
+    $('rectEgout').value = v.rectEgout; $('rectFaitage').value = v.rectFaitage; $('rectRampant').value = v.rectRampant;
+    $('largeurBac').value = v.largeurBac; $('largeurTasseau').value = v.largeurTasseau;
+    $('maxAvantJoint').value = v.maxAvantJoint; $('recouvrementJoint').value = v.recouvrementJoint;
+    $('pente').value = v.pente; $('epaisseur').value = v.epaisseur;
+    openings = JSON.parse(JSON.stringify(v.openings || []));
+    roofEdges = JSON.parse(JSON.stringify(v.roofEdges || []));
+    setShapeModeUI(v.shapeMode || 'rect');
+    if (v.shapeMode === 'free') {
+      mode = 'edit';
+      $('edgesWrap').style.display = roofEdges.length ? 'block' : 'none';
+      renderEdgesTable();
+    } else {
+      updateDrawButtons();
+    }
+    renderOpenings();
+    redraw();
+  }
+
+  function renderVersantList(){
+    $('versantCount').textContent = roofVersants.length;
+    const list = $('versantList');
+    if (!roofVersants.length) {
+      list.innerHTML = '<div class="empty-note" style="padding:12px;">Aucun versant enregistré pour l\'instant.</div>';
+      renderGlobalProject();
+      return;
+    }
+    list.innerHTML = '';
+    roofVersants.forEach(v => {
+      const data = computeZincCalc({ roofEdges: v.roofEdges, largeurBac: v.largeurBac, maxAvantJoint: v.maxAvantJoint, recouvrementJoint: v.recouvrementJoint });
+      const card = document.createElement('div');
+      card.className = 'profile-card';
+      if (v.id === currentVersantId) card.style.borderColor = 'var(--accent)';
+      card.innerHTML = `
+        <div class="profile-card-info" style="cursor:pointer;">
+          <div class="profile-card-name">${v.name}</div>
+          <div class="profile-card-meta">${data ? `${data.nBacs} bac(s) · ${(data.geo.areaMm2/1e6).toFixed(1)} m²` : 'Configuration incomplète'}</div>
+        </div>
+        <div class="profile-card-actions">
+          <button class="icon-action-btn" data-load title="Charger">📂</button>
+          <button class="icon-action-btn" data-remove title="Supprimer">✕</button>
+        </div>
+      `;
+      card.querySelector('[data-load]').addEventListener('click', () => { applyVersantConfig(v); renderVersantList(); showToast(`Versant "${v.name}" chargé.`); });
+      card.querySelector('.profile-card-info').addEventListener('click', () => { applyVersantConfig(v); renderVersantList(); showToast(`Versant "${v.name}" chargé.`); });
+      card.querySelector('[data-remove]').addEventListener('click', () => {
+        roofVersants = roofVersants.filter(x => x.id !== v.id);
+        if (currentVersantId === v.id) currentVersantId = null;
+        renderVersantList();
+        showToast('Versant supprimé du projet.');
+      });
+      list.appendChild(card);
+    });
+    renderGlobalProject();
+  }
+
+  $('versantSaveBtn').addEventListener('click', () => {
+    if (!roofEdges.length) { showToast('Configure d\'abord un versant avant de l\'enregistrer.'); return; }
+    const cfg = captureCurrentVersantConfig();
+    const existingIdx = roofVersants.findIndex(v => v.id === cfg.id);
+    if (existingIdx >= 0) roofVersants[existingIdx] = cfg; else roofVersants.push(cfg);
+    currentVersantId = cfg.id;
+    renderVersantList();
+    showToast(`Versant "${cfg.name}" enregistré dans le projet.`);
+  });
+
+  $('versantNewBtn').addEventListener('click', () => {
+    currentVersantId = null;
+    $('versantName').value = `Versant ${roofVersants.length + 1}`;
+    openings = [];
+    setShapeMode('rect');
+    $('rectEgout').value = 5000; $('rectFaitage').value = 5000; $('rectRampant').value = 8000;
+    buildRectEdges();
+    renderOpenings();
+    redraw();
+    showToast('Nouveau versant vierge — configure-le puis enregistre-le.');
+  });
+
+  // Combine tous les versants enregistrés : plan côte à côte + tableau de
+  // totaux (surface, bacs, lés, métrage, bobines).
+  function renderGlobalProject(){
+    const planWrap = $('globalPlanWrap');
+    const statsWrap = $('globalStatsWrap');
+    if (!roofVersants.length) {
+      planWrap.innerHTML = '<div style="padding:20px;color:#999;text-align:center;font-size:12px;">Enregistre au moins un versant pour voir la vue globale du projet.</div>';
+      statsWrap.innerHTML = '';
+      return;
+    }
+
+    const margePct = parseFloat($('margeChute').value) || 0;
+    const metrageBobine = parseFloat($('metrageBobine').value) || 0;
+
+    const entries = roofVersants.map(v => {
+      const data = computeZincCalc({ roofEdges: v.roofEdges, largeurBac: v.largeurBac, maxAvantJoint: v.maxAvantJoint, recouvrementJoint: v.recouvrementJoint });
+      const matiere = data ? computeMatiereNeeds(data, margePct, metrageBobine) : null;
+      return { v, data, matiere };
+    }).filter(e => e.data);
+
+    if (!entries.length) {
+      planWrap.innerHTML = '<div style="padding:20px;color:#999;text-align:center;font-size:12px;">Versants enregistrés incomplets.</div>';
+      statsWrap.innerHTML = '';
+      return;
+    }
+
+    // Plan combiné : chaque versant dans sa propre boîte, placés côte à côte.
+    const gap = 60;
+    let cursorX = 0, maxH = 0;
+    const placed = entries.map(e => {
+      const pts = e.data.geo.pts;
+      const bbox = e.data.geo.bbox;
+      const w = bbox.maxX - bbox.minX, h = bbox.maxY - bbox.minY;
+      const offsetX = cursorX - bbox.minX;
+      const offsetY = -bbox.minY;
+      cursorX += w + gap;
+      maxH = Math.max(maxH, h);
+      return { e, pts, offsetX, offsetY, w, h };
+    });
+    const totalW = cursorX - gap;
+    const pad = 40;
+    let svg = `<svg viewBox="${-pad} ${-pad} ${totalW + pad*2} ${maxH + pad*2}" style="width:100%;max-height:420px;">`;
+    placed.forEach(p => {
+      const poly = p.pts.map(pt => `${pt.x + p.offsetX},${maxH - (pt.y + p.offsetY)}`).join(' ');
+      svg += `<polygon points="${poly}" fill="#dfe6ec" stroke="#1c1b1a" stroke-width="2"/>`;
+      svg += `<text x="${p.offsetX + p.w/2}" y="${maxH + 22}" text-anchor="middle" font-family="Inter, sans-serif" font-size="13" fill="#1c1b1a">${p.e.v.name}</text>`;
+    });
+    svg += `</svg>`;
+    planWrap.innerHTML = svg;
+
+    // Tableau de totaux.
+    let rows = '';
+    let totSurf = 0, totBacs = 0, totLineaireAvecMarge = 0, totBobines = 0;
+    entries.forEach(({ v, data, matiere }) => {
+      totSurf += matiere.surfaceM2; totBacs += data.nBacs; totLineaireAvecMarge += matiere.avecMarge; totBobines += matiere.nBobines;
+      rows += `<tr><td>${v.name}</td><td>${matiere.surfaceM2.toFixed(2)} m²</td><td>${data.nBacs}</td><td>${data.les.n} lé(s) de ${Math.round(data.les.L)}mm</td><td>${matiere.avecMarge.toFixed(1)} m</td><td>${matiere.nBobines}</td></tr>`;
+    });
+    statsWrap.innerHTML = `
+      <table class="recap-table">
+        <thead><tr><th>Versant</th><th>Surface</th><th>Bacs</th><th>Lés</th><th>Métrage (marge incl.)</th><th>Bobines</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td>TOTAL PROJET</td><td>${totSurf.toFixed(2)} m²</td><td>${totBacs}</td><td>—</td><td>${totLineaireAvecMarge.toFixed(1)} m</td><td>${totBobines}</td></tr></tfoot>
+      </table>
+    `;
+  }
+
   buildRectEdges();
   updateDrawButtons();
   renderOpenings();
   drawSchema();
+  renderVersantList();
 
   return { redraw, init3D, update3D: () => { update3D(); drawSchema(); }, fitCamera };
 }
@@ -6295,6 +6753,59 @@ function createZincController(suffix, kind){
 window.zincCtrl_tas = createZincController('tas', 'tasseaux');
 window.zincCtrl_jd = createZincController('jd', 'jointdebout');
 
+
+/* ===================== BIBLIOTHÈQUE DE PROFILS TYPES ===================== */
+const PROFILE_LIBRARY = [
+  { name: 'Cornière (L)', desc: "Angle simple à 90°, usage courant d'habillage.",
+    segments: [ {type:'straight',len:60}, {type:'bend',angle:90,dir:1,hemType:'aucun',hemGap:6}, {type:'straight',len:60} ] },
+  { name: 'U / Goulotte', desc: 'Chéneau ou goulotte en U, trois faces.',
+    segments: [ {type:'straight',len:50}, {type:'bend',angle:90,dir:1,hemType:'aucun',hemGap:6}, {type:'straight',len:100}, {type:'bend',angle:90,dir:1,hemType:'aucun',hemGap:6}, {type:'straight',len:50} ] },
+  { name: 'Z (couvre-mur)', desc: 'Deux ailes opposées reliées par une âme.',
+    segments: [ {type:'straight',len:40}, {type:'bend',angle:90,dir:1,hemType:'aucun',hemGap:6}, {type:'straight',len:120}, {type:'bend',angle:90,dir:-1,hemType:'aucun',hemGap:6}, {type:'straight',len:40} ] },
+  { name: 'Oméga (chapeau)', desc: 'Chapeau rectangulaire, pattes de fixation aux extrémités.',
+    segments: [ {type:'straight',len:30}, {type:'bend',angle:90,dir:-1,hemType:'aucun',hemGap:6}, {type:'straight',len:30}, {type:'bend',angle:90,dir:1,hemType:'aucun',hemGap:6}, {type:'straight',len:60}, {type:'bend',angle:90,dir:1,hemType:'aucun',hemGap:6}, {type:'straight',len:30}, {type:'bend',angle:90,dir:-1,hemType:'aucun',hemGap:6}, {type:'straight',len:30} ] },
+  { name: 'Bavette / Couvre-joint', desc: "Pli à 90° avec petit retour d'égouttement.",
+    segments: [ {type:'straight',len:150}, {type:'bend',angle:90,dir:1,hemType:'aucun',hemGap:6}, {type:'straight',len:20}, {type:'bend',angle:90,dir:-1,hemType:'aucun',hemGap:6}, {type:'straight',len:10} ] },
+  { name: 'Tasseau (support)', desc: 'Petit U rigide utilisé comme support de couverture.',
+    segments: [ {type:'straight',len:30}, {type:'bend',angle:90,dir:1,hemType:'aucun',hemGap:6}, {type:'straight',len:40}, {type:'bend',angle:90,dir:1,hemType:'aucun',hemGap:6}, {type:'straight',len:30} ] },
+  { name: 'Larmier', desc: "Profil d'égouttement avec double pli.",
+    segments: [ {type:'straight',len:100}, {type:'bend',angle:135,dir:1,hemType:'aucun',hemGap:6}, {type:'straight',len:15}, {type:'bend',angle:45,dir:-1,hemType:'aucun',hemGap:6}, {type:'straight',len:20} ] },
+  { name: 'Demi-rond (chéneau)', desc: 'Chéneau demi-rond avec deux ailes droites.',
+    segments: [ {type:'straight',len:20}, {type:'bend',angle:90,dir:-1,hemType:'aucun',hemGap:6}, {type:'arc',radius:60,angle:180,dir:1}, {type:'bend',angle:90,dir:-1,hemType:'aucun',hemGap:6}, {type:'straight',len:20} ] }
+];
+
+function renderProfileLibrary(){
+  const grid = document.getElementById('libraryGrid');
+  grid.innerHTML = '';
+  PROFILE_LIBRARY.forEach((lib) => {
+    const card = document.createElement('div');
+    card.className = 'library-card';
+    card.innerHTML = `
+      <canvas></canvas>
+      <div class="lib-name">${lib.name}</div>
+      <div class="lib-desc">${lib.desc}</div>
+      <button class="add-btn" type="button">Charger</button>
+    `;
+    grid.appendChild(card);
+    const canvas = card.querySelector('canvas');
+    canvas.width = 400; canvas.height = 240;
+    drawProfileOnCanvas(canvas, true, { segments: lib.segments, color: '', rotation: 0, customArrow: null });
+    card.querySelector('button').addEventListener('click', () => {
+      segments = JSON.parse(JSON.stringify(lib.segments));
+      renderSegments();
+      redrawProfile();
+      document.getElementById('libraryOverlay').classList.remove('show');
+      showToast(`Profil "${lib.name}" chargé — ajuste les cotes selon ton besoin.`);
+    });
+  });
+}
+document.getElementById('libraryOpenBtn').addEventListener('click', () => {
+  document.getElementById('libraryOverlay').classList.add('show');
+  renderProfileLibrary();
+});
+document.getElementById('libraryCloseBtn').addEventListener('click', () => {
+  document.getElementById('libraryOverlay').classList.remove('show');
+});
 
 /* ===================== TRACÉ À MAIN LEVÉE -> PROFIL ===================== */
 // Dessine un profil au doigt/à la souris, simplifie le tracé (Douglas-Peucker +
@@ -6506,19 +7017,24 @@ window.zincCtrl_jd = createZincController('jd', 'jointdebout');
   // plutôt que vers un élément voisin. Pour les champs, on encadre leur bloc complet.
   // Le champ "tab" force le bon onglet à être actif avant de localiser la cible.
   const steps = [
+    { tab:'tab-debit', getTarget:()=>document.getElementById('exportDebitPdfBtn')?.closest('.panel'), title:'Exporter le plan de débit', text:'Une fois le calcul lancé, exporte le dossier complet en PDF (avec l\'image de chaque tôle) ou juste le récapitulatif en Excel — pratique pour l\'atelier ou le chiffrage.', hint:'Ici : Export PDF / Excel' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('profileName')?.closest('.field') || document.getElementById('profileName'), title:'Nommer la pièce', text:'Donne un nom clair au profil. Il sera repris dans les schémas enregistrés et les impressions.', hint:'Ici : Nom du schéma' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('segList')?.closest('.panel'), title:'Construire le profil', text:'Ajoute les éléments avec Droit, Pli, Arrondi ou Boudin. Cette zone contient toute la séquence de fabrication.', hint:'Ici : Séquence du profil' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('freehandOpenBtn'), title:'Importer un tracé à main levée', text:'Dessine directement la forme du profil au doigt ou à la souris (un seul tracé continu), puis clique sur "Convertir en profil" : les droits et les plis sont générés automatiquement. Ajuste ensuite les cotes exactes une par une.', hint:'Ici : Dessiner à main levée' },
+    { tab:'tab-pliage', getTarget:()=>document.getElementById('libraryOpenBtn'), title:'Partir d\'un profil type', text:'Cornière, U, Z, oméga, bavette, tasseau... Charge un profil courant en un clic pour ne pas repartir de zéro, puis ajuste les cotes à ton besoin.', hint:'Ici : Bibliothèque de profils types' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('profileMaterial')?.closest('.sheet-fields'), title:'Choisir matière et épaisseur', text:'Choisis la matière et l’épaisseur de la tôle. Les deux champs sont regroupés et mis en évidence ensemble.', hint:'Ici : Matière + Épaisseur' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('ralSwatchRow'), title:'Choisir un RAL rapidement', text:'Clique directement sur une pastille pour appliquer un RAL courant, sans avoir à taper le code. Le champ texte reste disponible pour un code moins courant.', hint:'Ici : Pastilles RAL' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('profileCanvasWrap'), title:'Contrôler le schéma 2D', text:'Vérifie les longueurs, angles et rayons directement sur le dessin. Les cotes permettent de contrôler la géométrie.', hint:'Ici : Schéma 2D' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('canvas3dContainer'), title:'Manipuler la 3D', text:'Clic gauche + glisser : rotation. Clic droit ou Shift : déplacement. Molette : zoom. Double-clic : recentrage. La case "Afficher les cotes déportées" juste au-dessus permet de les masquer si besoin.', hint:'Ici : Vue 3D' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('fs3dOpenBtn'), title:'Ouvrir le plein écran 3D', text:'Passe la visualisation 3D en plein écran pour travailler plus confortablement. Les commandes restent identiques.', hint:'Ici : Plein écran 3D' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('profileRealisticBtn'), title:'Vue réaliste', text:'Ajoute un sol, des ombres portées douces et des reflets d\'environnement à la pièce en 3D. Un second clic revient à la vue standard, plus rapide à manipuler pendant que tu ajustes le profil.', hint:'Ici : Vue réaliste' },
-    { tab:'tab-pliage', getTarget:()=>document.getElementById('biaisEnabled')?.closest('.toggle-row'), title:'Schéma biais (pièce en biais)', text:'Active cette case pour dessiner une pièce qui passe progressivement d\'un profil Gauche à un profil Droite. Le panneau qui apparaît propose le calpinage en pièces, l\'impression du plan, et un bouton "Exporter le calpinage (Excel)" pour transmettre les cotes à l\'atelier ou au chiffrage.', hint:'Ici : Activer le schéma biais' },
+    { tab:'tab-pliage', getTarget:()=>document.getElementById('biaisEnabled')?.closest('.toggle-row'), title:'Schéma biais (pièce en biais)', text:'Active cette case pour dessiner une pièce qui passe progressivement d\'un profil Gauche à un profil Droite. Le panneau qui apparaît propose le calpinage en pièces, l\'impression du plan, et des exports Excel et PDF (avec les schémas de chaque pièce) pour transmettre les cotes à l\'atelier ou au chiffrage.', hint:'Ici : Activer le schéma biais' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('saveProfileBtn'), title:'Enregistrer le schéma', text:'Enregistre le profil pour le conserver en mémoire et le retrouver ensuite dans tes schémas.', hint:'Ici : Enregistrer ce schéma' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('savedProfilesSearch'), title:'Retrouver un schéma', text:'Tape quelques lettres du nom pour filtrer instantanément la liste des schémas enregistrés — pratique dès qu\'il y en a beaucoup.', hint:'Ici : Rechercher un schéma' },
     { tab:'tab-tasseaux', getTarget:()=>document.getElementById('shapeModeToggle_tas'), title:'Dessiner le versant', text:'Par défaut, choisis "Rectangle" et renseigne juste les 3 dimensions (égout, faîtage, rampant) — mets des largeurs différentes pour obtenir un versant trapézoïdal. Pour une forme irrégulière, passe en "Tracé libre" : clique pour poser les sommets, puis ferme le tracé et ajuste les cotes de chaque arête.', hint:'Ici : Rectangle / Tracé libre (identique sur l\'onglet Joint debout)' },
+    { tab:'tab-tasseaux', getTarget:()=>document.getElementById('versantList_tas')?.closest('.panel'), title:'Plusieurs versants (toiture à pans)', text:'Configure un versant puis clique "Enregistrer ce versant" ; recommence avec "Nouveau versant" pour le pan suivant. Tous les versants enregistrés apparaissent ici et se cumulent dans la vue globale du projet, en bas de page.', hint:'Ici : Versants du projet' },
+    { tab:'tab-tasseaux', getTarget:()=>document.getElementById('matiereStats_tas'), title:'Besoins en matière', text:'Surface, métrage à commander (marge de chute comprise) et nombre de bobines nécessaires pour ce versant, calculés automatiquement à partir du calepinage.', hint:'Ici : Besoins en matière' },
+    { tab:'tab-tasseaux', getTarget:()=>document.getElementById('globalStatsWrap_tas')?.closest('.panel'), title:'Vue globale du projet', text:'Cumule tous les versants enregistrés : surface totale, bacs, métrage et bobines pour l\'ensemble du chantier — utile dès qu\'il y a plusieurs pans.', hint:'Ici : Vue globale du projet' },
     { tab:'tab-assemblage', getTarget:()=>document.getElementById('assembleComponentsList'), title:'Composer l\'assemblage', text:'Chaque profil a sa propre longueur, indépendante des autres. Sur chaque composant : 🔓 verrouille sa position (pour éviter de le déplacer par erreur) et ⧉ le duplique. Le bouton "Vue compacte" juste au-dessus réduit la liste à l\'essentiel quand il y a beaucoup de composants.', hint:'Ici : Composants de l\'assemblage' },
     { tab:'tab-assemblage', getTarget:()=>document.getElementById('assemble2DWrap'), title:'Positionner et vérifier', text:'Glisse directement une pièce sur le schéma pour la repositionner (clique dessus pour la sélectionner). Si deux pièces se chevauchent, elles sont automatiquement surlignées en rouge — sur ce schéma comme sur la vue 3D.', hint:'Ici : Schéma d\'assemblage' },
     { tab:'tab-assemblage', getTarget:()=>document.getElementById('assembleRealisticBtn'), title:'Vue réaliste', text:'Ajoute un sol, des ombres portées douces et des reflets d\'environnement à la 3D — une bonne façon de présenter l\'assemblage sans être un rendu photoréaliste. Un second clic revient à la vue standard, plus rapide à manipuler.', hint:'Ici : Vue réaliste' }
