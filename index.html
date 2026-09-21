@@ -1182,6 +1182,14 @@
             <label>Face peinte (RAL) sur la 3D</label>
             <button type="button" class="add-btn" id="paintedFaceToggleBtn" style="width:100%;text-align:center;">Face extérieure peinte 🔄 cliquer pour inverser</button>
           </div>
+          <div class="field" id="paintFinishRow" style="margin-top:2px;">
+            <label>Aspect de la peinture RAL (rendu 3D)</label>
+            <div class="dir-toggle" id="paintFinishToggle">
+              <button type="button" data-finish="brillant">Brillant</button>
+              <button type="button" data-finish="satine" class="active">Satiné</button>
+              <button type="button" data-finish="mat">Mat</button>
+            </div>
+          </div>
           <div class="biais-hint" id="ralUnusualMsg" style="display:none;color:var(--accent);border-color:var(--accent-dim);"></div>
           <div class="field" id="nuanceFieldRow" style="display:none;">
             <label>Nuance / finition naturelle</label>
@@ -1323,14 +1331,33 @@
               </button>
             </div>
           </div>
+          <div id="canvasOptionsBar" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--panel2);border:1px solid var(--line-soft);border-radius:7px;padding:7px 10px;margin-bottom:10px;">
+            <label style="display:flex;align-items:center;gap:7px;font-size:11px;color:var(--text-dim);" title="Éloigne ou rapproche les cotes du dessin pour aérer le schéma">
+              Écartement des cotes
+              <input type="range" id="dimSpacing2DRange" min="0.5" max="4" step="0.1" value="1" style="width:100px;accent-color:var(--accent);">
+              <span id="dimSpacing2DVal" style="font-family:'JetBrains Mono',monospace;color:var(--accent);min-width:34px;">×1.0</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim);cursor:pointer;">
+              <input type="checkbox" id="gridToggle" style="accent-color:var(--accent);"> Quadrillage
+            </label>
+            <select id="gridStepSelect" title="Pas du quadrillage" style="background:var(--bg);border:1px solid var(--line);border-radius:5px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;padding:3px 6px;">
+              <option value="5">5 mm</option><option value="10" selected>10 mm</option><option value="20">20 mm</option>
+              <option value="25">25 mm</option><option value="50">50 mm</option><option value="100">100 mm</option>
+            </select>
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim);cursor:pointer;" title="Les points de mesure s'accrochent aux intersections du quadrillage">
+              <input type="checkbox" id="gridSnapChk" style="accent-color:var(--accent);"> Aimanter les points
+            </label>
+          </div>
           <div id="measureToolBar" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;background:var(--panel2);border:1px solid var(--line-soft);border-radius:7px;padding:8px 10px;margin-bottom:10px;">
             <span style="font-size:11px;color:var(--text-dim);">Mode :</span>
             <div class="dir-toggle" id="measureModeToggle">
               <button type="button" class="active" data-mode="diag">Distance directe</button>
-              <button type="button" data-mode="ortho">Angle droit (X puis Y)</button>
+              <button type="button" data-mode="ortho">Angle droit (coin déplaçable)</button>
             </div>
             <span id="measureHint" style="font-size:11px;color:var(--accent);margin-left:6px;">Clique le point A sur le schéma (accroche automatique aux sommets).</span>
+            <span style="font-size:10.5px;color:var(--text-faint);flex-basis:100%;">Croix = droites illimitées à angle droit · Alt = sans aimantation · Échap = annuler · En angle droit, glisse le rond du coin pour le déplacer (l'angle reste à 90°).</span>
           </div>
+          <div style="position:relative;">
           <canvas id="profileCanvas"></canvas>
           <div class="rotate-controls">
             <button class="profile-rotate-icon-btn" id="rotateIconBtn" title="Pivoter le profil (90°)">
@@ -1340,6 +1367,9 @@
               <input type="number" id="rotateDegInput" value="0" step="1">
               <span>°</span>
             </div>
+            <button class="profile-rotate-icon-btn" id="alignHBtn" type="button" title="Mettre un segment à l'horizontale : clique ce bouton puis clique le segment sur le schéma (re-clic = retourner de 180°)" style="font-size:20px;font-weight:700;">⟷</button>
+            <button class="profile-rotate-icon-btn" id="alignVBtn" type="button" title="Mettre un segment à la verticale : clique ce bouton puis clique le segment sur le schéma (re-clic = retourner de 180°)" style="font-size:20px;font-weight:700;">↕</button>
+          </div>
           </div>
           <div id="measurementsListWrap" style="margin-top:10px;"></div>
         </div>
@@ -1377,6 +1407,10 @@
           <div class="toggle-row" style="margin:0 0 10px;">
             <input type="checkbox" id="profile3dShowDims" checked>
             <span>Afficher les cotes déportées sur la 3D</span>
+          </div>
+          <div class="field" style="margin:0 0 10px;">
+            <label>Écartement des cotes 3D <span id="dimSpacing3DVal" style="font-family:'JetBrains Mono',monospace;color:var(--accent);">×1.0</span></label>
+            <input type="range" id="dimSpacing3DRange" min="0.5" max="4" step="0.1" value="1" style="width:100%;accent-color:var(--accent);">
           </div>
           <button class="add-btn" id="profileRealisticBtn" type="button" style="margin-bottom:10px;">✨ Vue réaliste (sol, ombres, reflets)</button>
           <div id="profileLightControls" style="display:none;">
@@ -1490,6 +1524,10 @@
           <div class="toggle-row" style="margin:10px 0 0;">
             <input type="checkbox" id="assembleShowDims" checked>
             <span>Afficher les cotes sur la 3D</span>
+          </div>
+          <div class="field" style="margin:10px 0 0;">
+            <label>Écartement des cotes 3D <span id="dimSpacing3DValAsm" style="font-family:'JetBrains Mono',monospace;color:var(--accent);">×1.0</span></label>
+            <input type="range" id="dimSpacing3DRangeAsm" min="0.5" max="4" step="0.1" value="1" style="width:100%;accent-color:var(--accent);">
           </div>
           <button class="add-btn" id="assembleRealisticBtn" type="button" style="margin-top:10px;">✨ Vue réaliste (sol, ombres, reflets)</button>
           <div id="assembleLightControls" style="display:none;">
@@ -1638,6 +1676,19 @@ let isPanning = false;
 let panStart = { x: 0, y: 0 };
 let lastAnnotationsMap = [];
 
+// --- Options d'affichage du schéma 2D / 3D ---
+let dimSpacing2D = 1;        // écartement des cotes du schéma 2D (multiplicateur)
+let dimSpacing3D = 1;        // écartement des cotes déportées en 3D (multiplicateur)
+let gridEnabled = false;     // quadrillage de traçage sur le schéma 2D
+let gridStepMm = 10;         // pas du quadrillage (mm)
+let gridSnap = false;        // aimantation des points de mesure sur le quadrillage
+let paintFinish = 'satine';  // aspect de la peinture RAL en 3D : 'brillant' | 'satine' | 'mat'
+let alignPickMode = null;    // null | 'h' | 'v' : clic sur un segment pour le mettre droit
+let alignHoverIdx = -1;      // segment survolé en mode alignement
+let crosshairPos = null;     // { canvas, px, py, mm, kind } : curseur en croix de l'outil de mesure
+let cornerDrag = null;       // { id, canvas } : coin d'angle droit en cours de déplacement
+let suppressNextCanvasClick = false;
+
 // Variables pour Three.js 3D
 let scene3D, camera3D, renderer3D, partMesh3D;
 let is3DInitialized = false;
@@ -1728,12 +1779,23 @@ function updateProfile3DLabels(){
     // Une cote à chaque jonction entre pièces du calpinage (mêmes valeurs que
     // le tableau "Séquence du profil" / l'impression du calpinage). Les deux
     // valeurs d'une même jonction (mâle / femelle) sont fusionnées en une seule
-    // étiquette pour ne pas se superposer au même point physique.
+    // étiquette. Les étiquettes sortent AU-DESSUS de la pièce (avec trait de
+    // rappel), à une distance réglable par le curseur "Écartement des cotes 3D".
     const data = computeBiaisPieceRows();
     if (!data.val.ok || !data.rows.length) return;
     const n = data.plan.n, L = data.plan.L;
     const zStart = -(n * L) / 2;
     const rows = data.rows;
+    const envPts = computeCrossSectionPoints(biaisSegGauche).centerPoints
+      .concat(computeCrossSectionPoints(biaisSegDroite).centerPoints);
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    envPts.forEach(p => {
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+    });
+    const xMid = (minX + maxX) / 2;
+    const sizeSec = Math.max(maxX - minX, maxY - minY, 60);
+    const off = Math.max(40, sizeSec * 0.25) * dimSpacing3D;
     const points = [];
     for (let i = 0; i <= n; i++) {
       const z = zStart + i * L;
@@ -1741,24 +1803,21 @@ function updateProfile3DLabels(){
       if (i === 0) text = `${rows[0].leftType} : ${Math.round(rows[0].leftDev)} mm`;
       else if (i === n) text = `${rows[n-1].rightType} : ${Math.round(rows[n-1].rightDev)} mm`;
       else text = `${rows[i-1].rightType.replace('Jonction : ','')} ${Math.round(rows[i-1].rightDev)} / ${rows[i].leftType.replace('Jonction : ','')} ${Math.round(rows[i].leftDev)} mm`;
-      points.push({ p: projectLocal(0, 40, z), anchor: projectLocal(0, 0, z), text });
+      points.push({ p: projectLocal(xMid, maxY + off, z), anchor: projectLocal(xMid, maxY, z), text });
     }
     const MIN_DIST = 46;
     const accepted = [];
+    const items = [];
     points.forEach((L2, i) => {
-      if (!L2.p) return;
+      if (!L2.p || !L2.anchor) return;
       const isEdge = (i === 0 || i === points.length - 1);
       const tooClose = !isEdge && accepted.some(q => Math.hypot(q.x - L2.p.x, q.y - L2.p.y) < MIN_DIST);
       if (tooClose) return;
       accepted.push(L2.p);
-      if (L2.anchor) drawSimpleLabel(L2.anchor, '');
-      const lbl = document.createElement('div');
-      lbl.textContent = L2.text;
-      lbl.style.cssText = `position:absolute;left:${L2.p.x}px;top:${L2.p.y}px;transform:translate(-50%,-50%);
-        background:rgba(20,20,20,0.85);color:#fff;font-family:'JetBrains Mono',monospace;font-size:10px;
-        padding:2px 6px;border-radius:4px;white-space:nowrap;border:1px solid var(--accent);pointer-events:none;`;
-      profile3DLabelsWrap.appendChild(lbl);
+      items.push({ ax: L2.anchor.x, ay: L2.anchor.y, lx: L2.p.x, ly: L2.p.y, lines: [L2.text], color: '#ffce00' });
     });
+    relaxLabelOverlaps(items, container.clientWidth, container.clientHeight);
+    drawExternalLabels(profile3DLabelsWrap, items);
     return;
   }
 
@@ -1766,46 +1825,81 @@ function updateProfile3DLabels(){
   if (!chk || !chk.checked) return;
   // Même principe que les cotes du schéma 2D, projetées sur la face avant de la
   // 3D — avec de vraies lignes d'attache et une ligne de cote fléchée pour les
-  // droits, comme sur un plan technique (le reste : angles/arcs/boudins garde
-  // une étiquette simple, faute de segment de référence net à coter).
+  // droits. Chaque cote est reportée vers l'EXTÉRIEUR du profil (côté opposé au
+  // centre de la section) ; la distance suit le curseur "Écartement des cotes 3D".
+  // Angles / arcs / boudins : étiquette sortie hors de la pièce avec trait de rappel.
   const length = parseFloat(document.getElementById('pieceLength').value) || 2000;
   const geo = generateProfileGeometry(segments, 1);
   const z = length / 2;
 
+  const secPts = [];
+  geo.pathSteps.forEach(st => {
+    if (st.x !== undefined) secPts.push({ x: st.x, y: st.y });
+    else if (st.type === 'arc') {
+      secPts.push({ x: st.cx + st.r * Math.cos(st.startAng), y: st.cy + st.r * Math.sin(st.startAng) });
+      secPts.push({ x: st.cx + st.r * Math.cos(st.endAng), y: st.cy + st.r * Math.sin(st.endAng) });
+    }
+  });
+  if (!secPts.length) return;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  secPts.forEach(p => {
+    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+  });
+  const cxs = (minX + maxX) / 2, cys = (minY + maxY) / 2;
+  const sizeSec = Math.max(maxX - minX, maxY - minY, 60);
+  const baseOff = Math.max(35, sizeSec * 0.16) * dimSpacing3D;
+
   const dimLines = [];
-  const simpleLabels = [];
+  const simpleItems = [];
   geo.annotations.forEach(ann => {
     if (ann.type === 'dim' && ann.startX !== undefined) {
+      const mx = (ann.startX + ann.endX) / 2, my = (ann.startY + ann.endY) / 2;
+      let nx = ann.nx, ny = ann.ny;
+      if ((mx - cxs) * nx + (my - cys) * ny < 0) { nx = -nx; ny = -ny; }   // toujours vers l'extérieur
+      const off = baseOff * (1 + (ann.segmentIndex % 2) * 0.5);
       const p1 = projectLocal(ann.startX, ann.startY, z);
       const p2 = projectLocal(ann.endX, ann.endY, z);
-      const o1 = projectLocal(ann.startX + ann.nx * ann.offsetDist, ann.startY + ann.ny * ann.offsetDist, z);
-      const o2 = projectLocal(ann.endX + ann.nx * ann.offsetDist, ann.endY + ann.ny * ann.offsetDist, z);
-      const mid = projectLocal(ann.midX, ann.midY, z);
+      const o1 = projectLocal(ann.startX + nx * off, ann.startY + ny * off, z);
+      const o2 = projectLocal(ann.endX + nx * off, ann.endY + ny * off, z);
+      const mid = projectLocal(mx + nx * off, my + ny * off, z);
       if (p1 && p2 && o1 && o2 && mid) dimLines.push({ p1, p2, o1, o2, mid, text: ann.text });
     } else if (ann.type === 'dim') {
       const p = projectLocal(ann.midX, ann.midY, z);
-      if (p) simpleLabels.push({ p, text: ann.text });
+      if (p) simpleItems.push({ ax: p.x, ay: p.y, lines: [ann.text], color: '#ffce00' });
     } else if (ann.type === 'angle') {
       const p = projectLocal(ann.x, ann.y, z);
-      if (p) simpleLabels.push({ p, text: ann.text });
+      if (p) simpleItems.push({ ax: p.x, ay: p.y, lines: [ann.text], color: '#ffce00' });
     }
   });
+
+  // Longueur de la pièce : cote le long de l'extrusion, décalée hors du profil
+  {
+    const xr = maxX + baseOff * 0.9, yb = minY - baseOff * 0.9;
+    const p1 = projectLocal(maxX, minY, -length / 2), p2 = projectLocal(maxX, minY, length / 2);
+    const o1 = projectLocal(xr, yb, -length / 2), o2 = projectLocal(xr, yb, length / 2);
+    const mid = projectLocal(xr, yb, 0);
+    if (p1 && p2 && o1 && o2 && mid) dimLines.push({ p1, p2, o1, o2, mid, text: `Long. ${Math.round(length)} mm`, priority: true });
+  }
 
   const MIN_DIST = 50;
   const accepted = [];
   dimLines.forEach((d, i) => {
-    const isEdge = (i === 0 || i === dimLines.length - 1);
+    const isEdge = d.priority || (i === 0 || i === dimLines.length - 1);
     const tooClose = !isEdge && accepted.some(q => Math.hypot(q.x - d.mid.x, q.y - d.mid.y) < MIN_DIST);
     if (tooClose) return;
     accepted.push(d.mid);
     drawTechDimLine(d);
   });
-  simpleLabels.forEach(L => {
-    const tooClose = accepted.some(q => Math.hypot(q.x - L.p.x, q.y - L.p.y) < MIN_DIST);
-    if (tooClose) return;
-    accepted.push(L.p);
-    drawSimpleLabel(L.p, L.text);
-  });
+
+  if (simpleItems.length) {
+    const cScreen = projectLocal(cxs, cys, z);
+    const center = cScreen || { x: container.clientWidth / 2, y: container.clientHeight / 2 };
+    simpleItems.forEach(it => { it.selected = false; });
+    placeLabelsRadial(simpleItems, center, 34 * dimSpacing3D);
+    relaxLabelOverlaps(simpleItems, container.clientWidth, container.clientHeight);
+    drawExternalLabels(profile3DLabelsWrap, simpleItems);
+  }
 }
 
 // Fond "ciel" léger (dégradé, sans image externe) utilisé par défaut dans toutes
@@ -2044,17 +2138,37 @@ function getRawMetalMaterial(matType){
 }
 // Face thermolaquée (RAL) : peinture, donc peu métallique, avec un léger vernis
 // (clearcoat) qui donne le rendu satiné/brillant typique d'un thermolaquage.
-function getRalPaintMaterial(ralCode){
+// L'aspect (brillant / satiné / mat) est réglable : "mat" supprime le vernis et les reflets.
+function getPaintFinishParams(finish){
+  if (finish === 'brillant') return { metalness: 0.05, roughness: 0.2, clearcoat: 0.9, clearcoatRoughness: 0.06, reflectivity: 0.5, envMapIntensity: 1.0 };
+  if (finish === 'mat')      return { metalness: 0.0,  roughness: 0.88, clearcoat: 0.0, clearcoatRoughness: 0.6,  reflectivity: 0.1, envMapIntensity: 0.25 };
+  return { metalness: 0.05, roughness: 0.38, clearcoat: 0.55, clearcoatRoughness: 0.22, reflectivity: 0.35, envMapIntensity: 0.9 };
+}
+function getRalPaintMaterial(ralCode, finish){
+  const p = getPaintFinishParams(finish || paintFinish);
   return new THREE.MeshPhysicalMaterial({
     color: getRalHex(ralCode),
-    metalness: 0.05,
-    roughness: 0.38,
-    clearcoat: 0.55,
-    clearcoatRoughness: 0.22,
-    reflectivity: 0.35,
+    metalness: p.metalness,
+    roughness: p.roughness,
+    clearcoat: p.clearcoat,
+    clearcoatRoughness: p.clearcoatRoughness,
+    reflectivity: p.reflectivity,
+    envMapIntensity: p.envMapIntensity,
     side: THREE.DoubleSide
   });
 }
+function syncPaintFinishButtons(){
+  document.querySelectorAll('#paintFinishToggle button').forEach(b => b.classList.toggle('active', b.dataset.finish === paintFinish));
+}
+function setPaintFinish(f, silent){
+  paintFinish = (f === 'brillant' || f === 'mat') ? f : 'satine';
+  syncPaintFinishButtons();
+  update3DModel();
+  if (!silent) showToast(`Peinture RAL : aspect ${paintFinish === 'mat' ? 'mat' : (paintFinish === 'brillant' ? 'brillant' : 'satiné')} sur la 3D.`);
+}
+document.querySelectorAll('#paintFinishToggle button').forEach(b => {
+  b.addEventListener('click', () => setPaintFinish(b.dataset.finish));
+});
 
 // --- Vue réaliste (profil) : même principe que l'assemblage — sol, ombres
 // portées douces et reflet d'environnement, activables/désactivables sans
@@ -2511,6 +2625,7 @@ function updatePaintAvailability(){
   document.getElementById('paintFieldsRow').style.display = canPaint ? 'grid' : 'none';
   document.getElementById('arrowHintRow').style.display = canPaint ? 'flex' : 'none';
   document.getElementById('paintedFaceRow').style.display = canPaint ? 'block' : 'none';
+  document.getElementById('paintFinishRow').style.display = canPaint ? 'block' : 'none';
   if (!canPaint) document.getElementById('ralUnusualMsg').style.display = 'none';
 }
 updatePaintAvailability();
@@ -3411,7 +3526,7 @@ function generateProfileGeometry(segList, scale = 1){
         nx = -dy / segLen;
         ny = dx / segLen;
       }
-      const offsetDist = 35 + (index % 2) * 12;
+      const offsetDist = (35 + (index % 2) * 12) * dimSpacing2D;
       const midX = (startX + curX) / 2 + nx * offsetDist;
       const midY = (startY + curY) / 2 + ny * offsetDist;
 
@@ -3620,6 +3735,9 @@ function drawProfileOnCanvas(canvas, isLight = false, profileData = null){
     canvas._pfTransform = { scale, offsetX, offsetY, rotation, w, h };
   }
 
+  // Quadrillage de traçage (aligné écran, ancré sur le départ du profil)
+  if (!profileData && gridEnabled) drawGridOnCanvas(ctx, canvas, w, h, isLight);
+
   ctx.save();
   ctx.translate(w / 2, h / 2);
   ctx.rotate((rotation * Math.PI) / 180);
@@ -3790,9 +3908,13 @@ function drawProfileOnCanvas(canvas, isLight = false, profileData = null){
   });
 
   const measurementsToDraw = profileData ? (profileData.customMeasurements || []) : customMeasurements;
-  drawCustomMeasurementsOnCanvas(ctx, measurementsToDraw, scale, offsetX, offsetY, w, h, textCorrectionAngle, isLight);
+  const isInteractiveCanvas = !profileData && (canvas.id === 'profileCanvas' || canvas.id === 'fsCanvas');
+  drawCustomMeasurementsOnCanvas(ctx, measurementsToDraw, scale, offsetX, offsetY, w, h, textCorrectionAngle, isLight, isInteractiveCanvas);
 
   ctx.restore();
+
+  // Surcouche écran : point A en attente, croix illimitée, segment survolé…
+  if (!profileData) drawInteractiveOverlay(ctx, canvas, w, h, isLight);
 }
 
 const profileCanvas = document.getElementById('profileCanvas');
@@ -3836,29 +3958,68 @@ function profileMmToClientPoint(canvas, mmX, mmY){
   };
 }
 
-/* ===================== OUTIL DE MESURE 2D (cote entre 2 points) ===================== */
+/* ===================== OUTIL DE MESURE 2D + QUADRILLAGE + ALIGNEMENT ===================== */
 let customMeasurements = [];
 let measureMode = false;
 let measurePendingPoint = null;
-let measureToolMode = 'diag'; // 'diag' (distance directe) | 'ortho' (X puis Y, angle droit)
+let measureToolMode = 'diag'; // 'diag' (distance directe) | 'ortho' (angle droit, coin déplaçable)
+let clickOrigin = null;
+
+// Position réelle (mm, repère du profil) -> pixel du canvas (après zoom/pan/rotation).
+function mmToCanvasPx(canvas, mmX, mmY){
+  const t = canvas._pfTransform;
+  if (!t) return null;
+  const lx = mmX * t.scale + t.offsetX - t.w / 2;
+  const ly = mmY * t.scale + t.offsetY - t.h / 2;
+  const rad = t.rotation * Math.PI / 180;
+  return {
+    x: lx * Math.cos(rad) - ly * Math.sin(rad) + t.w / 2,
+    y: lx * Math.sin(rad) + ly * Math.cos(rad) + t.h / 2
+  };
+}
+function clientToCanvasPx(canvas, clientX, clientY){
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (clientX - rect.left) * (canvas.width / rect.width),
+    y: (clientY - rect.top) * (canvas.height / rect.height)
+  };
+}
+// Redessin léger d'un des deux canvas 2D (sans toucher à la 3D) : utilisé pour le
+// curseur en croix, le survol, le glisser du coin d'angle droit…
+function lightRedraw(canvas){
+  if (!canvas) return;
+  drawProfileOnCanvas(canvas, canvas.id === 'fsCanvas');
+}
+function redraw2DViews(){
+  drawProfileOnCanvas(profileCanvas, false);
+  const fo = document.getElementById('fsOverlay');
+  if (fo && fo.classList.contains('show')) drawProfileOnCanvas(document.getElementById('fsCanvas'), true);
+}
+function applyCanvasCursors(){
+  const cur = measureMode ? 'none' : (alignPickMode ? 'pointer' : '');
+  ['profileCanvas', 'fsCanvas'].forEach(id => {
+    const c = document.getElementById(id);
+    if (c) c.style.cursor = cur;
+  });
+}
 
 function setMeasureMode(on){
+  if (on) setAlignMode(null);
   measureMode = on;
   measurePendingPoint = null;
+  crosshairPos = null;
   document.getElementById('measureToolBar').style.display = on ? 'flex' : 'none';
   document.getElementById('measureToolBtn').style.borderColor = on ? 'var(--accent)' : '';
   document.getElementById('measureToolBtn').style.color = on ? 'var(--accent)' : '';
-  const pc = document.getElementById('profileCanvas');
-  if (pc) pc.style.cursor = on ? 'crosshair' : '';
-  const fc = document.getElementById('fsCanvas');
-  if (fc) fc.style.cursor = on ? 'crosshair' : '';
+  applyCanvasCursors();
   updateMeasureHint();
+  redraw2DViews();
 }
 function updateMeasureHint(){
   const hint = document.getElementById('measureHint');
   if (!hint) return;
   hint.textContent = measurePendingPoint
-    ? 'Point A placé — clique le point B.'
+    ? (measureToolMode === 'ortho' ? 'Point A placé — clique le point B (le coin se déplace ensuite en glissant son rond).' : 'Point A placé — clique le point B.')
     : 'Clique le point A sur le schéma (accroche automatique aux sommets).';
 }
 document.getElementById('measureToolBtn').addEventListener('click', () => setMeasureMode(!measureMode));
@@ -3866,96 +4027,316 @@ document.querySelectorAll('#measureModeToggle button').forEach(b => {
   b.addEventListener('click', () => {
     measureToolMode = b.dataset.mode;
     document.querySelectorAll('#measureModeToggle button').forEach(x => x.classList.toggle('active', x === b));
+    updateMeasureHint();
   });
 });
 
-// Accroche au sommet du profil le plus proche du clic (tolérance à l'écran),
-// sinon position libre convertie en mm réels.
-function snapToProfileVertexOrFree(canvas, clientX, clientY){
-  const rect = canvas.getBoundingClientRect();
-  const pxX = (clientX - rect.left) * (canvas.width / rect.width);
-  const pxY = (clientY - rect.top) * (canvas.height / rect.height);
-  if (segments.length) {
-    const geo = generateProfileGeometry(segments, 1);
-    let best = null, bestDist = 22;
-    geo.pathSteps.forEach(st => {
-      if (st.x === undefined) return;
-      const cp = profileMmToClientPoint(canvas, st.x, st.y);
-      if (!cp) return;
-      const d = Math.hypot(cp.x - clientX, cp.y - clientY);
-      if (d < bestDist) { bestDist = d; best = { x: st.x, y: st.y }; }
-    });
-    if (best) return best;
+/* ---------- Quadrillage ---------- */
+// Pas réellement affiché : on agrandit le pas si le zoom est trop faible, pour
+// que le quadrillage reste lisible (jamais plus dense qu'une ligne / ~8 px écran).
+function getEffectiveGridPitch(canvas){
+  const t = canvas && canvas._pfTransform;
+  let pitch = gridStepMm;
+  if (!t) return pitch;
+  const steps = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000];
+  while (pitch * t.scale < 16) {
+    const next = steps.find(v => v > pitch);
+    if (!next) break;
+    pitch = next;
   }
-  return pixelToProfileMm(canvas, pxX, pxY);
+  return pitch;
+}
+// Le quadrillage est aligné sur l'écran (horizontal / vertical), ancré sur le
+// point de départ du profil, et suit le zoom et le déplacement.
+function drawGridOnCanvas(ctx, canvas, w, h, isLight){
+  const t = canvas._pfTransform;
+  if (!t) return;
+  const pitch = getEffectiveGridPitch(canvas);
+  const step = pitch * t.scale;
+  const o = mmToCanvasPx(canvas, 0, 0);
+  if (!o || !(step > 2)) return;
+  const kx0 = Math.floor((0 - o.x) / step), kx1 = Math.ceil((w - o.x) / step);
+  const ky0 = Math.floor((0 - o.y) / step), ky1 = Math.ceil((h - o.y) / step);
+  if ((kx1 - kx0) > 600 || (ky1 - ky0) > 600) return;
+  const minor = isLight ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.075)';
+  const major = isLight ? 'rgba(0,0,0,0.26)' : 'rgba(255,206,0,0.24)';
+  ctx.save();
+  ctx.lineWidth = 1;
+  for (let k = kx0; k <= kx1; k++) {
+    const x = Math.round(o.x + k * step) + 0.5;
+    ctx.strokeStyle = (k % 5 === 0) ? major : minor;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+  }
+  for (let k = ky0; k <= ky1; k++) {
+    const y = Math.round(o.y + k * step) + 0.5;
+    ctx.strokeStyle = (k % 5 === 0) ? major : minor;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+  ctx.font = 'bold 15px "JetBrains Mono"';
+  ctx.textAlign = 'right';
+  ctx.fillStyle = isLight ? 'rgba(0,0,0,0.55)' : 'rgba(238,236,231,0.5)';
+  ctx.fillText(`Quadrillage : ${pitch} mm`, w - 16, h - 14);
+  ctx.restore();
+}
+function snapToGridMm(canvas, p){
+  const t = canvas._pfTransform;
+  if (!t) return p;
+  const pitch = getEffectiveGridPitch(canvas);
+  const q = mmToCanvasPx(canvas, p.x, p.y);
+  const o = mmToCanvasPx(canvas, 0, 0);
+  const sx = Math.round(((q.x - o.x) / t.scale) / pitch) * pitch;
+  const sy = Math.round(((q.y - o.y) / t.scale) / pitch) * pitch;
+  return pixelToProfileMm(canvas, o.x + sx * t.scale, o.y + sy * t.scale);
+}
+
+/* ---------- Points de mesure (accroche sommets / quadrillage) ---------- */
+function collectProfileVertices(){
+  const pts = [];
+  if (!segments.length) return pts;
+  const geo = generateProfileGeometry(segments, 1);
+  geo.pathSteps.forEach(st => {
+    if (st.x !== undefined) pts.push({ x: st.x, y: st.y });
+    else if (st.type === 'arc') {
+      pts.push({ x: st.cx + st.r * Math.cos(st.startAng), y: st.cy + st.r * Math.sin(st.startAng) });
+      pts.push({ x: st.cx + st.r * Math.cos(st.endAng), y: st.cy + st.r * Math.sin(st.endAng) });
+    }
+  });
+  return pts;
+}
+// Retourne { x, y, kind } (mm réels du profil). Alt = position libre, sans aimantation.
+function snapMeasurePoint(canvas, e){
+  const px = clientToCanvasPx(canvas, e.clientX, e.clientY);
+  const free = pixelToProfileMm(canvas, px.x, px.y);
+  if (e.altKey) return { x: free.x, y: free.y, kind: 'libre' };
+  let best = null, bestDist = 22;
+  collectProfileVertices().forEach(v => {
+    const cp = profileMmToClientPoint(canvas, v.x, v.y);
+    if (!cp) return;
+    const d = Math.hypot(cp.x - e.clientX, cp.y - e.clientY);
+    if (d < bestDist) { bestDist = d; best = v; }
+  });
+  if (best) return { x: best.x, y: best.y, kind: 'sommet' };
+  if (gridEnabled && gridSnap) {
+    const g = snapToGridMm(canvas, free);
+    return { x: g.x, y: g.y, kind: 'grille' };
+  }
+  return { x: free.x, y: free.y, kind: 'libre' };
+}
+
+/* ---------- Angle droit : le coin reste sur le cercle de Thalès de [AB] ---------- */
+// Axes de l'écran exprimés dans le repère du profil (selon la rotation d'affichage).
+function displayAxes(rotDeg){
+  const r = rotDeg * Math.PI / 180;
+  return { u: { x: Math.cos(r), y: -Math.sin(r) }, w: { x: Math.sin(r), y: Math.cos(r) } };
+}
+function cornerFromDirection(A, B, dir){
+  const d = (B.x - A.x) * dir.x + (B.y - A.y) * dir.y;
+  return { x: A.x + dir.x * d, y: A.y + dir.y * d };
+}
+function defaultOrthoCorner(A, B, rotDeg){
+  return cornerFromDirection(A, B, displayAxes(rotDeg).u);
+}
+function getOrthoCorner(m){
+  if (m.cx !== undefined && m.cx !== null) return { x: m.cx, y: m.cy };
+  return { x: m.bx, y: m.ay };
+}
+// Projette la position souhaitée p sur le cercle de diamètre [AB] : quel que soit
+// l'endroit, l'angle en C reste exactement de 90°. Aimantation (tolMm > 0) sur les
+// axes de l'écran et sur les directions des segments droits du profil.
+function projectCornerOnCircle(A, B, p, tolMm){
+  const M = { x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 };
+  const rho = Math.hypot(B.x - A.x, B.y - A.y) / 2;
+  const vx = p.x - M.x, vy = p.y - M.y;
+  const vl = Math.hypot(vx, vy);
+  if (rho < 1e-6 || vl < 1e-6) return null;
+  let C = { x: M.x + vx / vl * rho, y: M.y + vy / vl * rho };
+  if (tolMm > 0) {
+    const dirs = [displayAxes(currentProfileRotation).u];
+    generateProfileGeometry(segments, 1).annotations.forEach(a => {
+      if (a.type === 'dim' && a.startX !== undefined) {
+        const ar = a.angle * Math.PI / 180;
+        dirs.push({ x: Math.cos(ar), y: Math.sin(ar) });
+      }
+    });
+    let bestC = null, bestD = tolMm;
+    dirs.forEach(d => {
+      [d, { x: -d.y, y: d.x }].forEach(dd => {
+        const cand = cornerFromDirection(A, B, dd);
+        const dist = Math.hypot(cand.x - C.x, cand.y - C.y);
+        if (dist < bestD) { bestD = dist; bestC = cand; }
+      });
+    });
+    if (bestC) C = bestC;
+  }
+  return C;
+}
+function hitOrthoCorner(canvas, clientX, clientY){
+  if (canvas.id !== 'profileCanvas' && canvas.id !== 'fsCanvas') return null;
+  let best = null, bd = 16;
+  customMeasurements.forEach(m => {
+    if (m.mode !== 'ortho') return;
+    const C = getOrthoCorner(m);
+    const cp = profileMmToClientPoint(canvas, C.x, C.y);
+    if (!cp) return;
+    const d = Math.hypot(cp.x - clientX, cp.y - clientY);
+    if (d < bd) { bd = d; best = m.id; }
+  });
+  return best;
+}
+function updateCornerDrag(e){
+  if (!cornerDrag) return;
+  const canvas = cornerDrag.canvas;
+  const m = customMeasurements.find(x => x.id === cornerDrag.id);
+  if (!m) return;
+  const t = canvas._pfTransform;
+  if (!t) return;
+  const rect = canvas.getBoundingClientRect();
+  const px = clientToCanvasPx(canvas, e.clientX, e.clientY);
+  const p = pixelToProfileMm(canvas, px.x, px.y);
+  const cssPerMm = t.scale * (rect.width / canvas.width);
+  const C = projectCornerOnCircle({ x: m.ax, y: m.ay }, { x: m.bx, y: m.by }, p, e.altKey ? 0 : 12 / cssPerMm);
+  if (C) { m.cx = C.x; m.cy = C.y; }
+  lightRedraw(canvas);
 }
 
 function handleMeasureClick(canvas, e, redrawFn){
-  const mm = snapToProfileVertexOrFree(canvas, e.clientX, e.clientY);
+  const mm = snapMeasurePoint(canvas, e);
   if (!measurePendingPoint) {
-    measurePendingPoint = mm;
+    measurePendingPoint = { x: mm.x, y: mm.y };
     updateMeasureHint();
+    lightRedraw(canvas);
   } else {
-    customMeasurements.push({
+    const A = measurePendingPoint, B = { x: mm.x, y: mm.y };
+    if (Math.hypot(B.x - A.x, B.y - A.y) < 0.01) return;
+    const m = {
       id: Date.now() + Math.round(Math.random() * 999),
-      ax: measurePendingPoint.x, ay: measurePendingPoint.y,
-      bx: mm.x, by: mm.y, mode: measureToolMode
-    });
+      ax: A.x, ay: A.y, bx: B.x, by: B.y, mode: measureToolMode
+    };
+    if (m.mode === 'ortho') {
+      const C = defaultOrthoCorner(A, B, currentProfileRotation);
+      m.cx = C.x; m.cy = C.y;
+    }
+    customMeasurements.push(m);
     measurePendingPoint = null;
     updateMeasureHint();
     renderMeasurementsList();
-    if (redrawFn) redrawFn(); else redrawProfile();
-    showToast('Cote ajoutée.');
+    lightRedraw(canvas);
+    showToast(m.mode === 'ortho' ? 'Cote ajoutée — glisse le rond du coin pour la déplacer.' : 'Cote ajoutée.');
   }
+}
+
+function setOrthoLeg1(m, value){
+  const A = { x: m.ax, y: m.ay }, B = { x: m.bx, y: m.by };
+  const d = Math.hypot(B.x - A.x, B.y - A.y);
+  if (d < 1e-6) return;
+  const a = Math.max(0, Math.min(d, Number(value) || 0));
+  const C0 = getOrthoCorner(m);
+  const cross = (B.x - A.x) * (C0.y - A.y) - (B.y - A.y) * (C0.x - A.x);
+  const side = cross >= 0 ? 1 : -1;
+  const theta = Math.acos(Math.min(1, a / d)) * side;
+  const ux = (B.x - A.x) / d, uy = (B.y - A.y) / d;
+  const dx = ux * Math.cos(theta) - uy * Math.sin(theta);
+  const dy = ux * Math.sin(theta) + uy * Math.cos(theta);
+  m.cx = A.x + dx * a; m.cy = A.y + dy * a;
 }
 
 function renderMeasurementsList(){
   const wrap = document.getElementById('measurementsListWrap');
   if (!wrap) return;
   if (!customMeasurements.length) { wrap.innerHTML = ''; return; }
+  const fmt = v => (Math.round(v * 10) / 10).toString();
   let html = '<div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Cotes personnalisées</div>';
   customMeasurements.forEach(m => {
-    const distMm = Math.round(Math.hypot(m.bx - m.ax, m.by - m.ay));
-    const valueTxt = m.mode === 'ortho'
-      ? `X ${Math.round(Math.abs(m.bx - m.ax))} mm · Y ${Math.round(Math.abs(m.by - m.ay))} mm`
-      : `${distMm} mm`;
+    let valueHtml, extraBtns = '';
+    if (m.mode === 'ortho') {
+      const A = { x: m.ax, y: m.ay }, B = { x: m.bx, y: m.by }, C = getOrthoCorner(m);
+      const l1 = Math.hypot(C.x - A.x, C.y - A.y), l2 = Math.hypot(B.x - C.x, B.y - C.y);
+      const hyp = Math.hypot(B.x - A.x, B.y - A.y);
+      valueHtml = `📐 Côté 1
+        <input type="number" data-leg1="${m.id}" value="${fmt(l1)}" min="0" max="${fmt(hyp)}" step="0.5" style="width:74px;background:var(--bg);border:1px solid var(--line);border-radius:5px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11.5px;padding:3px 5px;"> mm
+        · Côté 2 <b>${fmt(l2)} mm</b> <span style="color:var(--text-faint);">(90° · A→B ${fmt(hyp)} mm)</span>`;
+      extraBtns = `
+        <button class="icon-action-btn" data-mid="${m.id}" data-flip title="Placer le coin de l'autre côté de la diagonale" style="font-size:10px;padding:3px 7px;">⇄ Coin opposé</button>
+        <button class="icon-action-btn" data-mid="${m.id}" data-reset title="Remettre les côtés parallèles aux axes de l'écran" style="font-size:10px;padding:3px 7px;">⊾ Axes écran</button>`;
+    } else {
+      valueHtml = `📏 ${Math.round(Math.hypot(m.bx - m.ax, m.by - m.ay))} mm`;
+    }
     html += `
-      <div style="display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line-soft);border-radius:6px;padding:6px 10px;margin-bottom:6px;font-size:11.5px;">
-        <span style="flex:1;color:var(--text);font-family:'JetBrains Mono',monospace;">${m.mode === 'ortho' ? '📐' : '📏'} ${valueTxt}</span>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--panel2);border:1px solid var(--line-soft);border-radius:6px;padding:6px 10px;margin-bottom:6px;font-size:11.5px;">
+        <span style="flex:1;min-width:200px;color:var(--text);font-family:'JetBrains Mono',monospace;">${valueHtml}</span>
+        ${extraBtns}
         <button class="icon-action-btn" data-mid="${m.id}" data-toggle style="font-size:10px;padding:3px 7px;">${m.mode === 'ortho' ? 'Passer en direct' : 'Passer en angle droit'}</button>
         <button class="icon-action-btn" data-mid="${m.id}" data-del style="font-size:10px;padding:3px 7px;color:var(--danger);">✕</button>
       </div>`;
   });
   wrap.innerHTML = html;
+  const byId = btn => customMeasurements.find(x => x.id === Number(btn.dataset.mid));
   wrap.querySelectorAll('[data-toggle]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const m = customMeasurements.find(x => x.id === Number(btn.dataset.mid));
-      if (m) { m.mode = m.mode === 'ortho' ? 'diag' : 'ortho'; renderMeasurementsList(); redrawProfile(); }
+      const m = byId(btn);
+      if (!m) return;
+      m.mode = m.mode === 'ortho' ? 'diag' : 'ortho';
+      if (m.mode === 'ortho' && (m.cx === undefined || m.cx === null)) {
+        const C = defaultOrthoCorner({ x: m.ax, y: m.ay }, { x: m.bx, y: m.by }, currentProfileRotation);
+        m.cx = C.x; m.cy = C.y;
+      }
+      renderMeasurementsList(); redraw2DViews();
     });
   });
   wrap.querySelectorAll('[data-del]').forEach(btn => {
     btn.addEventListener('click', () => {
       customMeasurements = customMeasurements.filter(x => x.id !== Number(btn.dataset.mid));
-      renderMeasurementsList();
-      redrawProfile();
+      renderMeasurementsList(); redraw2DViews();
+    });
+  });
+  wrap.querySelectorAll('[data-flip]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const m = byId(btn);
+      if (!m) return;
+      const C = getOrthoCorner(m);
+      m.cx = m.ax + m.bx - C.x; m.cy = m.ay + m.by - C.y;
+      renderMeasurementsList(); redraw2DViews();
+    });
+  });
+  wrap.querySelectorAll('[data-reset]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const m = byId(btn);
+      if (!m) return;
+      const C = defaultOrthoCorner({ x: m.ax, y: m.ay }, { x: m.bx, y: m.by }, currentProfileRotation);
+      m.cx = C.x; m.cy = C.y;
+      renderMeasurementsList(); redraw2DViews();
+    });
+  });
+  wrap.querySelectorAll('[data-leg1]').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const m = customMeasurements.find(x => x.id === Number(inp.dataset.leg1));
+      if (!m) return;
+      setOrthoLeg1(m, inp.value);
+      renderMeasurementsList(); redraw2DViews();
     });
   });
 }
 
 // Dessine les cotes personnalisées (lignes d'attache + flèches + valeur),
 // dans le même repère (mm -> pixels) que le reste du schéma.
-function drawCustomMeasurementsOnCanvas(ctx, measurements, scale, offsetX, offsetY, w, h, textCorrectionAngle, isLight){
+function drawCustomMeasurementsOnCanvas(ctx, measurements, scale, offsetX, offsetY, w, h, textCorrectionAngle, isLight, interactive){
   if (!measurements.length) return;
   const toX = mm => mm * scale + offsetX - w / 2;
   const toY = mm => mm * scale + offsetY - h / 2;
   const col = isLight ? '#0369a1' : '#60a5fa';
   const colSoft = isLight ? 'rgba(3,105,161,0.4)' : 'rgba(96,165,250,0.45)';
 
-  function drawDimSeg(x1, y1, x2, y2, text){
+  // awayX/awayY : point vers lequel on NE veut PAS décaler la cote (pour qu'elle
+  // sorte du triangle formé par l'angle droit).
+  function drawDimSeg(x1, y1, x2, y2, text, awayX, awayY){
     const dx = x2 - x1, dy = y2 - y1;
     const len = Math.hypot(dx, dy) || 1;
-    const nx = -dy / len, ny = dx / len;
-    const offDist = 28;
+    let nx = -dy / len, ny = dx / len;
+    if (awayX !== undefined) {
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      if ((awayX - mx) * nx + (awayY - my) * ny > 0) { nx = -nx; ny = -ny; }
+    }
+    const offDist = 28 * dimSpacing2D;
     const ox1 = x1 + nx * offDist, oy1 = y1 + ny * offDist;
     const ox2 = x2 + nx * offDist, oy2 = y2 + ny * offDist;
 
@@ -4007,10 +4388,51 @@ function drawCustomMeasurementsOnCanvas(ctx, measurements, scale, offsetX, offse
   measurements.forEach(m => {
     const ax = toX(m.ax), ay = toY(m.ay), bx = toX(m.bx), by = toY(m.by);
     if (m.mode === 'ortho') {
-      const cx = toX(m.bx), cy = toY(m.ay);
-      const dxMm = Math.abs(m.bx - m.ax), dyMm = Math.abs(m.by - m.ay);
-      if (dxMm > 0.5) drawDimSeg(ax, ay, cx, cy, `${Math.round(dxMm)} mm`);
-      if (dyMm > 0.5) drawDimSeg(cx, cy, bx, by, `${Math.round(dyMm)} mm`);
+      const Cmm = getOrthoCorner(m);
+      const cx = toX(Cmm.x), cy = toY(Cmm.y);
+      const l1 = Math.hypot(Cmm.x - m.ax, Cmm.y - m.ay);
+      const l2 = Math.hypot(m.bx - Cmm.x, m.by - Cmm.y);
+
+      // diagonale A-B en fin pointillé (rappelle le triangle rectangle)
+      ctx.save();
+      ctx.strokeStyle = colSoft;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 5]);
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+      ctx.restore();
+
+      if (l1 > 0.5) drawDimSeg(ax, ay, cx, cy, `${Math.round(l1)} mm`, bx, by);
+      if (l2 > 0.5) drawDimSeg(cx, cy, bx, by, `${Math.round(l2)} mm`, ax, ay);
+
+      // équerre 90° au coin
+      if (l1 > 0.5 && l2 > 0.5) {
+        const e1x = (ax - cx) / (Math.hypot(ax - cx, ay - cy) || 1), e1y = (ay - cy) / (Math.hypot(ax - cx, ay - cy) || 1);
+        const e2x = (bx - cx) / (Math.hypot(bx - cx, by - cy) || 1), e2y = (by - cy) / (Math.hypot(bx - cx, by - cy) || 1);
+        const sq = 16;
+        ctx.save();
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(cx + e1x * sq, cy + e1y * sq);
+        ctx.lineTo(cx + e1x * sq + e2x * sq, cy + e1y * sq + e2y * sq);
+        ctx.lineTo(cx + e2x * sq, cy + e2y * sq);
+        ctx.stroke();
+        ctx.restore();
+      }
+      // poignée de déplacement du coin (écran uniquement, pas à l'impression)
+      if (interactive) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+        ctx.fillStyle = col;
+        ctx.globalAlpha = 0.85;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = isLight ? '#ffffff' : '#0b1220';
+        ctx.stroke();
+        ctx.restore();
+      }
     } else {
       drawDimSeg(ax, ay, bx, by, `${Math.round(Math.hypot(m.bx - m.ax, m.by - m.ay))} mm`);
     }
@@ -4023,9 +4445,191 @@ function drawCustomMeasurementsOnCanvas(ctx, measurements, scale, offsetX, offse
   });
 }
 
+/* ---------- Surcouche interactive : croix illimitée, point A, survol d'alignement ---------- */
+function drawInteractiveOverlay(ctx, canvas, w, h, isLight){
+  if (canvas.id !== 'profileCanvas' && canvas.id !== 'fsCanvas') return;
+  const t = canvas._pfTransform;
+  if (!t) return;
+  const col = isLight ? '#0369a1' : '#22d3ee';
+  ctx.save();
+
+  if (alignPickMode && alignHoverIdx >= 0) {
+    const ann = generateProfileGeometry(segments, 1).annotations
+      .find(a => a.type === 'dim' && a.segmentIndex === alignHoverIdx && a.startX !== undefined);
+    if (ann) {
+      const p1 = mmToCanvasPx(canvas, ann.startX, ann.startY);
+      const p2 = mmToCanvasPx(canvas, ann.endX, ann.endY);
+      ctx.strokeStyle = '#ff9d4d';
+      ctx.globalAlpha = 0.6;
+      ctx.lineWidth = 14;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  if (measureMode) {
+    let pA = null;
+    if (measurePendingPoint) {
+      pA = mmToCanvasPx(canvas, measurePendingPoint.x, measurePendingPoint.y);
+      ctx.beginPath();
+      ctx.arc(pA.x, pA.y, 9, 0, Math.PI * 2);
+      ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(pA.x, pA.y, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = col; ctx.fill();
+    }
+    if (crosshairPos && crosshairPos.canvas === canvas) {
+      const px = crosshairPos.px, py = crosshairPos.py;
+      // aperçu élastique depuis le point A
+      if (pA) {
+        ctx.save();
+        ctx.setLineDash([9, 7]);
+        ctx.strokeStyle = col; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(pA.x, pA.y);
+        if (measureToolMode === 'ortho') {
+          const Cmm = defaultOrthoCorner(measurePendingPoint, crosshairPos.mm, currentProfileRotation);
+          const pC = mmToCanvasPx(canvas, Cmm.x, Cmm.y);
+          ctx.lineTo(pC.x, pC.y);
+        }
+        ctx.lineTo(px, py);
+        ctx.stroke();
+        ctx.restore();
+      }
+      // croix : droites illimitées à angle droit
+      ctx.save();
+      ctx.strokeStyle = col;
+      ctx.globalAlpha = 0.85;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(0, py); ctx.lineTo(w, py);
+      ctx.moveTo(px, 0); ctx.lineTo(px, h);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 2.5;
+      ctx.strokeRect(px - 8, py - 8, 16, 16);
+      ctx.restore();
+
+      // bulle d'information près du curseur
+      let label;
+      if (pA) {
+        const dxm = (px - pA.x) / t.scale, dym = (py - pA.y) / t.scale;
+        label = `Δ ${Math.round(Math.abs(dxm))} × ${Math.round(Math.abs(dym))} · ${Math.round(Math.hypot(dxm, dym))} mm`;
+      } else {
+        label = 'Point A';
+      }
+      if (crosshairPos.kind && crosshairPos.kind !== 'libre') label += ` · ${crosshairPos.kind}`;
+      ctx.font = 'bold 15px "JetBrains Mono"';
+      const tw = ctx.measureText(label).width;
+      let bx = px + 18, by = py - 30;
+      if (bx + tw + 14 > w) bx = px - 18 - tw - 14;
+      if (by < 4) by = py + 16;
+      ctx.fillStyle = isLight ? 'rgba(255,255,255,0.95)' : 'rgba(11,18,32,0.92)';
+      ctx.fillRect(bx, by, tw + 14, 24);
+      ctx.strokeStyle = col; ctx.lineWidth = 1.2;
+      ctx.strokeRect(bx, by, tw + 14, 24);
+      ctx.fillStyle = isLight ? '#0369a1' : '#a5f3fc';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(label, bx + 7, by + 12);
+    }
+  }
+  ctx.restore();
+}
+
+/* ---------- Pivoter la pièce : mettre un segment choisi à l'horizontale / verticale ---------- */
+function distPointToSegment(px, py, p1, p2){
+  const dx = p2.x - p1.x, dy = p2.y - p1.y;
+  const l2 = dx * dx + dy * dy;
+  let tt = l2 ? ((px - p1.x) * dx + (py - p1.y) * dy) / l2 : 0;
+  tt = Math.max(0, Math.min(1, tt));
+  return Math.hypot(px - (p1.x + tt * dx), py - (p1.y + tt * dy));
+}
+function hitTestSegment(canvas, clientX, clientY){
+  let best = -1, bestD = 16;
+  generateProfileGeometry(segments, 1).annotations.forEach(a => {
+    if (a.type !== 'dim' || a.startX === undefined) return;
+    const p1 = profileMmToClientPoint(canvas, a.startX, a.startY);
+    const p2 = profileMmToClientPoint(canvas, a.endX, a.endY);
+    if (!p1 || !p2) return;
+    const d = distPointToSegment(clientX, clientY, p1, p2);
+    if (d < bestD) { bestD = d; best = a.segmentIndex; }
+  });
+  return best;
+}
+function applySegmentAlignment(segIndex, axis){
+  const ann = generateProfileGeometry(segments, 1).annotations
+    .find(a => a.type === 'dim' && a.segmentIndex === segIndex && a.startX !== undefined);
+  if (!ann) return;
+  const a = ann.angle; // direction du segment dans le repère du profil (°)
+  let target = (((axis === 'h' ? -a : 90 - a) % 360) + 360) % 360;
+  const diff = Math.abs(currentProfileRotation - target);
+  // déjà dans cette position : un second clic retourne la pièce de 180°
+  if (diff < 0.5 || diff > 359.5) target = (target + 180) % 360;
+  currentProfileRotation = Math.round(target * 100) / 100;
+  document.getElementById('rotateDegInput').value = currentProfileRotation;
+  syncFsRotateInput();
+  redrawProfile();
+  const fo = document.getElementById('fsOverlay');
+  if (fo && fo.classList.contains('show')) redrawFsProfile();
+  showToast(`Segment n°${segIndex + 1} à ${axis === 'h' ? "l'horizontale" : 'la verticale'} (rotation ${currentProfileRotation}°). Re-clique pour retourner de 180°, Échap pour terminer.`);
+}
+function handleAlignClick(canvas, e, redrawFn){
+  const idx = hitTestSegment(canvas, e.clientX, e.clientY);
+  if (idx < 0) { showToast('Clique sur un segment droit du profil.'); return; }
+  applySegmentAlignment(idx, alignPickMode);
+}
+function setAlignMode(mode){
+  alignPickMode = mode;
+  alignHoverIdx = -1;
+  if (mode && measureMode) setMeasureMode(false);
+  [['alignHBtn', 'h'], ['alignVBtn', 'v']].forEach(([id, key]) => {
+    const b = document.getElementById(id);
+    if (!b) return;
+    const on = (mode === key);
+    b.style.borderColor = on ? 'var(--accent)' : '';
+    b.style.background = on ? 'var(--accent)' : '';
+    b.style.color = on ? '#1c1b1a' : '';
+  });
+  applyCanvasCursors();
+  if (mode) showToast(mode === 'h' ? "Clique le segment à mettre à l'horizontale (Échap pour terminer)." : 'Clique le segment à mettre à la verticale (Échap pour terminer).');
+  redraw2DViews();
+}
+document.getElementById('alignHBtn').addEventListener('click', () => setAlignMode(alignPickMode === 'h' ? null : 'h'));
+document.getElementById('alignVBtn').addEventListener('click', () => setAlignMode(alignPickMode === 'v' ? null : 'v'));
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const tut = document.getElementById('tutorialOverlay');
+  if (tut && tut.classList.contains('show')) return;
+  if (measureMode) {
+    if (measurePendingPoint) { measurePendingPoint = null; updateMeasureHint(); redraw2DViews(); }
+    else setMeasureMode(false);
+  } else if (alignPickMode) {
+    setAlignMode(null);
+  }
+});
+
+/* ---------- Options d'affichage : quadrillage + écartement des cotes 2D ---------- */
+document.getElementById('gridToggle').addEventListener('change', function(){ gridEnabled = this.checked; redraw2DViews(); });
+document.getElementById('gridStepSelect').addEventListener('change', function(){ gridStepMm = Number(this.value) || 10; redraw2DViews(); });
+document.getElementById('gridSnapChk').addEventListener('change', function(){
+  gridSnap = this.checked;
+  if (gridSnap && !gridEnabled) { gridEnabled = true; document.getElementById('gridToggle').checked = true; redraw2DViews(); }
+});
+document.getElementById('dimSpacing2DRange').addEventListener('input', function(){
+  dimSpacing2D = Number(this.value) || 1;
+  document.getElementById('dimSpacing2DVal').textContent = '×' + dimSpacing2D.toFixed(1);
+  redraw2DViews();
+});
+
 function bindCanvasInteractions(canvas, redrawFn){
   canvas.addEventListener('click', (e) => {
     if (isPanning) return;
+    if (suppressNextCanvasClick) return;
+    // un glisser (déplacement de la vue) ne doit pas compter comme un clic
+    if (clickOrigin && Math.hypot(e.clientX - clickOrigin.x, e.clientY - clickOrigin.y) > 5) return;
+    if (alignPickMode) { handleAlignClick(canvas, e, redrawFn); return; }
     if (measureMode) { handleMeasureClick(canvas, e, redrawFn); return; }
     const clickX = e.clientX;
     const clickY = e.clientY;
@@ -4087,6 +4691,17 @@ function bindCanvasInteractions(canvas, redrawFn){
   canvas.addEventListener('mousedown', (e) => {
     activeCanvasEl = canvas;
     activeRedraw = redrawFn;
+    clickOrigin = { x: e.clientX, y: e.clientY };
+    // glisser le coin d'un angle droit (prioritaire sur tout le reste)
+    if (e.button === 0) {
+      const cornerId = hitOrthoCorner(canvas, e.clientX, e.clientY);
+      if (cornerId !== null) {
+        cornerDrag = { id: cornerId, canvas };
+        canvas.style.cursor = 'grabbing';
+        e.preventDefault();
+        return;
+      }
+    }
     if (measureMode) return;
     if (e.shiftKey) {
       isDrawingArrow = true;
@@ -4099,6 +4714,33 @@ function bindCanvasInteractions(canvas, redrawFn){
     if (e.button === 0) {
       isPanning = true;
       panStart = { x: e.clientX - canvasPanX, y: e.clientY - canvasPanY };
+    }
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    if (cornerDrag || isPanning || isDrawingArrow) return;
+    if (hitOrthoCorner(canvas, e.clientX, e.clientY) !== null) {
+      canvas.style.cursor = 'grab';
+      if (crosshairPos) { crosshairPos = null; lightRedraw(canvas); }
+      return;
+    }
+    canvas.style.cursor = measureMode ? 'none' : (alignPickMode ? 'pointer' : '');
+    if (measureMode) {
+      const sn = snapMeasurePoint(canvas, e);
+      const pp = mmToCanvasPx(canvas, sn.x, sn.y);
+      if (!pp) return;
+      crosshairPos = { canvas, px: pp.x, py: pp.y, mm: { x: sn.x, y: sn.y }, kind: sn.kind };
+      lightRedraw(canvas);
+    } else if (alignPickMode) {
+      const idx = hitTestSegment(canvas, e.clientX, e.clientY);
+      if (idx !== alignHoverIdx) { alignHoverIdx = idx; lightRedraw(canvas); }
+    }
+  });
+  canvas.addEventListener('mouseleave', () => {
+    if (cornerDrag) return;
+    if (crosshairPos || alignHoverIdx >= 0) {
+      crosshairPos = null; alignHoverIdx = -1;
+      lightRedraw(canvas);
     }
   });
 
@@ -4116,6 +4758,7 @@ function bindCanvasInteractions(canvas, redrawFn){
 }
 
 window.addEventListener('mousemove', (e) => {
+  if (cornerDrag) { updateCornerDrag(e); return; }
   if (isPanning) {
     canvasPanX = e.clientX - panStart.x;
     canvasPanY = e.clientY - panStart.y;
@@ -4124,6 +4767,16 @@ window.addEventListener('mousemove', (e) => {
 });
 
 window.addEventListener('mouseup', (e) => {
+  if (cornerDrag) {
+    const cd = cornerDrag;
+    cornerDrag = null;
+    suppressNextCanvasClick = true;
+    setTimeout(() => { suppressNextCanvasClick = false; }, 80);
+    cd.canvas.style.cursor = measureMode ? 'none' : (alignPickMode ? 'pointer' : '');
+    renderMeasurementsList();
+    lightRedraw(cd.canvas);
+    return;
+  }
   isPanning = false;
   if (isDrawingArrow) {
     isDrawingArrow = false;
@@ -4210,6 +4863,7 @@ document.getElementById('saveProfileBtn').addEventListener('click', () => {
     rotation: currentProfileRotation,
     customArrow: customArrowData,
     customMeasurements: JSON.parse(JSON.stringify(customMeasurements)),
+    paintFinish,
     segments: JSON.parse(JSON.stringify(segments))
   });
   saveProfilesToLocalStorage();
@@ -4279,6 +4933,8 @@ function renderSavedProfiles(){
         document.getElementById('profileThickness').value = p.th;
         document.getElementById('profileColor').value = p.color || '';
         renderRalSwatches();
+        paintFinish = p.paintFinish || 'satine';
+        syncPaintFinishButtons();
         currentProfileRotation = p.rotation || 0;
         document.getElementById('rotateDegInput').value = currentProfileRotation;
         customArrowData = p.customArrow || null;
@@ -4446,12 +5102,12 @@ function build3DSnapshotPrintHTML(sectionTitle, dimsHtml){
   if (!is3DInitialized) init3DViewer();
   if (!renderer3D || !scene3D || !camera3D) return '';
   update3DModel();
-  if (typeof fitCameraToPartMesh === 'function') fitCameraToPartMesh();
-  renderer3D.render(scene3D, camera3D); updateProfile3DLabels(); syncProfileRotInputs();
-  const dataUrl = renderer3D.domElement.toDataURL('image/png');
+  // Cadrage serré sur la pièce (fond blanc, image recadrée) — ne modifie pas la vue à l'écran.
+  const dataUrl = captureTight3D(renderer3D, scene3D, camera3D, partMesh3D);
+  updateProfile3DLabels(); syncProfileRotInputs();
   return `
     <div class="print-section-title">${sectionTitle}</div>
-    <img src="${dataUrl}" class="print-sheet-img" style="background:#f1f5f9;">
+    <img src="${dataUrl}" class="print-sheet-img" style="background:#ffffff;">
     <div style="color:#000000 !important;font-size:11px;margin-top:4px;line-height:1.5;">${dimsHtml}</div>
   `;
 }
@@ -4827,7 +5483,11 @@ function computeCrossSectionPoints(segList = segments){
 // Construit une "bande de tôle" 3D conique entre une section GAUCHE (à zLeft) et
 // une section DROITE (à zRight) — les deux doivent avoir le même nombre de points
 // (garanti si les deux profils ont la même structure de segments).
-function buildTaperedStripGeometry(centerLeft, centerRight, thickness, zLeft, zRight){
+// `cuts` (optionnel) : coupes d'angle aux extrémités { startH, startV, endH, endV } en degrés.
+//  · H = onglet "en plan" (vu du dessus, angle de mur) ; V = coupe inclinée "en profil" (dans la hauteur).
+//  · Signe + : la coupe rallonge le côté X+ (ou le haut pour V). La longueur nominale est celle du
+//    point LE PLUS LONG de chaque extrémité (longueur hors tout, comme au débit).
+function buildTaperedStripGeometry(centerLeft, centerRight, thickness, zLeft, zRight, cuts){
   const halfT = Math.max(0.01, thickness / 2);
   const offsetSet = (centerPoints) => {
     const outer = [], inner = [];
@@ -4849,12 +5509,24 @@ function buildTaperedStripGeometry(centerLeft, centerRight, thickness, zLeft, zR
   const R = offsetSet(centerRight);
   const n = centerLeft.length;
 
+  const tanDeg = d => Math.tan(Math.max(-85, Math.min(85, Number(d) || 0)) * Math.PI / 180);
+  const cs = cuts ? { sH: tanDeg(cuts.startH), sV: tanDeg(cuts.startV), eH: tanDeg(cuts.endH), eV: tanDeg(cuts.endV) } : null;
+  const hasCuts = !!cs && (cs.sH || cs.sV || cs.eH || cs.eV);
+  let maxExtS = 0, maxExtE = 0;
+  if (hasCuts) {
+    maxExtS = -Infinity; maxExtE = -Infinity;
+    [L.outer, L.inner].forEach(arr => arr.forEach(p => { maxExtS = Math.max(maxExtS, p.x * cs.sH + p.y * cs.sV); }));
+    [R.outer, R.inner].forEach(arr => arr.forEach(p => { maxExtE = Math.max(maxExtE, p.x * cs.eH + p.y * cs.eV); }));
+  }
+  const zStartOf = p => hasCuts ? zLeft + (maxExtS - (p.x * cs.sH + p.y * cs.sV)) : zLeft;
+  const zEndOf = p => hasCuts ? zRight - (maxExtE - (p.x * cs.eH + p.y * cs.eV)) : zRight;
+
   const verts = [];
   const pushV = (p, z) => { verts.push(p.x, p.y, z); };
-  for (let i = 0; i < n; i++) pushV(L.outer[i], zLeft);
-  for (let i = 0; i < n; i++) pushV(L.inner[i], zLeft);
-  for (let i = 0; i < n; i++) pushV(R.outer[i], zRight);
-  for (let i = 0; i < n; i++) pushV(R.inner[i], zRight);
+  for (let i = 0; i < n; i++) pushV(L.outer[i], zStartOf(L.outer[i]));
+  for (let i = 0; i < n; i++) pushV(L.inner[i], zStartOf(L.inner[i]));
+  for (let i = 0; i < n; i++) pushV(R.outer[i], zEndOf(R.outer[i]));
+  for (let i = 0; i < n; i++) pushV(R.inner[i], zEndOf(R.inner[i]));
 
   const indices = [];
   const quad = (a, b, c, d) => { indices.push(a, b, c, a, c, d); };
@@ -5468,6 +6140,230 @@ document.getElementById('savedProfilesList').addEventListener('click', (e) => {
 });
 
 
+/* ===================== ÉTIQUETTES 3D À L'EXTÉRIEUR + CAPTURE SERRÉE POUR L'IMPRESSION ===================== */
+
+// Calcule la taille estimée de chaque étiquette (nb de lignes / longueur du texte).
+function measureExternalLabels(items){
+  items.forEach(it => {
+    const maxLen = Math.max.apply(null, it.lines.map(l => l.length));
+    it.w = maxLen * 6.3 + 16;
+    it.h = it.lines.length * 13 + 8;
+  });
+}
+// Pousse chaque étiquette hors de la pièce : depuis le centre de la forme vers son
+// ancre, puis un cran plus loin (distPx, réglé par le curseur d'écartement).
+function placeLabelsRadial(items, center, distPx){
+  items.forEach(it => {
+    let dx = it.ax - center.x, dy = it.ay - center.y;
+    let d = Math.hypot(dx, dy);
+    if (d < 4) { dx = 0; dy = -1; d = 1; }
+    it.lx = it.ax + dx / d * distPx;
+    it.ly = it.ay + dy / d * distPx;
+  });
+}
+// Écarte les étiquettes qui se chevauchent et les garde dans la fenêtre.
+function relaxLabelOverlaps(items, cw, ch){
+  measureExternalLabels(items);
+  for (let iter = 0; iter < 60; iter++) {
+    let moved = false;
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        const a = items[i], b = items[j];
+        const ox = (a.w + b.w) / 2 + 6 - Math.abs(a.lx - b.lx);
+        const oy = (a.h + b.h) / 2 + 4 - Math.abs(a.ly - b.ly);
+        if (ox > 0 && oy > 0) {
+          moved = true;
+          if (oy <= ox) { const sg = (a.ly <= b.ly) ? -1 : 1; a.ly += sg * oy / 2; b.ly -= sg * oy / 2; }
+          else { const sg = (a.lx <= b.lx) ? -1 : 1; a.lx += sg * ox / 2; b.lx -= sg * ox / 2; }
+        }
+      }
+    }
+    items.forEach(it => {
+      it.lx = Math.max(it.w / 2 + 4, Math.min(cw - it.w / 2 - 4, it.lx));
+      it.ly = Math.max(it.h / 2 + 4, Math.min(ch - it.h / 2 - 4, it.ly));
+    });
+    if (!moved) break;
+  }
+}
+// Trait de rappel + point d'ancrage sur la pièce + étiquette placée à l'extérieur.
+function drawExternalLabels(wrap, items){
+  if (!items.length) return;
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;';
+  items.forEach(it => {
+    const line = document.createElementNS(svgNS, 'line');
+    line.setAttribute('x1', it.ax); line.setAttribute('y1', it.ay);
+    line.setAttribute('x2', it.lx); line.setAttribute('y2', it.ly);
+    line.setAttribute('stroke', it.color); line.setAttribute('stroke-width', it.selected ? 1.8 : 1.2);
+    line.setAttribute('stroke-dasharray', '4,3');
+    svg.appendChild(line);
+    const dot = document.createElementNS(svgNS, 'circle');
+    dot.setAttribute('cx', it.ax); dot.setAttribute('cy', it.ay); dot.setAttribute('r', 3.2);
+    dot.setAttribute('fill', it.color);
+    svg.appendChild(dot);
+  });
+  wrap.appendChild(svg);
+  items.forEach(it => {
+    const lbl = document.createElement('div');
+    lbl.style.cssText = `position:absolute;left:${it.lx}px;top:${it.ly}px;transform:translate(-50%,-50%);
+      background:rgba(20,20,20,0.86);color:#fff;font-family:'JetBrains Mono',monospace;font-size:10.5px;line-height:13px;
+      padding:3px 7px;border-radius:4px;white-space:nowrap;border:1px solid ${it.color};pointer-events:none;text-align:center;
+      ${it.selected ? `box-shadow:0 0 0 1.5px ${it.color};` : ''}`;
+    it.lines.forEach((txt, i) => {
+      const row = document.createElement('div');
+      row.textContent = txt;
+      if (i === 0 && it.lines.length > 1) row.style.fontWeight = '700';
+      lbl.appendChild(row);
+    });
+    wrap.appendChild(lbl);
+  });
+}
+
+// Points (monde) de toutes les mailles visibles d'un objet 3D — sert au cadrage serré.
+function collectWorldPoints(root, maxPts){
+  const pts = [];
+  root.updateMatrixWorld(true);
+  const meshes = [];
+  root.traverse(o => {
+    if (o.isMesh && o.visible && o.geometry && o.geometry.attributes && o.geometry.attributes.position) meshes.push(o);
+  });
+  let total = 0;
+  meshes.forEach(m => { total += m.geometry.attributes.position.count; });
+  const stride = Math.max(1, Math.ceil(total / maxPts));
+  meshes.forEach(m => {
+    const pos = m.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i += stride) {
+      pts.push(new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld));
+    }
+  });
+  return pts;
+}
+// Rapproche la caméra jusqu'à ce que la pièce remplisse l'image (marge en coordonnées écran).
+function fitCameraTightToPoints(camera, pts, dirVec, marginNdc){
+  const box = new THREE.Box3().setFromPoints(pts);
+  const center = box.getCenter(new THREE.Vector3());
+  const sphere = new THREE.Sphere();
+  box.getBoundingSphere(sphere);
+  let dist = (sphere.radius || 1) / Math.sin(camera.fov * Math.PI / 360) * 1.25;
+  const tmp = new THREE.Vector3();
+  for (let it = 0; it < 16; it++) {
+    camera.position.copy(center).addScaledVector(dirVec, dist);
+    camera.lookAt(center);
+    camera.updateMatrixWorld(true);
+    let maxN = 0, behind = false;
+    for (let k = 0; k < pts.length; k++) {
+      tmp.copy(pts[k]).project(camera);
+      if (tmp.z >= 1 || !isFinite(tmp.x) || !isFinite(tmp.y)) { behind = true; break; }
+      const m = Math.max(Math.abs(tmp.x), Math.abs(tmp.y));
+      if (m > maxN) maxN = m;
+    }
+    if (behind) { dist *= 1.5; continue; }
+    const ratio = maxN / marginNdc;
+    if (Math.abs(ratio - 1) < 0.01) break;
+    dist *= ratio;
+  }
+}
+// Instantané pour l'impression : fond blanc, sol masqué, caméra rapprochée au plus
+// près de la pièce, image recadrée sur la pièce, grande résolution. La vue à l'écran
+// (caméra, taille, fond) est restaurée ensuite à l'identique.
+function captureTight3D(renderer, scene, camera, root, opts){
+  opts = opts || {};
+  const W = opts.width || 2000, H = opts.height || 1200;
+  const prevSize = renderer.getSize(new THREE.Vector2());
+  const prevPR = renderer.getPixelRatio();
+  const prevPos = camera.position.clone();
+  const prevQuat = camera.quaternion.clone();
+  const prevAspect = camera.aspect;
+  const prevBg = scene.background;
+  const hidden = [];
+  let dataUrl = '';
+  try {
+    root.traverse(o => {
+      if (o.isMesh && o.geometry && o.geometry.type === 'PlaneGeometry' && o.visible) { o.visible = false; hidden.push(o); }
+    });
+    const pts = collectWorldPoints(root, 30000);
+    if (!pts.length) throw new Error('scène vide');
+    const dirVec = prevPos.clone();
+    if (dirVec.lengthSq() < 1e-8) dirVec.set(0.5, 0.4, 1);
+    dirVec.normalize();
+
+    renderer.setPixelRatio(1);
+    renderer.setSize(W, H, false);
+    camera.aspect = W / H;
+    camera.updateProjectionMatrix();
+    fitCameraTightToPoints(camera, pts, dirVec, 0.94);
+
+    // 1) rendu sur fond "clé" (magenta) : sert uniquement à repérer l'emprise réelle de la pièce
+    scene.background = new THREE.Color(0xff00ff);
+    renderer.render(scene, camera);
+    const probe = document.createElement('canvas');
+    probe.width = W; probe.height = H;
+    const pctx = probe.getContext('2d');
+    pctx.drawImage(renderer.domElement, 0, 0);
+    const data = pctx.getImageData(0, 0, W, H).data;
+    let minX = W, minY = H, maxX = -1, maxY = -1;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = (y * W + x) * 4;
+        if (Math.abs(data[i] - 255) + data[i + 1] + Math.abs(data[i + 2] - 255) > 60) {
+          if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (y < minY) minY = y; if (y > maxY) maxY = y;
+        }
+      }
+    }
+
+    // 2) rendu final sur fond blanc, recadré sur la pièce
+    scene.background = new THREE.Color(0xffffff);
+    renderer.render(scene, camera);
+    let sx = 0, sy = 0, cw = W, ch = H;
+    if (maxX >= minX && maxY >= minY) {
+      const pad = Math.round(Math.max(maxX - minX, maxY - minY) * 0.04) + 8;
+      sx = Math.max(0, minX - pad); sy = Math.max(0, minY - pad);
+      cw = Math.min(W, maxX + pad) - sx; ch = Math.min(H, maxY + pad) - sy;
+    }
+    const out = document.createElement('canvas');
+    out.width = cw; out.height = ch;
+    const octx = out.getContext('2d');
+    octx.fillStyle = '#ffffff';
+    octx.fillRect(0, 0, cw, ch);
+    octx.drawImage(renderer.domElement, sx, sy, cw, ch, 0, 0, cw, ch);
+    dataUrl = out.toDataURL('image/png');
+  } catch (err) {
+    console.error('Capture 3D serrée impossible, repli sur la vue courante :', err);
+    try { renderer.render(scene, camera); dataUrl = renderer.domElement.toDataURL('image/png'); } catch (_) {}
+  } finally {
+    hidden.forEach(o => { o.visible = true; });
+    scene.background = prevBg;
+    renderer.setPixelRatio(prevPR);
+    renderer.setSize(prevSize.x, prevSize.y, false);
+    camera.aspect = prevAspect;
+    camera.updateProjectionMatrix();
+    camera.position.copy(prevPos);
+    camera.quaternion.copy(prevQuat);
+    renderer.render(scene, camera);
+  }
+  return dataUrl;
+}
+
+// Curseurs "Écartement des cotes 3D" (pliage + assemblage) : une seule valeur partagée.
+function setDimSpacing3D(v, fromId){
+  dimSpacing3D = v;
+  ['dimSpacing3DRange', 'dimSpacing3DRangeAsm'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && id !== fromId) el.value = v;
+  });
+  ['dimSpacing3DVal', 'dimSpacing3DValAsm'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '×' + v.toFixed(1);
+  });
+  if (typeof updateProfile3DLabels === 'function') updateProfile3DLabels();
+  if (typeof renderAssembleFrame === 'function') renderAssembleFrame();
+}
+['dimSpacing3DRange', 'dimSpacing3DRangeAsm'].forEach(id => {
+  document.getElementById(id).addEventListener('input', function(){ setDimSpacing3D(Number(this.value) || 1, id); });
+});
+
 /* ===================== ASSEMBLAGE DE PLIAGE ===================== */
 // Un composant est soit un "profile" (schéma de pliage enregistré, extrudé sur
 // la longueur commune) soit un "block" (mur/acrotère : un pavé de largeur x
@@ -5477,6 +6373,23 @@ let assembleScene, assembleCamera, assembleRenderer, assembleGroup, assembleInit
 let assembleLabelsWrap = null;
 let assembleSelectedUid = null;
 let assembleCompactMode = false;
+let assembleLocalCenter = null;
+
+// Aspect de matière d'un composant : métal (défaut) ou laqué brillant / satiné / mat.
+function getAssembleMaterialParams(c){
+  const f = c.finish || 'auto';
+  if (f === 'brillant' || f === 'satine' || f === 'mat') return getPaintFinishParams(f);
+  if (c.type === 'block') return { metalness: 0.05, roughness: 0.9, clearcoat: 0, clearcoatRoughness: 0, envMapIntensity: 0.9 };
+  return { metalness: 0.6, roughness: 0.35, clearcoat: 0, clearcoatRoughness: 0, envMapIntensity: 0.9 };
+}
+// Résumé texte des coupes d'angle d'un composant (vide s'il n'y en a pas).
+function describeAssembleCuts(c){
+  if (c.type !== 'profile') return '';
+  const sH = c.cutStartH || 0, sV = c.cutStartV || 0, eH = c.cutEndH || 0, eV = c.cutEndV || 0;
+  if (!sH && !sV && !eH && !eV) return '';
+  const fmt = (h, v) => (h && v) ? `${h}° plan / ${v}° profil` : (h ? `${h}° plan` : (v ? `${v}° profil` : 'droit'));
+  return `coupe début ${fmt(sH, sV)} · fin ${fmt(eH, eV)}`;
+}
 const ASSEMBLE_PALETTE_CSS = ['#e63946', '#1d7a8c', '#f4a300', '#2a9d8f', '#6a4c93', '#8d99ae', '#3a86ff', '#c9184a'];
 
 document.getElementById('assembleCompactBtn').addEventListener('click', function(){
@@ -5520,7 +6433,8 @@ function addAssembleProfile(p){
     segments: JSON.parse(JSON.stringify(p.segments)),
     th: parseFloat(p.th) || 1.5,
     length: parseFloat(p.len) || 2000,
-    color: nextAssembleColor(), opacity: 1,
+    color: nextAssembleColor(), opacity: 1, ral: '', finish: 'auto',
+    cutStartH: 0, cutStartV: 0, cutEndH: 0, cutEndV: 0,
     posX: 0, posY: 0, posZ: 0, rotationDeg: 0, locked: false
   });
   assembleSelectedUid = assembleComponents[assembleComponents.length - 1].uid;
@@ -5534,7 +6448,7 @@ function addAssembleBlock(){
     type: 'block',
     name: 'Mur / bloc ' + (assembleComponents.filter(c => c.type === 'block').length + 1),
     blockW: 200, blockH: 1000, blockD: 200,
-    color: nextAssembleColor(), opacity: 0.85,
+    color: nextAssembleColor(), opacity: 0.85, ral: '', finish: 'auto',
     posX: 0, posY: 0, posZ: 0, rotationDeg: 0, locked: false
   });
   assembleSelectedUid = assembleComponents[assembleComponents.length - 1].uid;
@@ -5590,6 +6504,22 @@ function renderAssembleComponentsList(){
       } else {
         dimFields = `
         <div class="field"><label>Longueur du profil (mm)</label><input type="number" data-field="length" value="${c.length}" min="1"></div>
+        <div style="margin-top:6px;padding:8px 10px;border:1px dashed var(--line);border-radius:7px;">
+          <div style="font-size:10.5px;color:var(--text-dim);margin-bottom:6px;">✂ Coupes d'angle aux extrémités <span style="color:var(--text-faint);">(longueur = côté le plus long)</span></div>
+          <div class="sheet-fields">
+            <div class="field"><label>Début · en plan (°)</label><input type="number" data-field="cutStartH" value="${c.cutStartH || 0}" min="-85" max="85" step="1"></div>
+            <div class="field"><label>Début · en profil (°)</label><input type="number" data-field="cutStartV" value="${c.cutStartV || 0}" min="-85" max="85" step="1"></div>
+          </div>
+          <div class="sheet-fields">
+            <div class="field"><label>Fin · en plan (°)</label><input type="number" data-field="cutEndH" value="${c.cutEndH || 0}" min="-85" max="85" step="1"></div>
+            <div class="field"><label>Fin · en profil (°)</label><input type="number" data-field="cutEndV" value="${c.cutEndV || 0}" min="-85" max="85" step="1"></div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button type="button" class="add-btn" data-cut-quick="both45" style="width:auto;padding:5px 9px;font-size:10.5px;">Onglet 45° aux 2 bouts</button>
+            <button type="button" class="add-btn" data-cut-quick="clear" style="width:auto;padding:5px 9px;font-size:10.5px;">Effacer les coupes</button>
+          </div>
+          <div class="biais-hint" style="margin:6px 0 0;">En plan = onglet vu du dessus (angle de mur, retour d'angle). En profil = coupe inclinée dans la hauteur (rencontre d'une pente). Signe + : rallonge le côté X+ (ou le haut).</div>
+        </div>
         `;
       }
 
@@ -5607,6 +6537,17 @@ function renderAssembleComponentsList(){
         <div class="sheet-fields">
           <div class="field"><label>Couleur</label><input type="color" data-field="color" value="${c.color}" style="height:36px;padding:2px;"></div>
           <div class="field"><label>Opacité (${Math.round(c.opacity * 100)}%)</label><input type="range" data-field="opacity" min="0.1" max="1" step="0.05" value="${c.opacity}" style="margin-top:10px;"></div>
+        </div>
+        <div class="sheet-fields">
+          <div class="field"><label>RAL (optionnel)</label><input type="text" data-field="ral" maxlength="4" value="${c.ral || ''}" placeholder="Ex: 7016" style="font-family:'JetBrains Mono',monospace;"></div>
+          <div class="field"><label>Aspect 3D</label>
+            <select data-field="finish">
+              <option value="auto" ${(!c.finish || c.finish === 'auto') ? 'selected' : ''}>${c.type === 'block' ? 'Mat (maçonnerie)' : 'Métal (défaut)'}</option>
+              <option value="brillant" ${c.finish === 'brillant' ? 'selected' : ''}>Laqué brillant</option>
+              <option value="satine" ${c.finish === 'satine' ? 'selected' : ''}>Laqué satiné</option>
+              <option value="mat" ${c.finish === 'mat' ? 'selected' : ''}>Laqué mat</option>
+            </select>
+          </div>
         </div>
       `;
     }
@@ -5647,8 +6588,27 @@ function renderAssembleComponentsList(){
       inp.addEventListener('click', e => e.stopPropagation());
       inp.addEventListener('input', () => {
         const f = inp.dataset.field;
-        c[f] = (f === 'color') ? inp.value : (parseFloat(inp.value) || 0);
+        if (f === 'color' || f === 'ral' || f === 'finish') c[f] = inp.value;
+        else c[f] = parseFloat(inp.value) || 0;
+        if (f === 'ral') {
+          // un code RAL connu de la bibliothèque colore directement la pièce
+          const hex = RAL_HEX_MAP[inp.value.trim()];
+          if (hex) {
+            c.color = hex;
+            const colorInp = row.querySelector('[data-field="color"]');
+            if (colorInp) colorInp.value = hex;
+          }
+        }
         if (f === 'opacity') inp.closest('.field').querySelector('label').textContent = `Opacité (${Math.round(c.opacity * 100)}%)`;
+        updateAssembleAll();
+      });
+    });
+    row.querySelectorAll('[data-cut-quick]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (btn.dataset.cutQuick === 'both45') { c.cutStartH = 45; c.cutEndH = 45; c.cutStartV = 0; c.cutEndV = 0; }
+        else { c.cutStartH = 0; c.cutStartV = 0; c.cutEndH = 0; c.cutEndV = 0; }
+        renderAssembleComponentsList();
         updateAssembleAll();
       });
     });
@@ -6039,22 +6999,30 @@ function updateAssembleLabels(){
   if (!assembleLabelsWrap) return;
   assembleLabelsWrap.innerHTML = '';
   const showDims = document.getElementById('assembleShowDims').checked;
-  if (!showDims) return;
+  if (!showDims || !assembleComponents.length) return;
   const container = document.getElementById('assembleCanvas3dContainer');
 
-  const candidates = assembleComponents.map(c => {
-    let labelText, anchorLocal;
+  // Chaque étiquette est repoussée HORS de l'assemblage (depuis son centre, à l'écran),
+  // avec un trait de rappel vers la pièce ; la distance suit le curseur d'écartement.
+  const centerWorld = (assembleLocalCenter ? assembleLocalCenter.clone() : new THREE.Vector3()).applyEuler(assembleGroup.rotation);
+  const centerScreen = project3DToScreen(centerWorld, assembleCamera, container);
+
+  const items = [];
+  assembleComponents.forEach(c => {
+    let lines, anchorLocal;
     if (c.type === 'block') {
-      labelText = `${c.name} — ${Math.round(c.blockW)}×${Math.round(c.blockH)}×${Math.round(c.blockD)} mm`;
-      anchorLocal = new THREE.Vector3(0, c.blockH / 2 + 30, 0);
+      lines = [c.name, `${Math.round(c.blockW)} × ${Math.round(c.blockH)} × ${Math.round(c.blockD)} mm`];
+      anchorLocal = new THREE.Vector3(0, c.blockH / 2, 0);
     } else {
       const dev = getDevelopTotal(c.segments);
       const length = parseFloat(c.length) || 2000;
-      labelText = `${c.name} — développé ${dev} mm, longueur ${Math.round(length)} mm`;
+      lines = [c.name, `dév. ${dev} mm · long. ${Math.round(length)} mm`];
+      const cut = describeAssembleCuts(c);
+      if (cut) lines.push(cut);
       const cross = computeCrossSectionPoints(c.segments).centerPoints;
       let topY = -Infinity;
       cross.forEach(p => { if (p.y > topY) topY = p.y; });
-      anchorLocal = new THREE.Vector3(0, (isFinite(topY) ? topY : 0) + 25, length / 2);
+      anchorLocal = new THREE.Vector3(0, isFinite(topY) ? topY : 0, length / 2);
     }
     const rad = c.rotationDeg * Math.PI / 180;
     const worldPos = new THREE.Vector3(
@@ -6064,31 +7032,14 @@ function updateAssembleLabels(){
     );
     worldPos.applyEuler(assembleGroup.rotation);
     const screen = project3DToScreen(worldPos, assembleCamera, container);
-    return { uid: c.uid, color: c.color, text: labelText, screen, selected: c.uid === assembleSelectedUid };
-  }).filter(L => L.screen.visible && L.screen.x > -50 && L.screen.x < container.clientWidth + 50);
-
-  // Anti-collision à l'écran : au-delà d'une certaine densité, deux étiquettes trop
-  // proches deviennent illisibles (superposées). On garde la pièce sélectionnée en
-  // priorité, puis on ne conserve les autres que si elles restent bien espacées.
-  const MIN_DIST = 50;
-  candidates.sort((a, b) => (b.selected ? 1 : 0) - (a.selected ? 1 : 0));
-  const accepted = [];
-  candidates.forEach(L => {
-    const tooClose = !L.selected && accepted.some(q => Math.hypot(q.screen.x - L.screen.x, q.screen.y - L.screen.y) < MIN_DIST);
-    if (tooClose) return;
-    accepted.push(L);
-
-    const dot = document.createElement('div');
-    dot.style.cssText = `position:absolute;left:${L.screen.x}px;top:${L.screen.y}px;width:5px;height:5px;margin:-2.5px;border-radius:50%;background:${L.color};`;
-    assembleLabelsWrap.appendChild(dot);
-
-    const lbl = document.createElement('div');
-    lbl.textContent = L.text;
-    lbl.style.cssText = `position:absolute;left:${L.screen.x}px;top:${L.screen.y - 8}px;transform:translate(-50%,-100%);
-      background:rgba(20,20,20,0.82);color:#fff;font-family:'JetBrains Mono',monospace;font-size:10.5px;
-      padding:3px 7px;border-radius:4px;white-space:nowrap;border:1px solid ${L.color};`;
-    assembleLabelsWrap.appendChild(lbl);
+    if (!screen.visible || screen.x < -50 || screen.x > container.clientWidth + 50) return;
+    items.push({ ax: screen.x, ay: screen.y, lines, color: c.color, selected: c.uid === assembleSelectedUid });
   });
+  if (!items.length) return;
+
+  placeLabelsRadial(items, centerScreen, 70 * dimSpacing3D);
+  relaxLabelOverlaps(items, container.clientWidth, container.clientHeight);
+  drawExternalLabels(assembleLabelsWrap, items);
 }
 
 function syncAssembleRotInputs(){
@@ -6135,10 +7086,12 @@ function update3DAssemble(){
   const meshEntries = [];
   assembleComponents.forEach(c => {
     let mesh;
+    const mp = getAssembleMaterialParams(c);
     const mat = new THREE.MeshPhysicalMaterial({
-      color: new THREE.Color(c.color), metalness: c.type === 'block' ? 0.05 : 0.6, roughness: c.type === 'block' ? 0.9 : 0.35,
+      color: new THREE.Color(c.color), metalness: mp.metalness, roughness: mp.roughness,
+      clearcoat: mp.clearcoat, clearcoatRoughness: mp.clearcoatRoughness,
       side: THREE.DoubleSide, transparent: c.opacity < 1, opacity: c.opacity,
-      envMap: assembleRealisticMode ? assembleEnvTexture : null, envMapIntensity: 0.9
+      envMap: assembleRealisticMode ? assembleEnvTexture : null, envMapIntensity: mp.envMapIntensity
     });
     if (c.type === 'block') {
       const geom = new THREE.BoxGeometry(c.blockW, c.blockH, c.blockD);
@@ -6146,7 +7099,8 @@ function update3DAssemble(){
     } else {
       const length = parseFloat(c.length) || 2000;
       const cross = computeCrossSectionPoints(c.segments).centerPoints;
-      const geom = buildTaperedStripGeometry(cross, cross, c.th, -length / 2, length / 2);
+      const geom = buildTaperedStripGeometry(cross, cross, c.th, -length / 2, length / 2,
+        { startH: c.cutStartH, startV: c.cutStartV, endH: c.cutEndH, endV: c.cutEndV });
       mesh = new THREE.Mesh(geom, mat);
     }
     mesh.position.set(c.posX, c.posY, c.posZ);
@@ -6161,6 +7115,13 @@ function update3DAssemble(){
   // et rotation PROPRES de chaque pièce — en repère local de l'assemblage, pas en
   // repère écran, pour que ça ne dépende pas de la rotation de vue à la souris).
   const boxes = meshEntries.map(e => computeLocalMeshBox(e.mesh));
+  if (boxes.length) {
+    const allBox = boxes[0].clone();
+    for (let i = 1; i < boxes.length; i++) allBox.union(boxes[i]);
+    assembleLocalCenter = allBox.getCenter(new THREE.Vector3());
+  } else {
+    assembleLocalCenter = null;
+  }
   for (let i = 0; i < meshEntries.length; i++) {
     for (let j = i + 1; j < meshEntries.length; j++) {
       if (boxes[i].intersectsBox(boxes[j])) {
@@ -6208,14 +7169,16 @@ function updateAssembleAll(){
 
 document.getElementById('printAssembleBtn').addEventListener('click', () => {
   if (!assembleComponents.length) { showToast('Ajoute au moins un composant à assembler.'); return; }
-  fitCameraToAssemble();
-  const snap3D = assembleRenderer.domElement.toDataURL('image/png');
+  if (!assembleRenderer) { showToast('Ouvre d\'abord la visualisation 3D de l\'assemblage.'); return; }
+  const snap3D = captureTight3D(assembleRenderer, assembleScene, assembleCamera, assembleGroup);
+  renderAssembleFrame();
   const svg2D = document.getElementById('assemble2DWrap').querySelector('svg');
   const svgData = svg2D ? new XMLSerializer().serializeToString(svg2D) : '';
   const printArea = document.getElementById('printArea');
   let compRows = '';
   assembleComponents.forEach(c => {
-    const dims = c.type === 'block' ? `${c.blockW}×${c.blockH}×${c.blockD} mm` : `développé ${getDevelopTotal(c.segments)} mm, longueur ${Math.round(c.length)} mm`;
+    const cutTxt = describeAssembleCuts(c);
+    const dims = c.type === 'block' ? `${c.blockW}×${c.blockH}×${c.blockD} mm` : `développé ${getDevelopTotal(c.segments)} mm, longueur ${Math.round(c.length)} mm${cutTxt ? ' — ' + cutTxt : ''}`;
     compRows += `<tr><td>${c.type === 'block' ? 'Bloc' : 'Profil'}</td><td>${c.name}</td><td>X=${c.posX} / Y=${c.posY} / Z=${c.posZ} mm</td><td>${c.rotationDeg}°</td><td>${dims}</td></tr>`;
   });
   printArea.innerHTML = `
@@ -7192,8 +8155,7 @@ function createZincController(suffix, kind){
     const epaisseur = $('epaisseur').value;
     const typeLabel = isTasseaux ? 'Bac à tasseaux' : 'Joint debout';
 
-    fitCamera();
-    const snap3D = renderer3d ? renderer3d.domElement.toDataURL('image/png') : '';
+    const snap3D = renderer3d ? captureTight3D(renderer3d, scene3d, camera3d, group3d) : '';
 
     let openingRows = '';
     acc.openingsRows.forEach((o, i) => {
@@ -7785,6 +8747,12 @@ function collectFullProjectState(){
         customMeasurements,
         segments,
         paintedFaceSide,
+        paintFinish,
+        dimSpacing2D,
+        dimSpacing3D,
+        gridEnabled,
+        gridStepMm,
+        gridSnap,
         profileNuance
       },
       savedProfiles,
@@ -7840,6 +8808,18 @@ function applyFullProjectState(state){
     renderMeasurementsList();
     segments = JSON.parse(JSON.stringify(cur.segments || []));
     if (cur.paintedFaceSide) paintedFaceSide = cur.paintedFaceSide;
+    paintFinish = cur.paintFinish || 'satine';
+    syncPaintFinishButtons();
+    dimSpacing2D = Number(cur.dimSpacing2D) || 1;
+    document.getElementById('dimSpacing2DRange').value = dimSpacing2D;
+    document.getElementById('dimSpacing2DVal').textContent = '×' + dimSpacing2D.toFixed(1);
+    setDimSpacing3D(Number(cur.dimSpacing3D) || 1);
+    gridEnabled = !!cur.gridEnabled;
+    gridStepMm = Number(cur.gridStepMm) || 10;
+    gridSnap = !!cur.gridSnap;
+    document.getElementById('gridToggle').checked = gridEnabled;
+    document.getElementById('gridStepSelect').value = String(gridStepMm);
+    document.getElementById('gridSnapChk').checked = gridSnap;
     if (cur.profileNuance) profileNuance = cur.profileNuance;
     updatePaintAvailability();
     updateNuanceAvailability();
@@ -7950,7 +8930,7 @@ document.getElementById('importProjectFile').addEventListener('change', (e) => {
     { tab:'tab-pliage', getTarget:()=>document.getElementById('profileMaterial')?.closest('.sheet-fields'), title:'Choisir matière et épaisseur', text:'Choisis la matière et l’épaisseur de la tôle. Les deux champs sont regroupés et mis en évidence ensemble.', hint:'Ici : Matière + Épaisseur' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('ralSwatchRow'), title:'Choisir un RAL rapidement', text:'Clique directement sur une pastille pour appliquer un RAL courant, sans avoir à taper le code. Le champ texte reste disponible pour un code moins courant.', hint:'Ici : Pastilles RAL' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('profileCanvasWrap'), title:'Contrôler le schéma 2D', text:'Vérifie les longueurs, angles et rayons directement sur le dessin. Les cotes permettent de contrôler la géométrie.', hint:'Ici : Schéma 2D' },
-    { tab:'tab-pliage', getTarget:()=>document.getElementById('measureToolBtn'), title:'Cotes personnalisées', text:'Active l\'outil, clique un point A puis un point B (accroche automatique aux sommets du profil) pour ajouter une cote entre ces deux points. Choisis "Distance directe" pour la ligne droite, ou "Angle droit" pour afficher la largeur et la hauteur séparément (comme une cote d\'intersection).', hint:'Ici : Outil de mesure' },
+    { tab:'tab-pliage', getTarget:()=>document.getElementById('measureToolBtn'), title:'Cotes personnalisées', text:'Active l\'outil, clique un point A puis un point B (accroche automatique aux sommets du profil) pour ajouter une cote entre ces deux points. Le curseur devient une croix aux droites illimitées. Choisis "Distance directe" pour la ligne droite, ou "Angle droit" : glisse ensuite le rond du coin pour obtenir d\'autres côtés tout en gardant 90°. Un quadrillage (avec aimantation) est disponible au-dessus du schéma.', hint:'Ici : Outil de mesure' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('profileRotY')?.closest('.sheet-fields'), title:'Angle de vue précis', text:'En plus du glisser à la souris, ces deux champs donnent l\'angle exact en degrés — pratique pour retrouver la même vue à chaque fois. Le même contrôle existe sur l\'assemblage et les toitures zinc.', hint:'Ici : Rotation horizontale / verticale' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('canvas3dContainer'), title:'Manipuler la 3D', text:'Clic gauche + glisser : rotation. Clic droit ou Shift : déplacement. Molette : zoom. Double-clic : recentrage. La case "Afficher les cotes déportées" juste au-dessus permet de les masquer si besoin.', hint:'Ici : Vue 3D' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('fs3dOpenBtn'), title:'Ouvrir le plein écran 3D', text:'Passe la visualisation 3D en plein écran pour travailler plus confortablement. Les commandes restent identiques.', hint:'Ici : Plein écran 3D' },
