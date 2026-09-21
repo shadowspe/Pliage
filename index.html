@@ -427,6 +427,30 @@
     border-color: var(--danger);
     background: rgba(255, 107, 107, 0.05);
   }
+  .seg-insert-row{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    padding:1px 2px;
+    margin:-3px 0 1px;
+    opacity:.35;
+    transition:opacity .15s;
+    flex-wrap:wrap;
+  }
+  .seg-insert-row:hover{opacity:1;}
+  .seg-insert-line{flex:1;height:1px;background:var(--line);}
+  .seg-insert-row button{
+    background:var(--bg);
+    border:1px dashed var(--line);
+    color:var(--text-faint);
+    border-radius:4px;
+    font-size:9px;
+    padding:2px 5px;
+    cursor:pointer;
+    white-space:nowrap;
+    flex:0 0 auto;
+  }
+  .seg-insert-row button:hover{border-color:var(--accent);color:var(--accent);background:rgba(255,206,0,0.08);}
   .seg-icon{
     width:14px;height:14px;
     border-radius:3px;
@@ -988,7 +1012,14 @@
       <div class="brand-eyebrow">Plan de découpe & Pliage · Tôlerie</div>
       <h1>Optimiseur & Schémas de Pliage</h1>
       <div class="subtitle">Gestion des listes de découpe avec cotation dynamique, personnalisation des noms et récapitulatif.</div>
-      <button class="tutorial-launch" id="openTutorialBtn" type="button">▶ Guide de prise en main</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+        <button class="tutorial-launch" id="openTutorialBtn" type="button">▶ Guide de prise en main</button>
+        <button class="tutorial-launch" id="exportProjectBtn" type="button" style="border-color:var(--good);color:var(--good);">💾 Exporter le projet complet</button>
+        <label class="tutorial-launch" id="importProjectLabel" style="cursor:pointer;margin:0;">
+          📂 Importer un projet
+          <input type="file" id="importProjectFile" accept=".json" style="display:none;">
+        </label>
+      </div>
     </div>
   </header>
 
@@ -1093,6 +1124,21 @@
 
         <div class="panel">
           <div class="panel-title">Pièce, Matière, Quantité &amp; Finition</div>
+          <div class="field">
+            <label>Type d'ouvrage (matière/épaisseur par défaut)</label>
+            <select id="ouvrageType">
+              <option value="">— Personnalisé —</option>
+              <option value="couvremur">Couvre-mur / couvertine</option>
+              <option value="cheneau">Chéneau</option>
+              <option value="descente">Descente EP</option>
+              <option value="bavette">Bavette / solin</option>
+              <option value="cheminee">Habillage cheminée</option>
+              <option value="couvrejoint">Couvre-joint</option>
+              <option value="faitiere">Faîtière / rive</option>
+              <option value="chapeau">Chapeau de poteau/pilier</option>
+              <option value="tasseau">Tasseau support</option>
+            </select>
+          </div>
           <div class="sheet-fields">
             <div class="field">
               <label>Longueur pièce (mm)</label>
@@ -1136,7 +1182,11 @@
             <label>Face peinte (RAL) sur la 3D</label>
             <button type="button" class="add-btn" id="paintedFaceToggleBtn" style="width:100%;text-align:center;">Face extérieure peinte 🔄 cliquer pour inverser</button>
           </div>
-          <div class="biais-hint" id="paintUnavailableMsg" style="display:none;">Le thermolaquage (RAL) ne s'applique qu'à l'acier et à l'aluminium — le zinc et le cuivre gardent leur teinte naturelle.</div>
+          <div class="biais-hint" id="ralUnusualMsg" style="display:none;color:var(--accent);border-color:var(--accent-dim);"></div>
+          <div class="field" id="nuanceFieldRow" style="display:none;">
+            <label>Nuance / finition naturelle</label>
+            <div id="nuanceSwatchRow" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;"></div>
+          </div>
           <div class="field" id="arrowHintRow" style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
             <span style="font-size:11px;color:var(--text-dim);">Astuce : Boutons ci-dessus ou Shift + Glisser sur le schéma.</span>
             <button class="icon-action-btn" id="resetArrowBtn" style="font-size:11px;padding:4px 8px;">Réinitialiser flèche</button>
@@ -1262,6 +1312,7 @@
           <div class="canvas-head">
             <span class="canvas-title">Schéma du profil (Cliquer sur une cote pour la modifier | Molette = Zoom)</span>
             <div class="head-actions">
+              <button class="fullscreen-btn" id="measureToolBtn">📏 Outil de mesure</button>
               <button class="fullscreen-btn" id="printSingleProfileBtn">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg>
                 Imprimer ce schéma
@@ -1271,6 +1322,14 @@
                 Plein écran 2D
               </button>
             </div>
+          </div>
+          <div id="measureToolBar" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;background:var(--panel2);border:1px solid var(--line-soft);border-radius:7px;padding:8px 10px;margin-bottom:10px;">
+            <span style="font-size:11px;color:var(--text-dim);">Mode :</span>
+            <div class="dir-toggle" id="measureModeToggle">
+              <button type="button" class="active" data-mode="diag">Distance directe</button>
+              <button type="button" data-mode="ortho">Angle droit (X puis Y)</button>
+            </div>
+            <span id="measureHint" style="font-size:11px;color:var(--accent);margin-left:6px;">Clique le point A sur le schéma (accroche automatique aux sommets).</span>
           </div>
           <canvas id="profileCanvas"></canvas>
           <div class="rotate-controls">
@@ -1282,6 +1341,7 @@
               <span>°</span>
             </div>
           </div>
+          <div id="measurementsListWrap" style="margin-top:10px;"></div>
         </div>
 
         <!-- MODULE 3D AVEC VARIANTES DE COULEURS ET LISSAGE DES ARRONDIS -->
@@ -1302,12 +1362,36 @@
             <button class="view3d-btn" data-view="side">Profil</button>
             <button class="view3d-btn" data-view="top">Dessus</button>
           </div>
-          <div style="font-size:11.5px;color:var(--text-dim);margin-bottom:8px;">Maintenez le clic gauche pour pivoter · Utilisez la molette pour zoomer.</div>
+          <div class="sheet-fields" style="margin-bottom:8px;">
+            <div class="field">
+              <label>Rotation horizontale (°)</label>
+              <input type="number" id="profileRotY" value="0" step="1">
+            </div>
+            <div class="field">
+              <label>Rotation verticale (°)</label>
+              <input type="number" id="profileRotX" value="0" step="1">
+            </div>
+          </div>
+          <button class="icon-action-btn" id="profileRotResetBtn" style="width:100%;margin-bottom:8px;">Réinitialiser l'angle</button>
+          <div style="font-size:11.5px;color:var(--text-dim);margin-bottom:8px;">Maintenez le clic gauche pour pivoter à la souris · Utilisez la molette pour zoomer.</div>
           <div class="toggle-row" style="margin:0 0 10px;">
             <input type="checkbox" id="profile3dShowDims" checked>
             <span>Afficher les cotes déportées sur la 3D</span>
           </div>
           <button class="add-btn" id="profileRealisticBtn" type="button" style="margin-bottom:10px;">✨ Vue réaliste (sol, ombres, reflets)</button>
+          <div id="profileLightControls" style="display:none;">
+            <div class="sheet-fields" style="margin-bottom:8px;">
+              <div class="field">
+                <label>Intensité lumière</label>
+                <input type="range" id="profileLightIntensity" min="0.3" max="2.5" step="0.1" value="1.15">
+              </div>
+              <div class="field">
+                <label>Direction (°)</label>
+                <input type="range" id="profileLightAzimuth" min="0" max="360" step="5" value="35">
+              </div>
+            </div>
+          </div>
+          <button class="add-btn" id="profilePngExportBtn" type="button" style="margin-bottom:10px;">📷 Exporter cette vue (PNG)</button>
           <div id="canvas3dContainer" style="width:100%;height:350px;border-radius:6px;background:linear-gradient(180deg,#a9cdec 0%,#d6e6f0 55%,#eef1ee 100%);position:relative;overflow:hidden;"></div>
         </div>
 
@@ -1392,11 +1476,35 @@
             <button type="button" data-view="profil">Profil</button>
             <button type="button" data-view="dessus">Dessus</button>
           </div>
+          <div class="sheet-fields" style="margin:10px 0 0;">
+            <div class="field">
+              <label>Rotation horizontale (°)</label>
+              <input type="number" id="assembleRotY" value="0" step="1">
+            </div>
+            <div class="field">
+              <label>Rotation verticale (°)</label>
+              <input type="number" id="assembleRotX" value="0" step="1">
+            </div>
+          </div>
+          <button class="icon-action-btn" id="assembleRotResetBtn" style="width:100%;margin-top:2px;">Réinitialiser l'angle</button>
           <div class="toggle-row" style="margin:10px 0 0;">
             <input type="checkbox" id="assembleShowDims" checked>
             <span>Afficher les cotes sur la 3D</span>
           </div>
           <button class="add-btn" id="assembleRealisticBtn" type="button" style="margin-top:10px;">✨ Vue réaliste (sol, ombres, reflets)</button>
+          <div id="assembleLightControls" style="display:none;">
+            <div class="sheet-fields" style="margin-top:10px;margin-bottom:0;">
+              <div class="field">
+                <label>Intensité lumière</label>
+                <input type="range" id="assembleLightIntensity" min="0.3" max="2.5" step="0.1" value="1.15">
+              </div>
+              <div class="field">
+                <label>Direction (°)</label>
+                <input type="range" id="assembleLightAzimuth" min="0" max="360" step="5" value="55">
+              </div>
+            </div>
+          </div>
+          <button class="add-btn" id="assemblePngExportBtn" type="button" style="margin-top:10px;">📷 Exporter cette vue (PNG)</button>
           <div id="assembleCanvas3dContainer" style="width:100%;height:460px;border-radius:6px;background:linear-gradient(180deg,#a9cdec 0%,#d6e6f0 55%,#eef1ee 100%);position:relative;overflow:hidden;margin-top:10px;"></div>
         </div>
       </div>
@@ -1534,99 +1642,169 @@ let lastAnnotationsMap = [];
 let scene3D, camera3D, renderer3D, partMesh3D;
 let is3DInitialized = false;
 let profile3DLabelsWrap = null;
+let profile3DDimsSvg = null;
+
+// Contrôle précis de l'angle de vue 3D du profil (en plus du glisser à la
+// souris) : deux champs en degrés, synchronisés dans les deux sens.
+function syncProfileRotInputs(){
+  if (!partMesh3D) return;
+  const rotX = document.getElementById('profileRotX');
+  const rotY = document.getElementById('profileRotY');
+  if (!rotX || !rotY || document.activeElement === rotX || document.activeElement === rotY) return;
+  rotX.value = Math.round(partMesh3D.rotation.x * 180 / Math.PI);
+  rotY.value = Math.round(partMesh3D.rotation.y * 180 / Math.PI);
+}
+function applyProfileRotFromInputs(){
+  if (!partMesh3D) return;
+  const rotX = document.getElementById('profileRotX');
+  const rotY = document.getElementById('profileRotY');
+  partMesh3D.rotation.x = (Number(rotX.value) || 0) * Math.PI / 180;
+  partMesh3D.rotation.y = (Number(rotY.value) || 0) * Math.PI / 180;
+  if (renderer3D) { renderer3D.render(scene3D, camera3D); updateProfile3DLabels(); }
+}
 
 function updateProfile3DLabels(){
-  if (!profile3DLabelsWrap) return;
+  if (!profile3DLabelsWrap || !profile3DDimsSvg) return;
   profile3DLabelsWrap.innerHTML = '';
+  while (profile3DDimsSvg.lastChild && profile3DDimsSvg.lastChild.tagName !== 'defs') {
+    profile3DDimsSvg.removeChild(profile3DDimsSvg.lastChild);
+  }
   if (!partMesh3D || !camera3D || !renderer3D) return;
   const container = document.getElementById('canvas3dContainer');
   if (!container) return;
   partMesh3D.updateMatrixWorld(true);
 
-  const biaisChk = document.getElementById('biaisEnabled');
-  const labels = [];
-
-  if (biaisChk && biaisChk.checked) {
-    const dimsChk = document.getElementById('biaisShow3DDims');
-    if (dimsChk && dimsChk.checked) {
-      // Une cote à chaque jonction entre pièces du calpinage (mêmes valeurs que
-      // le tableau "Séquence du profil" / l'impression du calpinage). Les deux
-      // valeurs d'une même jonction (mâle / femelle) sont fusionnées en une seule
-      // étiquette pour ne pas se superposer au même point physique.
-      const data = computeBiaisPieceRows();
-      if (data.val.ok && data.rows.length) {
-        const n = data.plan.n, L = data.plan.L;
-        const zStart = -(n * L) / 2;
-        const rows = data.rows;
-        for (let i = 0; i <= n; i++) {
-          const z = zStart + i * L;
-          let text;
-          if (i === 0) text = `${rows[0].leftType} : ${Math.round(rows[0].leftDev)} mm`;
-          else if (i === n) text = `${rows[n-1].rightType} : ${Math.round(rows[n-1].rightDev)} mm`;
-          else text = `${rows[i-1].rightType.replace('Jonction : ','')} ${Math.round(rows[i-1].rightDev)} / ${rows[i].leftType.replace('Jonction : ','')} ${Math.round(rows[i].leftDev)} mm`;
-          labels.push({ local: new THREE.Vector3(0, 40, z), text, anchor: new THREE.Vector3(0, 0, z) });
-        }
-      }
-    }
-  } else {
-    const chk = document.getElementById('profile3dShowDims');
-    if (!chk || !chk.checked) return;
-    // Même principe que les cotes du schéma 2D, projetées sur la face avant de la 3D.
-    const length = parseFloat(document.getElementById('pieceLength').value) || 2000;
-    const geo = generateProfileGeometry(segments, 1);
-    const z = length / 2;
-    geo.annotations.forEach(ann => {
-      if (ann.type === 'dim') {
-        const x = ann.midX !== undefined ? ann.midX : ann.x;
-        const y = ann.midY !== undefined ? ann.midY : ann.y;
-        labels.push({ local: new THREE.Vector3(x, y, z), text: ann.text });
-      } else if (ann.type === 'angle') {
-        labels.push({ local: new THREE.Vector3(ann.x, ann.y, z), text: ann.text });
-      }
-    });
-  }
-
-  // Anti-collision à l'écran : à distance/zoom faible, beaucoup de cotes se
-  // projettent trop près les unes des autres et deviennent illisibles. On ne
-  // garde que celles qui restent à distance suffisante des cotes déjà retenues
-  // (les premières et dernières de la liste sont toujours prioritaires).
-  const MIN_DIST = 46;
-  const accepted = [];
-  const projected = labels.map(L => {
-    const world = L.local.clone().applyMatrix4(partMesh3D.matrixWorld);
+  const projectLocal = (x, y, z) => {
+    const world = new THREE.Vector3(x, y, z).applyMatrix4(partMesh3D.matrixWorld);
     const v = world.clone().project(camera3D);
     if (v.z >= 1) return null;
-    const x = (v.x * 0.5 + 0.5) * container.clientWidth;
-    const y = (-v.y * 0.5 + 0.5) * container.clientHeight;
-    if (x < -60 || x > container.clientWidth + 60 || y < -60 || y > container.clientHeight + 60) return null;
-    let ax = x, ay = y;
-    if (L.anchor) {
-      const aw = L.anchor.clone().applyMatrix4(partMesh3D.matrixWorld);
-      const av = aw.clone().project(camera3D);
-      ax = (av.x * 0.5 + 0.5) * container.clientWidth;
-      ay = (-av.y * 0.5 + 0.5) * container.clientHeight;
-    }
-    return { x, y, ax, ay, text: L.text };
-  });
+    const sx = (v.x * 0.5 + 0.5) * container.clientWidth;
+    const sy = (-v.y * 0.5 + 0.5) * container.clientHeight;
+    if (sx < -80 || sx > container.clientWidth + 80 || sy < -80 || sy > container.clientHeight + 80) return null;
+    return { x: sx, y: sy };
+  };
 
-  projected.forEach((p, i) => {
-    if (!p) return;
-    const isEdge = (i === 0 || i === projected.length - 1);
-    const tooClose = !isEdge && accepted.some(q => Math.hypot(q.x - p.x, q.y - p.y) < MIN_DIST);
-    if (tooClose) return;
-    accepted.push(p);
+  const svgNS = 'http://www.w3.org/2000/svg';
+  function drawTechDimLine(d){
+    const g = document.createElementNS(svgNS, 'g');
+    const mkLine = (x1,y1,x2,y2,opts) => {
+      const line = document.createElementNS(svgNS, 'line');
+      line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+      line.setAttribute('stroke', opts.color); line.setAttribute('stroke-width', opts.width);
+      if (opts.dash) line.setAttribute('stroke-dasharray', opts.dash);
+      if (opts.markers) { line.setAttribute('marker-start', 'url(#dimArrowStart)'); line.setAttribute('marker-end', 'url(#dimArrowEnd)'); }
+      return line;
+    };
+    g.appendChild(mkLine(d.p1.x, d.p1.y, d.o1.x, d.o1.y, { color:'rgba(255,206,0,0.55)', width:1, dash:'2,2' }));
+    g.appendChild(mkLine(d.p2.x, d.p2.y, d.o2.x, d.o2.y, { color:'rgba(255,206,0,0.55)', width:1, dash:'2,2' }));
+    g.appendChild(mkLine(d.o1.x, d.o1.y, d.o2.x, d.o2.y, { color:'#ffce00', width:1.4, markers:true }));
+    profile3DDimsSvg.appendChild(g);
 
-    if (p.ax !== p.x || p.ay !== p.y) {
-      const dot = document.createElement('div');
-      dot.style.cssText = `position:absolute;left:${p.ax}px;top:${p.ay}px;width:5px;height:5px;margin:-2.5px;border-radius:50%;background:var(--accent);`;
-      profile3DLabelsWrap.appendChild(dot);
-    }
     const lbl = document.createElement('div');
-    lbl.textContent = p.text;
-    lbl.style.cssText = `position:absolute;left:${p.x}px;top:${p.y}px;transform:translate(-50%,-50%);
+    lbl.textContent = d.text;
+    lbl.style.cssText = `position:absolute;left:${d.mid.x}px;top:${d.mid.y}px;transform:translate(-50%,-50%);
       background:rgba(20,20,20,0.85);color:#fff;font-family:'JetBrains Mono',monospace;font-size:10px;
       padding:2px 6px;border-radius:4px;white-space:nowrap;border:1px solid var(--accent);pointer-events:none;`;
     profile3DLabelsWrap.appendChild(lbl);
+  }
+  function drawSimpleLabel(p, text){
+    const dot = document.createElement('div');
+    dot.style.cssText = `position:absolute;left:${p.x}px;top:${p.y}px;width:5px;height:5px;margin:-2.5px;border-radius:50%;background:var(--accent);`;
+    profile3DLabelsWrap.appendChild(dot);
+    const lbl = document.createElement('div');
+    lbl.textContent = text;
+    lbl.style.cssText = `position:absolute;left:${p.x}px;top:${p.y - 16}px;transform:translate(-50%,-100%);
+      background:rgba(20,20,20,0.85);color:#fff;font-family:'JetBrains Mono',monospace;font-size:10px;
+      padding:2px 6px;border-radius:4px;white-space:nowrap;border:1px solid var(--accent);pointer-events:none;`;
+    profile3DLabelsWrap.appendChild(lbl);
+  }
+
+  const biaisChk = document.getElementById('biaisEnabled');
+
+  if (biaisChk && biaisChk.checked) {
+    const dimsChk = document.getElementById('biaisShow3DDims');
+    if (!dimsChk || !dimsChk.checked) return;
+    // Une cote à chaque jonction entre pièces du calpinage (mêmes valeurs que
+    // le tableau "Séquence du profil" / l'impression du calpinage). Les deux
+    // valeurs d'une même jonction (mâle / femelle) sont fusionnées en une seule
+    // étiquette pour ne pas se superposer au même point physique.
+    const data = computeBiaisPieceRows();
+    if (!data.val.ok || !data.rows.length) return;
+    const n = data.plan.n, L = data.plan.L;
+    const zStart = -(n * L) / 2;
+    const rows = data.rows;
+    const points = [];
+    for (let i = 0; i <= n; i++) {
+      const z = zStart + i * L;
+      let text;
+      if (i === 0) text = `${rows[0].leftType} : ${Math.round(rows[0].leftDev)} mm`;
+      else if (i === n) text = `${rows[n-1].rightType} : ${Math.round(rows[n-1].rightDev)} mm`;
+      else text = `${rows[i-1].rightType.replace('Jonction : ','')} ${Math.round(rows[i-1].rightDev)} / ${rows[i].leftType.replace('Jonction : ','')} ${Math.round(rows[i].leftDev)} mm`;
+      points.push({ p: projectLocal(0, 40, z), anchor: projectLocal(0, 0, z), text });
+    }
+    const MIN_DIST = 46;
+    const accepted = [];
+    points.forEach((L2, i) => {
+      if (!L2.p) return;
+      const isEdge = (i === 0 || i === points.length - 1);
+      const tooClose = !isEdge && accepted.some(q => Math.hypot(q.x - L2.p.x, q.y - L2.p.y) < MIN_DIST);
+      if (tooClose) return;
+      accepted.push(L2.p);
+      if (L2.anchor) drawSimpleLabel(L2.anchor, '');
+      const lbl = document.createElement('div');
+      lbl.textContent = L2.text;
+      lbl.style.cssText = `position:absolute;left:${L2.p.x}px;top:${L2.p.y}px;transform:translate(-50%,-50%);
+        background:rgba(20,20,20,0.85);color:#fff;font-family:'JetBrains Mono',monospace;font-size:10px;
+        padding:2px 6px;border-radius:4px;white-space:nowrap;border:1px solid var(--accent);pointer-events:none;`;
+      profile3DLabelsWrap.appendChild(lbl);
+    });
+    return;
+  }
+
+  const chk = document.getElementById('profile3dShowDims');
+  if (!chk || !chk.checked) return;
+  // Même principe que les cotes du schéma 2D, projetées sur la face avant de la
+  // 3D — avec de vraies lignes d'attache et une ligne de cote fléchée pour les
+  // droits, comme sur un plan technique (le reste : angles/arcs/boudins garde
+  // une étiquette simple, faute de segment de référence net à coter).
+  const length = parseFloat(document.getElementById('pieceLength').value) || 2000;
+  const geo = generateProfileGeometry(segments, 1);
+  const z = length / 2;
+
+  const dimLines = [];
+  const simpleLabels = [];
+  geo.annotations.forEach(ann => {
+    if (ann.type === 'dim' && ann.startX !== undefined) {
+      const p1 = projectLocal(ann.startX, ann.startY, z);
+      const p2 = projectLocal(ann.endX, ann.endY, z);
+      const o1 = projectLocal(ann.startX + ann.nx * ann.offsetDist, ann.startY + ann.ny * ann.offsetDist, z);
+      const o2 = projectLocal(ann.endX + ann.nx * ann.offsetDist, ann.endY + ann.ny * ann.offsetDist, z);
+      const mid = projectLocal(ann.midX, ann.midY, z);
+      if (p1 && p2 && o1 && o2 && mid) dimLines.push({ p1, p2, o1, o2, mid, text: ann.text });
+    } else if (ann.type === 'dim') {
+      const p = projectLocal(ann.midX, ann.midY, z);
+      if (p) simpleLabels.push({ p, text: ann.text });
+    } else if (ann.type === 'angle') {
+      const p = projectLocal(ann.x, ann.y, z);
+      if (p) simpleLabels.push({ p, text: ann.text });
+    }
+  });
+
+  const MIN_DIST = 50;
+  const accepted = [];
+  dimLines.forEach((d, i) => {
+    const isEdge = (i === 0 || i === dimLines.length - 1);
+    const tooClose = !isEdge && accepted.some(q => Math.hypot(q.x - d.mid.x, q.y - d.mid.y) < MIN_DIST);
+    if (tooClose) return;
+    accepted.push(d.mid);
+    drawTechDimLine(d);
+  });
+  simpleLabels.forEach(L => {
+    const tooClose = accepted.some(q => Math.hypot(q.x - L.p.x, q.y - L.p.y) < MIN_DIST);
+    if (tooClose) return;
+    accepted.push(L.p);
+    drawSimpleLabel(L.p, L.text);
   });
 }
 
@@ -1677,6 +1855,14 @@ function init3DViewer() {
   profile3DLabelsWrap = document.createElement('div');
   profile3DLabelsWrap.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;';
   container.appendChild(profile3DLabelsWrap);
+
+  profile3DDimsSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  profile3DDimsSvg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;';
+  profile3DDimsSvg.innerHTML = `<defs>
+    <marker id="dimArrowStart" markerWidth="8" markerHeight="8" refX="1" refY="3" orient="auto"><path d="M7,0 L1,3 L7,6 Z" fill="#ffce00"/></marker>
+    <marker id="dimArrowEnd" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M1,0 L7,3 L1,6 Z" fill="#ffce00"/></marker>
+  </defs>`;
+  container.appendChild(profile3DDimsSvg);
 
   scene3D.add(new THREE.HemisphereLight(0xffffff, 0x66717d, 1.15));
   const dirLight1 = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -1754,7 +1940,7 @@ function init3DViewer() {
         lastPinchDistance = distance;
         lastPinchCenter = center;
       }
-      renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
+      renderer3D.render(scene3D, camera3D); updateProfile3DLabels(); syncProfileRotInputs();
       return;
     }
     if (activePointerId !== e.pointerId || !pointerMode || !partMesh3D) return;
@@ -1767,7 +1953,7 @@ function init3DViewer() {
       pan3D(dx, dy);
     }
     lastPointer = { x: e.clientX, y: e.clientY };
-    renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
+    renderer3D.render(scene3D, camera3D); updateProfile3DLabels(); syncProfileRotInputs();
   });
 
   function endPointer(e) {
@@ -1789,7 +1975,7 @@ function init3DViewer() {
   canvas.addEventListener('wheel', e => {
     e.preventDefault();
     zoom3D(e.deltaY * 0.0012);
-    renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
+    renderer3D.render(scene3D, camera3D); updateProfile3DLabels(); syncProfileRotInputs();
   }, { passive: false });
 
   // Double-clic : recentrer et remettre le zoom de départ sans modifier la géométrie.
@@ -1798,7 +1984,7 @@ function init3DViewer() {
     partMesh3D.position.set(0, 0, 0);
     camera3D.position.set(0, 0, 1800);
     camera3D.lookAt(0, 0, 0);
-    renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
+    renderer3D.render(scene3D, camera3D); updateProfile3DLabels(); syncProfileRotInputs();
   });
 
   function resize3D() {
@@ -1809,7 +1995,7 @@ function init3DViewer() {
     camera3D.aspect = w / h;
     camera3D.updateProjectionMatrix();
     renderer3D.setSize(w, h, false);
-    renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
+    renderer3D.render(scene3D, camera3D); updateProfile3DLabels(); syncProfileRotInputs();
   }
 
   window.addEventListener('resize', resize3D);
@@ -1845,6 +2031,12 @@ function getRawMetalMaterial(matType){
   else if (matType === 'Alu') { matColor = 0xf1f5f9; metalnessVal = 0.95; roughnessVal = 0.15; }
   else if (matType === 'Zinc') { matColor = 0x8291a0; metalnessVal = 0.5; roughnessVal = 0.48; }
   else if (matType === 'Cuivre') { matColor = 0xf59e0b; metalnessVal = 0.85; roughnessVal = 0.22; }
+  // Nuance/finition naturelle choisie (zinc/cuivre) : remplace la teinte par défaut.
+  if (typeof NUANCE_LIBRARY !== 'undefined' && NUANCE_LIBRARY[matType]) {
+    const idx = (typeof profileNuance !== 'undefined' && profileNuance[matType]) || 0;
+    const n = NUANCE_LIBRARY[matType][idx];
+    if (n) { matColor = n.hex; metalnessVal = n.metalness; roughnessVal = n.roughness; }
+  }
   return new THREE.MeshPhysicalMaterial({
     color: matColor, metalness: metalnessVal, roughness: roughnessVal,
     clearcoat: 0.22, clearcoatRoughness: 0.16, reflectivity: 0.7, side: THREE.DoubleSide
@@ -1905,10 +2097,48 @@ function setProfileRealistic(on){
   }
   profileShadowLight.castShadow = on;
   profileShadowLight.visible = on;
+  document.getElementById('profileLightControls').style.display = on ? 'block' : 'none';
+  if (on) applyProfileLightFromInputs();
 
   update3DModel();
 }
 document.getElementById('profileRealisticBtn').addEventListener('click', () => setProfileRealistic(!profileRealisticMode));
+document.getElementById('profileRotX').addEventListener('input', applyProfileRotFromInputs);
+document.getElementById('profileRotY').addEventListener('input', applyProfileRotFromInputs);
+document.getElementById('profileRotResetBtn').addEventListener('click', () => {
+  document.getElementById('profileRotX').value = 0;
+  document.getElementById('profileRotY').value = 0;
+  applyProfileRotFromInputs();
+});
+
+// Éclairage ajustable (intensité + direction) de la lumière à ombres, active
+// seulement en Vue réaliste.
+function applyProfileLightFromInputs(){
+  if (!profileShadowLight) return;
+  const intensity = parseFloat(document.getElementById('profileLightIntensity').value) || 1.15;
+  const azimuthDeg = parseFloat(document.getElementById('profileLightAzimuth').value) || 0;
+  const rad = azimuthDeg * Math.PI / 180;
+  const R = 650, H = 750;
+  profileShadowLight.intensity = intensity;
+  profileShadowLight.position.set(R * Math.cos(rad), H, R * Math.sin(rad));
+  if (renderer3D) { renderer3D.render(scene3D, camera3D); updateProfile3DLabels(); }
+}
+document.getElementById('profileLightIntensity').addEventListener('input', applyProfileLightFromInputs);
+document.getElementById('profileLightAzimuth').addEventListener('input', applyProfileLightFromInputs);
+
+// Export PNG de la vue 3D actuelle, telle qu'affichée à l'écran.
+function downloadCanvasPNG(canvas, filename){
+  const link = document.createElement('a');
+  link.download = filename;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+document.getElementById('profilePngExportBtn').addEventListener('click', () => {
+  if (!renderer3D) { showToast('Ouvre d\'abord la visualisation 3D.'); return; }
+  const nom = (document.getElementById('profileName').value || 'profil').replace(/[^a-z0-9]+/gi, '_');
+  downloadCanvasPNG(renderer3D.domElement, `vue3d_${nom}.png`);
+  showToast('Image de la vue 3D exportée.');
+});
 
 function update3DModel() {
   if (!is3DInitialized) return;
@@ -1941,7 +2171,7 @@ function update3DModel() {
     partMesh3D.rotation.set(prevRotation.x, prevRotation.y, prevRotation.z);
     applyProfileRealisticExtras(partMesh3D);
     scene3D.add(partMesh3D);
-    renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
+    renderer3D.render(scene3D, camera3D); updateProfile3DLabels(); syncProfileRotInputs();
     return;
   }
 
@@ -2126,7 +2356,7 @@ function update3DModel() {
   partMesh3D.rotation.set(prevRotation.x, prevRotation.y, prevRotation.z);
   applyProfileRealisticExtras(partMesh3D);
   scene3D.add(partMesh3D);
-  renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
+  renderer3D.render(scene3D, camera3D); updateProfile3DLabels(); syncProfileRotInputs();
 }
 
 // Ajoute un sol + configure les ombres (mesh et lumière) quand la "Vue réaliste"
@@ -2171,7 +2401,7 @@ function setView3D(view, sourceBtnEl) {
   partMesh3D.rotation.x = preset.x;
   partMesh3D.rotation.y = preset.y;
   partMesh3D.rotation.z = 0;
-  renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
+  renderer3D.render(scene3D, camera3D); updateProfile3DLabels(); syncProfileRotInputs();
   // Synchronise l'état "actif" sur les DEUX jeux de boutons (panneau + plein écran)
   document.querySelectorAll('.view3d-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.view === view);
@@ -2184,7 +2414,31 @@ document.querySelectorAll('.view3d-btn').forEach(btn => {
 
 document.getElementById('refresh3DBtn').addEventListener('click', update3DModel);
 document.getElementById('profile3dShowDims').addEventListener('change', updateProfile3DLabels);
-document.getElementById('profileMaterial').addEventListener('change', () => { update3DModel(); updatePaintAvailability(); });
+document.getElementById('profileMaterial').addEventListener('change', () => { update3DModel(); updatePaintAvailability(); updateNuanceAvailability(); });
+
+// Valeurs indicatives courantes en tôlerie/couverture — à ajuster selon le
+// chantier réel, ce ne sont que des points de départ.
+const OUVRAGE_DEFAULTS = {
+  couvremur:  { mat: 'Alu',   th: '2' },
+  cheneau:    { mat: 'Zinc',  th: '0.65' },
+  descente:   { mat: 'Zinc',  th: '0.65' },
+  bavette:    { mat: 'Zinc',  th: '0.65' },
+  cheminee:   { mat: 'Zinc',  th: '0.65' },
+  couvrejoint:{ mat: 'Acier', th: '0.75' },
+  faitiere:   { mat: 'Zinc',  th: '0.65' },
+  chapeau:    { mat: 'Alu',   th: '1.5' },
+  tasseau:    { mat: 'Acier', th: '1' }
+};
+document.getElementById('ouvrageType').addEventListener('change', (e) => {
+  const def = OUVRAGE_DEFAULTS[e.target.value];
+  if (!def) return;
+  document.getElementById('profileMaterial').value = def.mat;
+  document.getElementById('profileThickness').value = def.th;
+  update3DModel();
+  updatePaintAvailability();
+  updateNuanceAvailability();
+  showToast(`Matière et épaisseur pré-remplies pour "${e.target.options[e.target.selectedIndex].text}" — ajuste si besoin.`);
+});
 document.getElementById('profileThickness').addEventListener('input', update3DModel);
 document.getElementById('pieceLength').addEventListener('input', update3DModel);
 
@@ -2231,21 +2485,82 @@ function renderRalSwatches(){
     });
     wrap.appendChild(btn);
   });
+  checkRalUnusual();
+}
+// Alerte simple (informative, non bloquante) si le code tapé ne correspond à
+// aucune référence RAL courante connue de l'outil.
+function checkRalUnusual(){
+  const msg = document.getElementById('ralUnusualMsg');
+  if (!msg) return;
+  const code = document.getElementById('profileColor').value.trim();
+  if (code.length === 4 && /^[0-9]{4}$/.test(code) && !RAL_HEX_MAP[code]) {
+    msg.textContent = `⚠ RAL ${code} non reconnu dans la bibliothèque courante de l'outil — vérifie sa disponibilité réelle en tôle prélaquée auprès du fournisseur.`;
+    msg.style.display = 'block';
+  } else {
+    msg.style.display = 'none';
+  }
 }
 renderRalSwatches();
 document.getElementById('profileColor').addEventListener('input', renderRalSwatches);
 
-// Le RAL/thermolaquage ne concerne que l'acier et l'aluminium (le zinc et le
-// cuivre gardent leur teinte naturelle) : on masque les champs sinon.
+// Le RAL/thermolaquage ne concerne que l'acier et l'aluminium ; le zinc et le
+// cuivre proposent à la place leurs nuances/finitions naturelles courantes.
 function updatePaintAvailability(){
   const matType = document.getElementById('profileMaterial').value;
   const canPaint = (matType === 'Acier' || matType === 'Alu');
   document.getElementById('paintFieldsRow').style.display = canPaint ? 'grid' : 'none';
   document.getElementById('arrowHintRow').style.display = canPaint ? 'flex' : 'none';
   document.getElementById('paintedFaceRow').style.display = canPaint ? 'block' : 'none';
-  document.getElementById('paintUnavailableMsg').style.display = canPaint ? 'none' : 'block';
+  if (!canPaint) document.getElementById('ralUnusualMsg').style.display = 'none';
 }
 updatePaintAvailability();
+
+// Nuances/finitions naturelles (indicatives) pour le zinc et le cuivre — ces
+// matières ne sont normalement pas thermolaquées RAL.
+const NUANCE_LIBRARY = {
+  Zinc: [
+    { name: 'Naturel', hex: '#a9adad', metalness: 0.55, roughness: 0.42 },
+    { name: 'Prépatiné gris clair', hex: '#8b9296', metalness: 0.4, roughness: 0.55 },
+    { name: 'Prépatiné gris foncé', hex: '#4a4f52', metalness: 0.35, roughness: 0.58 }
+  ],
+  Cuivre: [
+    { name: 'Naturel brillant', hex: '#d3894f', metalness: 0.85, roughness: 0.2 },
+    { name: 'Pré-oxydé brun', hex: '#7a4a30', metalness: 0.5, roughness: 0.5 },
+    { name: 'Pré-patiné vert-de-gris', hex: '#4f8f74', metalness: 0.25, roughness: 0.6 }
+  ]
+};
+let profileNuance = { Zinc: 0, Cuivre: 0 }; // index sélectionné par matière
+
+function updateNuanceAvailability(){
+  const matType = document.getElementById('profileMaterial').value;
+  const list = NUANCE_LIBRARY[matType];
+  document.getElementById('nuanceFieldRow').style.display = list ? 'block' : 'none';
+  if (list) renderNuanceSwatches();
+}
+function renderNuanceSwatches(){
+  const matType = document.getElementById('profileMaterial').value;
+  const list = NUANCE_LIBRARY[matType];
+  const wrap = document.getElementById('nuanceSwatchRow');
+  if (!list || !wrap) return;
+  wrap.innerHTML = '';
+  list.forEach((n, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.title = n.name;
+    const active = (profileNuance[matType] || 0) === i;
+    btn.style.cssText = `padding:6px 10px;border-radius:6px;font-size:11px;cursor:pointer;
+      background:${n.hex};color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.6);
+      border:2px solid ${active ? 'var(--accent)' : 'transparent'};`;
+    btn.textContent = n.name;
+    btn.addEventListener('click', () => {
+      profileNuance[matType] = i;
+      renderNuanceSwatches();
+      update3DModel();
+    });
+    wrap.appendChild(btn);
+  });
+}
+updateNuanceAvailability();
 
 function updatePaintedFaceBtnLabel(){
   const btn = document.getElementById('paintedFaceToggleBtn');
@@ -2315,6 +2630,7 @@ async function envoyerEmailProfile() {
   const currentProfileData = {
     name: nomProfil, dev, len, qty, mat, th, color, rotation: currentProfileRotation,
     customArrow: customArrowData,
+    customMeasurements: JSON.parse(JSON.stringify(customMeasurements)),
     segments: JSON.parse(JSON.stringify(segments))
   };
 
@@ -2856,10 +3172,22 @@ function drawSheetCanvas(canvas, sheet, sW, sH, isLight = false){
 }
 
 function addSegment(type){
-  if(type==='straight') segments.push({type:'straight', len:100});
-  if(type==='bend') segments.push({type:'bend', angle:90, dir:1, hemType:'aucun', hemGap:6});
-  if(type==='arc') segments.push({type:'arc', radius:50, angle:90, dir:1});
-  if(type==='boudin') segments.push({type:'boudin', diam:18, dir:1, style:'offset'});
+  segments.push(makeDefaultSegment(type));
+  renderSegments();
+  redrawProfile();
+}
+
+function makeDefaultSegment(type){
+  if(type==='straight') return {type:'straight', len:100};
+  if(type==='bend') return {type:'bend', angle:90, dir:1, hemType:'aucun', hemGap:6};
+  if(type==='arc') return {type:'arc', radius:50, angle:90, dir:1};
+  if(type==='boudin') return {type:'boudin', diam:18, dir:1, style:'offset'};
+}
+
+// Insère un nouvel élément à une position précise (entre deux éléments
+// existants), plutôt qu'uniquement en fin de séquence.
+function insertSegment(index, type){
+  segments.splice(index, 0, makeDefaultSegment(type));
   renderSegments();
   redrawProfile();
 }
@@ -2893,11 +3221,30 @@ function validateSegments() {
   return !hasError;
 }
 
+function buildSegInsertRow(index){
+  const row = document.createElement('div');
+  row.className = 'seg-insert-row';
+  row.innerHTML = `
+    <span class="seg-insert-line"></span>
+    <button type="button" data-insert-type="straight" title="Insérer un Droit ici">+ Droit</button>
+    <button type="button" data-insert-type="bend" title="Insérer un Pli ici">+ Pli</button>
+    <button type="button" data-insert-type="arc" title="Insérer un Arrondi ici">+ Arrondi</button>
+    <button type="button" data-insert-type="boudin" title="Insérer un Boudin ici">+ Boudin</button>
+    <span class="seg-insert-line"></span>
+  `;
+  row.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => insertSegment(index, btn.dataset.insertType));
+  });
+  return row;
+}
+
 function renderSegments(){
   const list = document.getElementById('segList');
   list.innerHTML = '';
-  
+
   segments.forEach((s, idx) => {
+    list.appendChild(buildSegInsertRow(idx));
+
     const row = document.createElement('div');
     row.className = 'seg-row';
     
@@ -3442,6 +3789,9 @@ function drawProfileOnCanvas(canvas, isLight = false, profileData = null){
     ctx.restore();
   });
 
+  const measurementsToDraw = profileData ? (profileData.customMeasurements || []) : customMeasurements;
+  drawCustomMeasurementsOnCanvas(ctx, measurementsToDraw, scale, offsetX, offsetY, w, h, textCorrectionAngle, isLight);
+
   ctx.restore();
 }
 
@@ -3466,10 +3816,217 @@ function pixelToProfileMm(canvas, px, py){
     y: (ly - t.offsetY + t.h / 2) / t.scale
   };
 }
+// Inverse de pixelToProfileMm : position réelle (mm) -> point écran (coordonnées
+// client, comme clientX/clientY) — utilisée pour l'accroche aux sommets de
+// l'outil de mesure.
+function profileMmToClientPoint(canvas, mmX, mmY){
+  const t = canvas._pfTransform;
+  if (!t) return null;
+  const lx = mmX * t.scale + t.offsetX - t.w / 2;
+  const ly = mmY * t.scale + t.offsetY - t.h / 2;
+  const rad = t.rotation * Math.PI / 180;
+  const rx = lx * Math.cos(rad) - ly * Math.sin(rad);
+  const ry = lx * Math.sin(rad) + ly * Math.cos(rad);
+  const canvasPxX = rx + t.w / 2;
+  const canvasPxY = ry + t.h / 2;
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: rect.left + canvasPxX * (rect.width / canvas.width),
+    y: rect.top + canvasPxY * (rect.height / canvas.height)
+  };
+}
+
+/* ===================== OUTIL DE MESURE 2D (cote entre 2 points) ===================== */
+let customMeasurements = [];
+let measureMode = false;
+let measurePendingPoint = null;
+let measureToolMode = 'diag'; // 'diag' (distance directe) | 'ortho' (X puis Y, angle droit)
+
+function setMeasureMode(on){
+  measureMode = on;
+  measurePendingPoint = null;
+  document.getElementById('measureToolBar').style.display = on ? 'flex' : 'none';
+  document.getElementById('measureToolBtn').style.borderColor = on ? 'var(--accent)' : '';
+  document.getElementById('measureToolBtn').style.color = on ? 'var(--accent)' : '';
+  const pc = document.getElementById('profileCanvas');
+  if (pc) pc.style.cursor = on ? 'crosshair' : '';
+  const fc = document.getElementById('fsCanvas');
+  if (fc) fc.style.cursor = on ? 'crosshair' : '';
+  updateMeasureHint();
+}
+function updateMeasureHint(){
+  const hint = document.getElementById('measureHint');
+  if (!hint) return;
+  hint.textContent = measurePendingPoint
+    ? 'Point A placé — clique le point B.'
+    : 'Clique le point A sur le schéma (accroche automatique aux sommets).';
+}
+document.getElementById('measureToolBtn').addEventListener('click', () => setMeasureMode(!measureMode));
+document.querySelectorAll('#measureModeToggle button').forEach(b => {
+  b.addEventListener('click', () => {
+    measureToolMode = b.dataset.mode;
+    document.querySelectorAll('#measureModeToggle button').forEach(x => x.classList.toggle('active', x === b));
+  });
+});
+
+// Accroche au sommet du profil le plus proche du clic (tolérance à l'écran),
+// sinon position libre convertie en mm réels.
+function snapToProfileVertexOrFree(canvas, clientX, clientY){
+  const rect = canvas.getBoundingClientRect();
+  const pxX = (clientX - rect.left) * (canvas.width / rect.width);
+  const pxY = (clientY - rect.top) * (canvas.height / rect.height);
+  if (segments.length) {
+    const geo = generateProfileGeometry(segments, 1);
+    let best = null, bestDist = 22;
+    geo.pathSteps.forEach(st => {
+      if (st.x === undefined) return;
+      const cp = profileMmToClientPoint(canvas, st.x, st.y);
+      if (!cp) return;
+      const d = Math.hypot(cp.x - clientX, cp.y - clientY);
+      if (d < bestDist) { bestDist = d; best = { x: st.x, y: st.y }; }
+    });
+    if (best) return best;
+  }
+  return pixelToProfileMm(canvas, pxX, pxY);
+}
+
+function handleMeasureClick(canvas, e, redrawFn){
+  const mm = snapToProfileVertexOrFree(canvas, e.clientX, e.clientY);
+  if (!measurePendingPoint) {
+    measurePendingPoint = mm;
+    updateMeasureHint();
+  } else {
+    customMeasurements.push({
+      id: Date.now() + Math.round(Math.random() * 999),
+      ax: measurePendingPoint.x, ay: measurePendingPoint.y,
+      bx: mm.x, by: mm.y, mode: measureToolMode
+    });
+    measurePendingPoint = null;
+    updateMeasureHint();
+    renderMeasurementsList();
+    if (redrawFn) redrawFn(); else redrawProfile();
+    showToast('Cote ajoutée.');
+  }
+}
+
+function renderMeasurementsList(){
+  const wrap = document.getElementById('measurementsListWrap');
+  if (!wrap) return;
+  if (!customMeasurements.length) { wrap.innerHTML = ''; return; }
+  let html = '<div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Cotes personnalisées</div>';
+  customMeasurements.forEach(m => {
+    const distMm = Math.round(Math.hypot(m.bx - m.ax, m.by - m.ay));
+    const valueTxt = m.mode === 'ortho'
+      ? `X ${Math.round(Math.abs(m.bx - m.ax))} mm · Y ${Math.round(Math.abs(m.by - m.ay))} mm`
+      : `${distMm} mm`;
+    html += `
+      <div style="display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line-soft);border-radius:6px;padding:6px 10px;margin-bottom:6px;font-size:11.5px;">
+        <span style="flex:1;color:var(--text);font-family:'JetBrains Mono',monospace;">${m.mode === 'ortho' ? '📐' : '📏'} ${valueTxt}</span>
+        <button class="icon-action-btn" data-mid="${m.id}" data-toggle style="font-size:10px;padding:3px 7px;">${m.mode === 'ortho' ? 'Passer en direct' : 'Passer en angle droit'}</button>
+        <button class="icon-action-btn" data-mid="${m.id}" data-del style="font-size:10px;padding:3px 7px;color:var(--danger);">✕</button>
+      </div>`;
+  });
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('[data-toggle]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const m = customMeasurements.find(x => x.id === Number(btn.dataset.mid));
+      if (m) { m.mode = m.mode === 'ortho' ? 'diag' : 'ortho'; renderMeasurementsList(); redrawProfile(); }
+    });
+  });
+  wrap.querySelectorAll('[data-del]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      customMeasurements = customMeasurements.filter(x => x.id !== Number(btn.dataset.mid));
+      renderMeasurementsList();
+      redrawProfile();
+    });
+  });
+}
+
+// Dessine les cotes personnalisées (lignes d'attache + flèches + valeur),
+// dans le même repère (mm -> pixels) que le reste du schéma.
+function drawCustomMeasurementsOnCanvas(ctx, measurements, scale, offsetX, offsetY, w, h, textCorrectionAngle, isLight){
+  if (!measurements.length) return;
+  const toX = mm => mm * scale + offsetX - w / 2;
+  const toY = mm => mm * scale + offsetY - h / 2;
+  const col = isLight ? '#0369a1' : '#60a5fa';
+  const colSoft = isLight ? 'rgba(3,105,161,0.4)' : 'rgba(96,165,250,0.45)';
+
+  function drawDimSeg(x1, y1, x2, y2, text){
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len, ny = dx / len;
+    const offDist = 28;
+    const ox1 = x1 + nx * offDist, oy1 = y1 + ny * offDist;
+    const ox2 = x2 + nx * offDist, oy2 = y2 + ny * offDist;
+
+    ctx.strokeStyle = colSoft;
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1); ctx.lineTo(ox1, oy1);
+    ctx.moveTo(x2, y2); ctx.lineTo(ox2, oy2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(ox1, oy1); ctx.lineTo(ox2, oy2);
+    ctx.stroke();
+
+    const ang = Math.atan2(oy2 - oy1, ox2 - ox1);
+    const headLen = 9;
+    [[ox1, oy1, ang], [ox2, oy2, ang + Math.PI]].forEach(([hx, hy, ha]) => {
+      ctx.beginPath();
+      ctx.moveTo(hx, hy);
+      ctx.lineTo(hx - headLen * Math.cos(ha - 0.4), hy - headLen * Math.sin(ha - 0.4));
+      ctx.lineTo(hx - headLen * Math.cos(ha + 0.4), hy - headLen * Math.sin(ha + 0.4));
+      ctx.closePath();
+      ctx.fillStyle = col;
+      ctx.fill();
+    });
+
+    const midX = (ox1 + ox2) / 2, midY = (oy1 + oy2) / 2;
+    ctx.save();
+    ctx.translate(midX, midY);
+    ctx.rotate((textCorrectionAngle * Math.PI) / 180);
+    ctx.font = 'bold 16px "JetBrains Mono"';
+    const metrics = ctx.measureText(text);
+    ctx.fillStyle = isLight ? 'rgba(255,255,255,0.95)' : 'rgba(15,25,40,0.92)';
+    ctx.fillRect(-metrics.width / 2 - 6, -13, metrics.width + 12, 26);
+    ctx.strokeStyle = colSoft;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-metrics.width / 2 - 6, -13, metrics.width + 12, 26);
+    ctx.fillStyle = isLight ? '#0369a1' : '#bfdbfe';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 0, 0);
+    ctx.restore();
+  }
+
+  measurements.forEach(m => {
+    const ax = toX(m.ax), ay = toY(m.ay), bx = toX(m.bx), by = toY(m.by);
+    if (m.mode === 'ortho') {
+      const cx = toX(m.bx), cy = toY(m.ay);
+      const dxMm = Math.abs(m.bx - m.ax), dyMm = Math.abs(m.by - m.ay);
+      if (dxMm > 0.5) drawDimSeg(ax, ay, cx, cy, `${Math.round(dxMm)} mm`);
+      if (dyMm > 0.5) drawDimSeg(cx, cy, bx, by, `${Math.round(dyMm)} mm`);
+    } else {
+      drawDimSeg(ax, ay, bx, by, `${Math.round(Math.hypot(m.bx - m.ax, m.by - m.ay))} mm`);
+    }
+    [[ax, ay], [bx, by]].forEach(([px, py]) => {
+      ctx.beginPath();
+      ctx.arc(px, py, 4, 0, Math.PI * 2);
+      ctx.fillStyle = col;
+      ctx.fill();
+    });
+  });
+}
 
 function bindCanvasInteractions(canvas, redrawFn){
   canvas.addEventListener('click', (e) => {
     if (isPanning) return;
+    if (measureMode) { handleMeasureClick(canvas, e, redrawFn); return; }
     const clickX = e.clientX;
     const clickY = e.clientY;
 
@@ -3530,6 +4087,7 @@ function bindCanvasInteractions(canvas, redrawFn){
   canvas.addEventListener('mousedown', (e) => {
     activeCanvasEl = canvas;
     activeRedraw = redrawFn;
+    if (measureMode) return;
     if (e.shiftKey) {
       isDrawingArrow = true;
       const rect = canvas.getBoundingClientRect();
@@ -3651,6 +4209,7 @@ document.getElementById('saveProfileBtn').addEventListener('click', () => {
     name, dev, len, qty, mat, th, color,
     rotation: currentProfileRotation,
     customArrow: customArrowData,
+    customMeasurements: JSON.parse(JSON.stringify(customMeasurements)),
     segments: JSON.parse(JSON.stringify(segments))
   });
   saveProfilesToLocalStorage();
@@ -3716,12 +4275,15 @@ function renderSavedProfiles(){
         document.getElementById('pieceQty').value = p.qty;
         document.getElementById('profileMaterial').value = p.mat;
         updatePaintAvailability();
+        updateNuanceAvailability();
         document.getElementById('profileThickness').value = p.th;
         document.getElementById('profileColor').value = p.color || '';
         renderRalSwatches();
         currentProfileRotation = p.rotation || 0;
         document.getElementById('rotateDegInput').value = currentProfileRotation;
         customArrowData = p.customArrow || null;
+        customMeasurements = JSON.parse(JSON.stringify(p.customMeasurements || []));
+        renderMeasurementsList();
         segments = JSON.parse(JSON.stringify(p.segments));
         renderSegments();
         redrawProfile();
@@ -3861,7 +4423,7 @@ document.getElementById('fs3dOpenBtn').addEventListener('click', () => {
     renderer3D.setSize(fsContainer.clientWidth, fsContainer.clientHeight);
     camera3D.aspect = fsContainer.clientWidth / fsContainer.clientHeight;
     camera3D.updateProjectionMatrix();
-    renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
+    renderer3D.render(scene3D, camera3D); updateProfile3DLabels(); syncProfileRotInputs();
   }
 });
 
@@ -3873,7 +4435,7 @@ document.getElementById('fs3dCloseBtn').addEventListener('click', () => {
     renderer3D.setSize(container3D.clientWidth, container3D.clientHeight);
     camera3D.aspect = container3D.clientWidth / container3D.clientHeight;
     camera3D.updateProjectionMatrix();
-    renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
+    renderer3D.render(scene3D, camera3D); updateProfile3DLabels(); syncProfileRotInputs();
   }
 });
 
@@ -3885,7 +4447,7 @@ function build3DSnapshotPrintHTML(sectionTitle, dimsHtml){
   if (!renderer3D || !scene3D || !camera3D) return '';
   update3DModel();
   if (typeof fitCameraToPartMesh === 'function') fitCameraToPartMesh();
-  renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
+  renderer3D.render(scene3D, camera3D); updateProfile3DLabels(); syncProfileRotInputs();
   const dataUrl = renderer3D.domElement.toDataURL('image/png');
   return `
     <div class="print-section-title">${sectionTitle}</div>
@@ -3998,6 +4560,28 @@ document.getElementById('printCombinedBtn').addEventListener('click', () => {
 
 // Reconstruit le récapitulatif de débit (même logique que l'affichage écran) —
 // réutilisé par les exports PDF et Excel.
+// Intègre une image (canvas) dans un PDF jsPDF de façon robuste : JPEG (plus
+// léger et plus fiable que le PNG pour de grandes images) avec repli visible
+// en cas d'échec, pour ne jamais laisser une page de PDF vide/cassée sans
+// qu'on s'en rende compte.
+function addImageToPdfSafe(doc, canvas, x, y, w, h, label){
+  try {
+    if (!canvas.width || !canvas.height) throw new Error('canvas vide');
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    if (!dataUrl || dataUrl.length < 100) throw new Error('image vide');
+    doc.addImage(dataUrl, 'JPEG', x, y, w, h);
+  } catch (err) {
+    console.error('Export PDF — image non intégrée :', label, err);
+    doc.setDrawColor(200);
+    doc.setLineDashPattern([2, 2], 0);
+    doc.rect(x, y, w, h);
+    doc.setLineDashPattern([], 0);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(`Image indisponible (${label}) — réessaie ou imprime cette page depuis l'écran.`, x + 4, y + h / 2);
+  }
+}
+
 function computeDebitRecapItems(){
   const recapMap = {};
   lastPackedResult.sheets.forEach(s => {
@@ -4086,7 +4670,6 @@ document.getElementById('exportDebitPdfBtn').addEventListener('click', () => {
     doc.addPage();
     const tempCanvas = document.createElement('canvas');
     drawSheetCanvas(tempCanvas, s, lastPackedResult.sW, lastPackedResult.sH, true);
-    const imgData = tempCanvas.toDataURL('image/png');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
     doc.text(`Tôle ${idx + 1} — ${lastPackedResult.sW} x ${lastPackedResult.sH} mm`, margin, margin);
@@ -4095,7 +4678,7 @@ document.getElementById('exportDebitPdfBtn').addEventListener('click', () => {
     const imgRatio = lastPackedResult.sH / lastPackedResult.sW;
     let imgW = availW, imgH = imgW * imgRatio;
     if (imgH > availH) { imgH = availH; imgW = imgH / imgRatio; }
-    doc.addImage(imgData, 'PNG', margin, margin + 10, imgW, imgH);
+    addImageToPdfSafe(doc, tempCanvas, margin, margin + 10, imgW, imgH, `Tôle ${idx + 1}`);
   });
 
   doc.save('plan_de_debit_altema.pdf');
@@ -4294,16 +4877,8 @@ function buildTaperedStripGeometry(centerLeft, centerRight, thickness, zLeft, zR
 }
 
 function createBiaisMaterial(){
-  let matColor = 0x8894a2, metalnessVal = 0.6, roughnessVal = 0.4;
   const matType = document.getElementById('profileMaterial').value;
-  if (matType === 'Acier') { matColor = 0x94a3b8; metalnessVal = 0.85; roughnessVal = 0.25; }
-  else if (matType === 'Alu') { matColor = 0xf1f5f9; metalnessVal = 0.95; roughnessVal = 0.15; }
-  else if (matType === 'Zinc') { matColor = 0x8291a0; metalnessVal = 0.5; roughnessVal = 0.48; }
-  else if (matType === 'Cuivre') { matColor = 0xf59e0b; metalnessVal = 0.85; roughnessVal = 0.22; }
-  return new THREE.MeshPhysicalMaterial({
-    color: matColor, metalness: metalnessVal, roughness: roughnessVal,
-    clearcoat: 0.22, clearcoatRoughness: 0.16, reflectivity: 0.7, side: THREE.DoubleSide
-  });
+  return getRawMetalMaterial(matType);
 }
 
 // Jeu d'emboîtement lié à l'épaisseur matière (règle par défaut : arrondi au mm
@@ -4774,8 +5349,8 @@ document.getElementById('exportBiaisPdfBtn').addEventListener('click', () => {
     const halfW = (pageW - margin * 2 - 6) / 2;
     const imgH = halfW * 0.6;
     const imgY = margin + 14;
-    doc.addImage(canvasL.toDataURL('image/png'), 'PNG', margin, imgY, halfW, imgH);
-    doc.addImage(canvasR.toDataURL('image/png'), 'PNG', margin + halfW + 6, imgY, halfW, imgH);
+    addImageToPdfSafe(doc, canvasL, margin, imgY, halfW, imgH, `Pièce ${r.idx} — Gauche`);
+    addImageToPdfSafe(doc, canvasR, margin + halfW + 6, imgY, halfW, imgH, `Pièce ${r.idx} — Droite`);
 
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
     doc.text(`Bout Gauche — ${r.leftType} · ${r.leftSummary} · développé ${Math.round(r.leftDev)} mm`, margin, imgY + imgH + 7);
@@ -4803,7 +5378,7 @@ function fitCameraToPartMesh(){
   dir.normalize().multiplyScalar(dist);
   camera3D.position.copy(dir);
   camera3D.lookAt(0, 0, 0);
-  renderer3D.render(scene3D, camera3D); updateProfile3DLabels();
+  renderer3D.render(scene3D, camera3D); updateProfile3DLabels(); syncProfileRotInputs();
 }
 
 // --- Bascule d'édition Gauche / Droite (réutilise l'éditeur "Séquence du profil") ---
@@ -5382,11 +5957,32 @@ function setAssembleRealistic(on){
   }
   assembleShadowLight.castShadow = on;
   assembleShadowLight.visible = on;
+  document.getElementById('assembleLightControls').style.display = on ? 'block' : 'none';
+  if (on) applyAssembleLightFromInputs();
 
   update3DAssemble();
   fitCameraToAssemble();
 }
 document.getElementById('assembleRealisticBtn').addEventListener('click', () => setAssembleRealistic(!assembleRealisticMode));
+
+function applyAssembleLightFromInputs(){
+  if (!assembleShadowLight) return;
+  const intensity = parseFloat(document.getElementById('assembleLightIntensity').value) || 1.15;
+  const azimuthDeg = parseFloat(document.getElementById('assembleLightAzimuth').value) || 0;
+  const rad = azimuthDeg * Math.PI / 180;
+  const R = 900, H = 1000;
+  assembleShadowLight.intensity = intensity;
+  assembleShadowLight.position.set(R * Math.cos(rad), H, R * Math.sin(rad));
+  renderAssembleFrame();
+}
+document.getElementById('assembleLightIntensity').addEventListener('input', applyAssembleLightFromInputs);
+document.getElementById('assembleLightAzimuth').addEventListener('input', applyAssembleLightFromInputs);
+
+document.getElementById('assemblePngExportBtn').addEventListener('click', () => {
+  if (!assembleRenderer) { showToast('Ouvre d\'abord l\'onglet Assemblage.'); return; }
+  downloadCanvasPNG(assembleRenderer.domElement, 'vue3d_assemblage.png');
+  showToast('Image de la vue 3D exportée.');
+});
 
 function fitCameraToAssemble(){
   if (!assembleGroup || !assembleCamera || !assembleRenderer) return;
@@ -5495,10 +6091,35 @@ function updateAssembleLabels(){
   });
 }
 
+function syncAssembleRotInputs(){
+  if (!assembleGroup) return;
+  const rotX = document.getElementById('assembleRotX');
+  const rotY = document.getElementById('assembleRotY');
+  if (!rotX || !rotY || document.activeElement === rotX || document.activeElement === rotY) return;
+  rotX.value = Math.round(assembleGroup.rotation.x * 180 / Math.PI);
+  rotY.value = Math.round(assembleGroup.rotation.y * 180 / Math.PI);
+}
+function applyAssembleRotFromInputs(){
+  if (!assembleGroup) return;
+  const rotX = document.getElementById('assembleRotX');
+  const rotY = document.getElementById('assembleRotY');
+  assembleGroup.rotation.x = (Number(rotX.value) || 0) * Math.PI / 180;
+  assembleGroup.rotation.y = (Number(rotY.value) || 0) * Math.PI / 180;
+  renderAssembleFrame();
+}
+document.getElementById('assembleRotX').addEventListener('input', applyAssembleRotFromInputs);
+document.getElementById('assembleRotY').addEventListener('input', applyAssembleRotFromInputs);
+document.getElementById('assembleRotResetBtn').addEventListener('click', () => {
+  document.getElementById('assembleRotX').value = 0;
+  document.getElementById('assembleRotY').value = 0;
+  applyAssembleRotFromInputs();
+});
+
 function renderAssembleFrame(){
   if (!assembleRenderer) return;
   assembleRenderer.render(assembleScene, assembleCamera);
   updateAssembleLabels();
+  syncAssembleRotInputs();
 }
 
 function update3DAssemble(){
@@ -5795,6 +6416,18 @@ function createZincController(suffix, kind){
           <button type="button" data-view="profil">Profil</button>
           <button type="button" data-view="dessus">Dessus</button>
         </div>
+        <div class="sheet-fields" style="margin:10px 0 0;">
+          <div class="field">
+            <label>Rotation horizontale (°)</label>
+            <input type="number" id="${id('rotY')}" value="0" step="1">
+          </div>
+          <div class="field">
+            <label>Rotation verticale (°)</label>
+            <input type="number" id="${id('rotX')}" value="0" step="1">
+          </div>
+        </div>
+        <button class="icon-action-btn" id="${id('rotResetBtn')}" style="width:100%;margin-top:2px;">Réinitialiser l'angle</button>
+        <button class="add-btn" id="${id('pngExportBtn')}" type="button" style="margin-top:8px;">📷 Exporter cette vue (PNG)</button>
         <div class="toggle-row" style="margin:10px 0 0;">
           <input type="checkbox" id="${id('showDims')}" checked>
           <span>Afficher les cotes déportées sur la 3D</span>
@@ -6470,10 +7103,36 @@ function createZincController(suffix, kind){
   }
 
   let lastComputedData = null;
+  function syncRotInputs(){
+    if (!group3d) return;
+    const rotX = $('rotX'), rotY = $('rotY');
+    if (!rotX || !rotY || document.activeElement === rotX || document.activeElement === rotY) return;
+    rotX.value = Math.round(group3d.rotation.x * 180 / Math.PI);
+    rotY.value = Math.round(group3d.rotation.y * 180 / Math.PI);
+  }
+  function applyRotFromInputs(){
+    if (!group3d) return;
+    group3d.rotation.x = (Number($('rotX').value) || 0) * Math.PI / 180;
+    group3d.rotation.y = (Number($('rotY').value) || 0) * Math.PI / 180;
+    renderFrame();
+  }
+  $('rotX').addEventListener('input', applyRotFromInputs);
+  $('rotY').addEventListener('input', applyRotFromInputs);
+  $('rotResetBtn').addEventListener('click', () => {
+    $('rotX').value = 0; $('rotY').value = 0;
+    applyRotFromInputs();
+  });
+  $('pngExportBtn').addEventListener('click', () => {
+    if (!renderer3d) { showToast('Ouvre d\'abord la visualisation 3D.'); return; }
+    downloadCanvasPNG(renderer3d.domElement, `vue3d_${kind}_${suffix}.png`);
+    showToast('Image de la vue 3D exportée.');
+  });
+
   function renderFrame(){
     if (!renderer3d) return;
     renderer3d.render(scene3d, camera3d);
     updateLabels(lastComputedData);
+    syncRotInputs();
   }
 
   function update3D(){
@@ -6747,7 +7406,19 @@ function createZincController(suffix, kind){
   drawSchema();
   renderVersantList();
 
-  return { redraw, init3D, update3D: () => { update3D(); drawSchema(); }, fitCamera };
+  return {
+    redraw, init3D, update3D: () => { update3D(); drawSchema(); }, fitCamera,
+    exportState: () => ({
+      versants: roofVersants,
+      current: roofEdges.length ? captureCurrentVersantConfig($('versantName').value || 'En cours') : null
+    }),
+    importState: (state) => {
+      if (!state) return;
+      roofVersants = state.versants || [];
+      if (state.current) applyVersantConfig(state.current);
+      renderVersantList();
+    }
+  };
 }
 
 window.zincCtrl_tas = createZincController('tas', 'tasseaux');
@@ -6771,7 +7442,31 @@ const PROFILE_LIBRARY = [
   { name: 'Larmier', desc: "Profil d'égouttement avec double pli.",
     segments: [ {type:'straight',len:100}, {type:'bend',angle:135,dir:1,hemType:'aucun',hemGap:6}, {type:'straight',len:15}, {type:'bend',angle:45,dir:-1,hemType:'aucun',hemGap:6}, {type:'straight',len:20} ] },
   { name: 'Demi-rond (chéneau)', desc: 'Chéneau demi-rond avec deux ailes droites.',
-    segments: [ {type:'straight',len:20}, {type:'bend',angle:90,dir:-1,hemType:'aucun',hemGap:6}, {type:'arc',radius:60,angle:180,dir:1}, {type:'bend',angle:90,dir:-1,hemType:'aucun',hemGap:6}, {type:'straight',len:20} ] }
+    segments: [ {type:'straight',len:20}, {type:'bend',angle:90,dir:-1,hemType:'aucun',hemGap:6}, {type:'arc',radius:60,angle:180,dir:1}, {type:'bend',angle:90,dir:-1,hemType:'aucun',hemGap:6}, {type:'straight',len:20} ] },
+  { name: 'Couvertine simple', desc: 'Muret plat 300 mm, retombées de 50 mm sans casse-goutte.', type: 'couvertine', refWidth: 300,
+    segments: [
+      {type:'straight',len:50}, {type:'bend',angle:90,dir:-1,hemType:'aucun',hemGap:6},
+      {type:'straight',len:300}, {type:'bend',angle:90,dir:1,hemType:'aucun',hemGap:6},
+      {type:'straight',len:50}
+    ] },
+  { name: 'Couvertine + casse-goutte', desc: 'Muret plat 300 mm, retombées de 50 mm avec casse-goutte intérieur des deux côtés (plis 90°/135°).', type: 'couvertine', refWidth: 300,
+    segments: [
+      {type:'straight',len:10}, {type:'bend',angle:135,dir:1,hemType:'aucun',hemGap:6},
+      {type:'straight',len:12}, {type:'bend',angle:90,dir:-1,hemType:'aucun',hemGap:6},
+      {type:'straight',len:50}, {type:'bend',angle:90,dir:-1,hemType:'aucun',hemGap:6},
+      {type:'straight',len:300}, {type:'bend',angle:90,dir:1,hemType:'aucun',hemGap:6},
+      {type:'straight',len:50}, {type:'bend',angle:90,dir:1,hemType:'aucun',hemGap:6},
+      {type:'straight',len:12}, {type:'bend',angle:135,dir:-1,hemType:'aucun',hemGap:6},
+      {type:'straight',len:10}
+    ] },
+  { name: 'Couvertine asymétrique + casse-goutte', desc: "Muret 280 mm, retombées 70/40 mm (ex: mur en pente), casse-goutte intérieur côté 70 mm.", type: 'couvertine', refWidth: 280,
+    segments: [
+      {type:'straight',len:10}, {type:'bend',angle:135,dir:1,hemType:'aucun',hemGap:6},
+      {type:'straight',len:12}, {type:'bend',angle:90,dir:-1,hemType:'aucun',hemGap:6},
+      {type:'straight',len:70}, {type:'bend',angle:90,dir:-1,hemType:'aucun',hemGap:6},
+      {type:'straight',len:280}, {type:'bend',angle:90,dir:1,hemType:'aucun',hemGap:6},
+      {type:'straight',len:40}
+    ] }
 ];
 
 function renderProfileLibrary(){
@@ -6780,24 +7475,88 @@ function renderProfileLibrary(){
   PROFILE_LIBRARY.forEach((lib) => {
     const card = document.createElement('div');
     card.className = 'library-card';
+    const extraBtns = lib.type === 'couvertine' ? `
+      <div style="display:flex;flex-direction:column;gap:5px;border-top:1px dashed var(--line);padding-top:8px;margin-top:2px;">
+        <span style="font-size:9.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;">Accessoires liés</span>
+        <button class="icon-action-btn" data-acc="fixation" style="font-size:10.5px;">🔩 Fixation (U galva 1mm, 20cm)</button>
+        <button class="icon-action-btn" data-acc="eclisse" style="font-size:10.5px;">🔗 Éclisse extérieure (20cm)</button>
+        <button class="icon-action-btn" data-acc="angles" style="font-size:10.5px;">📐 Angles int./ext. (ébauches débit)</button>
+      </div>
+    ` : '';
     card.innerHTML = `
       <canvas></canvas>
       <div class="lib-name">${lib.name}</div>
       <div class="lib-desc">${lib.desc}</div>
-      <button class="add-btn" type="button">Charger</button>
+      <button class="add-btn" data-load type="button">Charger</button>
+      ${extraBtns}
     `;
     grid.appendChild(card);
     const canvas = card.querySelector('canvas');
     canvas.width = 400; canvas.height = 240;
     drawProfileOnCanvas(canvas, true, { segments: lib.segments, color: '', rotation: 0, customArrow: null });
-    card.querySelector('button').addEventListener('click', () => {
+    card.querySelector('[data-load]').addEventListener('click', () => {
       segments = JSON.parse(JSON.stringify(lib.segments));
       renderSegments();
       redrawProfile();
       document.getElementById('libraryOverlay').classList.remove('show');
       showToast(`Profil "${lib.name}" chargé — ajuste les cotes selon ton besoin.`);
     });
+    if (lib.type === 'couvertine') {
+      card.querySelector('[data-acc="fixation"]').addEventListener('click', () => addCouvertineFixation(lib));
+      card.querySelector('[data-acc="eclisse"]').addEventListener('click', () => addCouvertineEclisse(lib));
+      card.querySelector('[data-acc="angles"]').addEventListener('click', () => addCouvertineAngles(lib));
+    }
   });
+}
+
+// Ajoute une nouvelle "pièce" à la liste des schémas enregistrés (mêmes champs
+// qu'un schéma sauvegardé manuellement), sans passer par l'éditeur.
+function pushQuickSavedProfile(name, segs, len, qty, mat, th){
+  savedProfiles.push({
+    id: Date.now() + Math.round(Math.random() * 999),
+    name, dev: getDevelopTotal(segs), len, qty, mat, th, color: '',
+    rotation: 0, customArrow: null, segments: segs
+  });
+  saveProfilesToLocalStorage();
+  renderSavedProfiles();
+}
+
+// Fixation : simple U en galva 1 mm, dimensionné à la largeur du plat de la
+// couvertine (avec un jeu de calage), débité en longueurs de 200 mm.
+function addCouvertineFixation(lib){
+  const clearance = 10; // jeu de calage de chaque côté, à ajuster selon l'épaisseur réelle
+  const innerWidth = Math.max(20, (lib.refWidth || 300) - clearance * 2);
+  const segs = [
+    { type: 'straight', len: 25 },
+    { type: 'bend', angle: 90, dir: 1, hemType: 'aucun', hemGap: 6 },
+    { type: 'straight', len: innerWidth },
+    { type: 'bend', angle: 90, dir: 1, hemType: 'aucun', hemGap: 6 },
+    { type: 'straight', len: 25 }
+  ];
+  pushQuickSavedProfile(`Fixation couvertine (U galva 1mm) — ${lib.name}`, segs, 200, 4, 'Acier', '1');
+  showToast('Fixation ajoutée aux schémas enregistrés (galva = revêtement, non modélisé comme matière séparée ici — épaisseur 1 mm en acier).');
+}
+
+// Éclisse de finition extérieure : reprend la forme de la couvertine, agrandie
+// d'un jeu de recouvrement pour pouvoir se glisser par-dessus le joint.
+function addCouvertineEclisse(lib){
+  const clearance = 6; // sur-largeur de recouvrement de chaque droit, à ajuster
+  const segs = lib.segments.map(s => s.type === 'straight' ? { ...s, len: s.len + clearance } : { ...s });
+  pushQuickSavedProfile(`Éclisse extérieure — ${lib.name}`, segs, 200, 1, 'Acier', '0.75');
+  showToast("Éclisse ajoutée aux schémas enregistrés — vérifie le recouvrement (jeu) selon ton système de couvertine.");
+}
+
+// Angles intérieur/extérieur : un vrai patron de découpe pour un onglet dépend
+// de la forme exacte de la couvertine (retombées, casse-goutte...) et ne peut
+// pas être déduit fiablement ici. On ajoute donc au Plan de débit des ébauches
+// carrées surdimensionnées (développé + marge), à recouper et souder/braser
+// sur place — plus rapide que de recalculer la marge à chaque fois.
+function addCouvertineAngles(lib){
+  const dev = getDevelopTotal(lib.segments);
+  const blank = Math.round(dev + 150);
+  addCut(blank, blank, 1, `Angle extérieur couvertine (ébauche à recouper) — ${lib.name}`, null);
+  addCut(blank, blank, 1, `Angle intérieur couvertine (ébauche à recouper) — ${lib.name}`, null);
+  showToast(`2 ébauches carrées de ${blank}x${blank} mm ajoutées au Plan de débit — à recouper à l'onglet et souder/braser sur place.`);
 }
 document.getElementById('libraryOpenBtn').addEventListener('click', () => {
   document.getElementById('libraryOverlay').classList.add('show');
@@ -6998,6 +7757,170 @@ document.getElementById('libraryCloseBtn').addEventListener('click', () => {
   });
 })();
 
+/* ===================== EXPORT / IMPORT DU PROJET COMPLET ===================== */
+// Rassemble tout l'état de l'outil (débit, pliage + biais, les deux toitures
+// zinc, assemblage) dans un seul fichier JSON, pour transférer un chantier
+// d'un poste à l'autre ou en garder une sauvegarde externe.
+function collectFullProjectState(){
+  return {
+    appVersion: 'altema-tolerie-1',
+    exportedAt: new Date().toISOString(),
+    debit: {
+      cuts,
+      sheetW: document.getElementById('sheetW').value,
+      sheetH: document.getElementById('sheetH').value,
+      kerf: document.getElementById('kerf').value,
+      allowRotate: document.getElementById('allowRotate').checked
+    },
+    pliage: {
+      current: {
+        profileName: document.getElementById('profileName').value,
+        pieceLength: document.getElementById('pieceLength').value,
+        pieceQty: document.getElementById('pieceQty').value,
+        profileMaterial: document.getElementById('profileMaterial').value,
+        profileThickness: document.getElementById('profileThickness').value,
+        profileColor: document.getElementById('profileColor').value,
+        rotation: currentProfileRotation,
+        customArrow: customArrowData,
+        customMeasurements,
+        segments,
+        paintedFaceSide,
+        profileNuance
+      },
+      savedProfiles,
+      biais: {
+        enabled: document.getElementById('biaisEnabled').checked,
+        segGauche: biaisSegGauche,
+        segDroite: biaisSegDroite,
+        activeSide: biaisActiveSide,
+        sens: document.getElementById('biaisSensInvertBtn').dataset.sens,
+        emboitementProfondeur: document.getElementById('biaisEmboitementProfondeur').value,
+        jeuOverrideChk: document.getElementById('biaisJeuOverrideChk').checked,
+        jeuOverrideVal: document.getElementById('biaisJeuOverrideVal').value,
+        totalRaw: document.getElementById('biaisTotalRaw').value,
+        segLenSouhaitee: document.getElementById('biaisSegLenSouhaitee').value,
+        maxSegLen: document.getElementById('biaisMaxSegLen').value,
+        positionMode: document.getElementById('biaisPositionMode').value,
+        transitionLen: document.getElementById('biaisTransitionLen').value
+      }
+    },
+    zincTasseaux: window.zincCtrl_tas ? window.zincCtrl_tas.exportState() : null,
+    zincJointDebout: window.zincCtrl_jd ? window.zincCtrl_jd.exportState() : null,
+    assemblage: { components: assembleComponents }
+  };
+}
+
+function applyFullProjectState(state){
+  if (!state) return;
+
+  // Débit
+  if (state.debit) {
+    cuts = state.debit.cuts || [];
+    idSeq = cuts.reduce((m, c) => Math.max(m, c.id || 0), 0) + 1;
+    document.getElementById('sheetW').value = state.debit.sheetW;
+    document.getElementById('sheetH').value = state.debit.sheetH;
+    document.getElementById('kerf').value = state.debit.kerf;
+    document.getElementById('allowRotate').checked = !!state.debit.allowRotate;
+    renderCutList();
+  }
+
+  // Pliage
+  if (state.pliage) {
+    const cur = state.pliage.current || {};
+    document.getElementById('profileName').value = cur.profileName || 'Schéma pliage';
+    document.getElementById('pieceLength').value = cur.pieceLength || 2000;
+    document.getElementById('pieceQty').value = cur.pieceQty || 1;
+    document.getElementById('profileMaterial').value = cur.profileMaterial || 'Zinc';
+    document.getElementById('profileThickness').value = cur.profileThickness || '1.5';
+    document.getElementById('profileColor').value = cur.profileColor || '';
+    currentProfileRotation = cur.rotation || 0;
+    document.getElementById('rotateDegInput').value = currentProfileRotation;
+    customArrowData = cur.customArrow || null;
+    customMeasurements = JSON.parse(JSON.stringify(cur.customMeasurements || []));
+    renderMeasurementsList();
+    segments = JSON.parse(JSON.stringify(cur.segments || []));
+    if (cur.paintedFaceSide) paintedFaceSide = cur.paintedFaceSide;
+    if (cur.profileNuance) profileNuance = cur.profileNuance;
+    updatePaintAvailability();
+    updateNuanceAvailability();
+    if (typeof updatePaintedFaceBtnLabel === 'function') updatePaintedFaceBtnLabel();
+    renderRalSwatches();
+    renderSegments();
+
+    savedProfiles = state.pliage.savedProfiles || [];
+    saveProfilesToLocalStorage();
+    renderSavedProfiles();
+
+    const b = state.pliage.biais;
+    if (b) {
+      biaisSegGauche = JSON.parse(JSON.stringify(b.segGauche || []));
+      biaisSegDroite = JSON.parse(JSON.stringify(b.segDroite || []));
+      document.getElementById('biaisSensInvertBtn').dataset.sens = b.sens || 'gd';
+      document.getElementById('biaisEmboitementProfondeur').value = b.emboitementProfondeur || 50;
+      document.getElementById('biaisJeuOverrideChk').checked = !!b.jeuOverrideChk;
+      document.getElementById('biaisJeuOverrideVal').value = b.jeuOverrideVal || 1;
+      document.getElementById('biaisJeuOverrideVal').disabled = !b.jeuOverrideChk;
+      document.getElementById('biaisTotalRaw').value = b.totalRaw || 6150;
+      document.getElementById('biaisSegLenSouhaitee').value = b.segLenSouhaitee || 2000;
+      document.getElementById('biaisMaxSegLen').value = b.maxSegLen || 4000;
+      document.getElementById('biaisPositionMode').value = b.positionMode || 'progressif';
+      document.getElementById('biaisTransitionLen').value = b.transitionLen || 1000;
+      document.getElementById('biaisEnabled').checked = !!b.enabled;
+      if (b.enabled) {
+        biaisActiveSide = 'gauche';
+        segments = biaisSegGauche;
+        document.querySelectorAll('#biaisSideToggle button').forEach(btn => btn.classList.toggle('active', btn.dataset.side === 'gauche'));
+        renderSegments();
+      }
+    }
+    redrawProfile();
+    if (typeof updateBiaisAll === 'function') updateBiaisAll();
+  }
+
+  // Zinc
+  if (window.zincCtrl_tas && state.zincTasseaux) window.zincCtrl_tas.importState(state.zincTasseaux);
+  if (window.zincCtrl_jd && state.zincJointDebout) window.zincCtrl_jd.importState(state.zincJointDebout);
+
+  // Assemblage
+  if (state.assemblage) {
+    assembleComponents = state.assemblage.components || [];
+    assembleSelectedUid = null;
+    if (typeof renderAssembleComponentsList === 'function') renderAssembleComponentsList();
+    if (typeof updateAssembleAll === 'function') updateAssembleAll();
+  }
+}
+
+document.getElementById('exportProjectBtn').addEventListener('click', () => {
+  const state = collectFullProjectState();
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  const nom = (document.getElementById('profileName').value || 'projet').replace(/[^a-z0-9]+/gi, '_');
+  link.download = `projet_altema_${nom}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+  showToast('Projet complet exporté.');
+});
+
+document.getElementById('importProjectFile').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    try {
+      const state = JSON.parse(evt.target.result);
+      applyFullProjectState(state);
+      showToast('Projet importé avec succès.');
+    } catch (err) {
+      console.error(err);
+      showToast("Impossible de lire ce fichier — vérifie qu'il s'agit bien d'un export de ce logiciel.");
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+});
+
 (function initInteractiveTutorial(){
   const overlay = document.getElementById('tutorialOverlay');
   if(!overlay) return;
@@ -7017,17 +7940,21 @@ document.getElementById('libraryCloseBtn').addEventListener('click', () => {
   // plutôt que vers un élément voisin. Pour les champs, on encadre leur bloc complet.
   // Le champ "tab" force le bon onglet à être actif avant de localiser la cible.
   const steps = [
+    { tab:'tab-debit', getTarget:()=>document.getElementById('exportProjectBtn'), title:'Sauvegarder tout le chantier', text:'Exporte débit, pliage, biais, les deux toitures zinc et l\'assemblage dans un seul fichier — pour continuer sur un autre poste ou garder une sauvegarde. "Importer un projet" restaure tout d\'un coup.', hint:'Ici : Exporter / Importer un projet' },
     { tab:'tab-debit', getTarget:()=>document.getElementById('exportDebitPdfBtn')?.closest('.panel'), title:'Exporter le plan de débit', text:'Une fois le calcul lancé, exporte le dossier complet en PDF (avec l\'image de chaque tôle) ou juste le récapitulatif en Excel — pratique pour l\'atelier ou le chiffrage.', hint:'Ici : Export PDF / Excel' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('profileName')?.closest('.field') || document.getElementById('profileName'), title:'Nommer la pièce', text:'Donne un nom clair au profil. Il sera repris dans les schémas enregistrés et les impressions.', hint:'Ici : Nom du schéma' },
-    { tab:'tab-pliage', getTarget:()=>document.getElementById('segList')?.closest('.panel'), title:'Construire le profil', text:'Ajoute les éléments avec Droit, Pli, Arrondi ou Boudin. Cette zone contient toute la séquence de fabrication.', hint:'Ici : Séquence du profil' },
+    { tab:'tab-pliage', getTarget:()=>document.getElementById('segList')?.closest('.panel'), title:'Construire le profil', text:'Ajoute les éléments avec Droit, Pli, Arrondi ou Boudin en bas de liste. Pour insérer un élément AU MILIEU de la séquence, survole l\'espace fin entre deux lignes : de petits boutons "+ Droit / + Pli..." apparaissent pour insérer exactement à cet endroit.', hint:'Ici : Séquence du profil' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('freehandOpenBtn'), title:'Importer un tracé à main levée', text:'Dessine directement la forme du profil au doigt ou à la souris (un seul tracé continu), puis clique sur "Convertir en profil" : les droits et les plis sont générés automatiquement. Ajuste ensuite les cotes exactes une par une.', hint:'Ici : Dessiner à main levée' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('libraryOpenBtn'), title:'Partir d\'un profil type', text:'Cornière, U, Z, oméga, bavette, tasseau... Charge un profil courant en un clic pour ne pas repartir de zéro, puis ajuste les cotes à ton besoin.', hint:'Ici : Bibliothèque de profils types' },
+    { tab:'tab-pliage', getTarget:()=>document.getElementById('ouvrageType'), title:'Partir d\'un type d\'ouvrage', text:'Choisis un type courant (couvre-mur, chéneau, bavette...) pour pré-remplir une matière et une épaisseur indicatives — à ajuster selon ton chantier. Pour le zinc et le cuivre, une nuance/finition naturelle remplace le RAL plus bas dans ce panneau.', hint:'Ici : Type d\'ouvrage' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('profileMaterial')?.closest('.sheet-fields'), title:'Choisir matière et épaisseur', text:'Choisis la matière et l’épaisseur de la tôle. Les deux champs sont regroupés et mis en évidence ensemble.', hint:'Ici : Matière + Épaisseur' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('ralSwatchRow'), title:'Choisir un RAL rapidement', text:'Clique directement sur une pastille pour appliquer un RAL courant, sans avoir à taper le code. Le champ texte reste disponible pour un code moins courant.', hint:'Ici : Pastilles RAL' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('profileCanvasWrap'), title:'Contrôler le schéma 2D', text:'Vérifie les longueurs, angles et rayons directement sur le dessin. Les cotes permettent de contrôler la géométrie.', hint:'Ici : Schéma 2D' },
+    { tab:'tab-pliage', getTarget:()=>document.getElementById('measureToolBtn'), title:'Cotes personnalisées', text:'Active l\'outil, clique un point A puis un point B (accroche automatique aux sommets du profil) pour ajouter une cote entre ces deux points. Choisis "Distance directe" pour la ligne droite, ou "Angle droit" pour afficher la largeur et la hauteur séparément (comme une cote d\'intersection).', hint:'Ici : Outil de mesure' },
+    { tab:'tab-pliage', getTarget:()=>document.getElementById('profileRotY')?.closest('.sheet-fields'), title:'Angle de vue précis', text:'En plus du glisser à la souris, ces deux champs donnent l\'angle exact en degrés — pratique pour retrouver la même vue à chaque fois. Le même contrôle existe sur l\'assemblage et les toitures zinc.', hint:'Ici : Rotation horizontale / verticale' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('canvas3dContainer'), title:'Manipuler la 3D', text:'Clic gauche + glisser : rotation. Clic droit ou Shift : déplacement. Molette : zoom. Double-clic : recentrage. La case "Afficher les cotes déportées" juste au-dessus permet de les masquer si besoin.', hint:'Ici : Vue 3D' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('fs3dOpenBtn'), title:'Ouvrir le plein écran 3D', text:'Passe la visualisation 3D en plein écran pour travailler plus confortablement. Les commandes restent identiques.', hint:'Ici : Plein écran 3D' },
-    { tab:'tab-pliage', getTarget:()=>document.getElementById('profileRealisticBtn'), title:'Vue réaliste', text:'Ajoute un sol, des ombres portées douces et des reflets d\'environnement à la pièce en 3D. Un second clic revient à la vue standard, plus rapide à manipuler pendant que tu ajustes le profil.', hint:'Ici : Vue réaliste' },
+    { tab:'tab-pliage', getTarget:()=>document.getElementById('profileRealisticBtn'), title:'Vue réaliste', text:'Ajoute un sol, des ombres portées douces et des reflets d\'environnement à la pièce en 3D — avec l\'intensité et la direction de la lumière réglables juste en dessous. Un second clic revient à la vue standard, plus rapide à manipuler. Le bouton "Exporter cette vue (PNG)" capture l\'image telle qu\'affichée.', hint:'Ici : Vue réaliste' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('biaisEnabled')?.closest('.toggle-row'), title:'Schéma biais (pièce en biais)', text:'Active cette case pour dessiner une pièce qui passe progressivement d\'un profil Gauche à un profil Droite. Le panneau qui apparaît propose le calpinage en pièces, l\'impression du plan, et des exports Excel et PDF (avec les schémas de chaque pièce) pour transmettre les cotes à l\'atelier ou au chiffrage.', hint:'Ici : Activer le schéma biais' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('saveProfileBtn'), title:'Enregistrer le schéma', text:'Enregistre le profil pour le conserver en mémoire et le retrouver ensuite dans tes schémas.', hint:'Ici : Enregistrer ce schéma' },
     { tab:'tab-pliage', getTarget:()=>document.getElementById('savedProfilesSearch'), title:'Retrouver un schéma', text:'Tape quelques lettres du nom pour filtrer instantanément la liste des schémas enregistrés — pratique dès qu\'il y en a beaucoup.', hint:'Ici : Rechercher un schéma' },
@@ -7037,7 +7964,7 @@ document.getElementById('libraryCloseBtn').addEventListener('click', () => {
     { tab:'tab-tasseaux', getTarget:()=>document.getElementById('globalStatsWrap_tas')?.closest('.panel'), title:'Vue globale du projet', text:'Cumule tous les versants enregistrés : surface totale, bacs, métrage et bobines pour l\'ensemble du chantier — utile dès qu\'il y a plusieurs pans.', hint:'Ici : Vue globale du projet' },
     { tab:'tab-assemblage', getTarget:()=>document.getElementById('assembleComponentsList'), title:'Composer l\'assemblage', text:'Chaque profil a sa propre longueur, indépendante des autres. Sur chaque composant : 🔓 verrouille sa position (pour éviter de le déplacer par erreur) et ⧉ le duplique. Le bouton "Vue compacte" juste au-dessus réduit la liste à l\'essentiel quand il y a beaucoup de composants.', hint:'Ici : Composants de l\'assemblage' },
     { tab:'tab-assemblage', getTarget:()=>document.getElementById('assemble2DWrap'), title:'Positionner et vérifier', text:'Glisse directement une pièce sur le schéma pour la repositionner (clique dessus pour la sélectionner). Si deux pièces se chevauchent, elles sont automatiquement surlignées en rouge — sur ce schéma comme sur la vue 3D.', hint:'Ici : Schéma d\'assemblage' },
-    { tab:'tab-assemblage', getTarget:()=>document.getElementById('assembleRealisticBtn'), title:'Vue réaliste', text:'Ajoute un sol, des ombres portées douces et des reflets d\'environnement à la 3D — une bonne façon de présenter l\'assemblage sans être un rendu photoréaliste. Un second clic revient à la vue standard, plus rapide à manipuler.', hint:'Ici : Vue réaliste' }
+    { tab:'tab-assemblage', getTarget:()=>document.getElementById('assembleRealisticBtn'), title:'Vue réaliste', text:'Ajoute un sol, des ombres portées douces et des reflets d\'environnement à la 3D — une bonne façon de présenter l\'assemblage sans être un rendu photoréaliste. L\'intensité et la direction de la lumière sont réglables, et "Exporter cette vue (PNG)" capture une image de l\'assemblage. Un second clic revient à la vue standard.', hint:'Ici : Vue réaliste' }
   ];
   let index = 0;
 
