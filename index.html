@@ -1795,6 +1795,18 @@
               <input type="text" id="acrotereThickness" value="0.8" placeholder="Ex: 0.8">
             </div>
             <div class="field">
+              <label>Teinte RAL (acier / alu)</label>
+              <select id="acrotereRal"></select>
+            </div>
+            <div class="field">
+              <label>Aspect du laquage</label>
+              <select id="acrotereFinish">
+                <option value="satine" selected>Satiné</option>
+                <option value="brillant">Brillant</option>
+                <option value="mat">Mat</option>
+              </select>
+            </div>
+            <div class="field">
               <label>Jeu sur le plat (mm)</label>
               <input type="number" id="acrotereGap" value="50" step="1" min="0">
             </div>
@@ -1821,7 +1833,7 @@
           </div>
 
           <button class="add-btn" id="acrotereGenerateBtn" type="button" style="margin-top:14px;font-weight:700;">🧱 Générer l'assemblage complet</button>
-          <div class="biais-hint" style="margin-top:6px;">Calcule les pièces de couvertine (découpées à la longueur max), les éclisses de jonction, les fixations tous les <span id="acrotereFixSpacingEcho">1000</span> mm, et place tout en 3D. Chaque angle = 2 morceaux de couvertine de 300 mm à onglet, qui recouvrent l'angle du mur ; éclisses et pattes de fixation de 200 mm.</div>
+          <div class="biais-hint" style="margin-top:6px;">Calcule les pièces de couvertine (découpées à la longueur max), les éclisses de jonction, les fixations tous les <span id="acrotereFixSpacingEcho">1000</span> mm, et place tout en 3D. Chaque angle = 2 morceaux de couvertine de 300 mm à onglet exact (largeurs de mur différentes et angles quelconques gérés), qui recouvrent l'angle du mur ; éclisses et pattes de fixation de 200 mm.</div>
 
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
             <button class="add-btn" id="acrotereDebitBtn" type="button" style="margin:0;flex:1;min-width:180px;" title="Ajoute chaque pièce (développé × longueur) à la liste de l'onglet Plan de débit">🧾 Envoyer au plan de débit</button>
@@ -8642,6 +8654,49 @@ function createZincController(suffix, kind){
       </div>
 
       <div class="panel" style="margin-top:16px;">
+        <div class="panel-title"><span>Compléments</span></div>
+        <div class="toggle-row"><input type="checkbox" id="${id('optSousFace')}"><span>Sous-face (cassette) en bas de pente</span></div>
+        <div class="toggle-row" style="margin-top:6px;"><input type="checkbox" id="${id('optVolige')}"><span>Volige sous la couverture</span></div>
+        <div class="toggle-row" style="margin-top:6px;"><input type="checkbox" id="${id('optBandeZ')}"><span>Habillage en bande Z en bas de pente</span></div>
+      </div>
+
+      <div class="panel" style="margin-top:16px;">
+        <div class="panel-title"><span>Calculateur multi-pans (arêtiers, faîtage, noues)</span></div>
+        <div class="biais-hint">Pour un ensemble de toiture standard (pignon, croupe, L, T ou U), à pente unique. Donne les longueurs de faîtage, arêtiers et noues, avec un plan et un aperçu 3D — indépendant du versant calculé au-dessus.</div>
+        <div class="field" style="margin-top:10px;">
+          <label>Forme</label>
+          <select id="${id('mpType')}">
+            <option value="2pans">2 pans (pignon)</option>
+            <option value="4pans">4 pans (croupe)</option>
+            <option value="L">En L</option>
+            <option value="T">En T</option>
+            <option value="U">En U</option>
+          </select>
+        </div>
+        <div class="toggle-row" style="margin-top:8px;">
+          <input type="checkbox" id="${id('mpMainHip')}">
+          <span>Extrémités du corps principal en croupe (sinon pignon)</span>
+        </div>
+        <div class="sheet-fields" style="margin-top:8px;">
+          <div class="field"><label>Corps principal — longueur (mm)</label><input type="number" id="${id('mpMainL')}" value="10000" min="500" step="100"></div>
+          <div class="field"><label>Corps principal — largeur (mm)</label><input type="number" id="${id('mpMainW')}" value="7000" min="500" step="100"></div>
+        </div>
+        <div class="sheet-fields" id="${id('mpWingWrap')}" style="margin-top:8px;">
+          <div class="field"><label>Aile — longueur (mm)</label><input type="number" id="${id('mpWingL')}" value="5000" min="500" step="100"></div>
+          <div class="field"><label>Aile — largeur (mm)</label><input type="number" id="${id('mpWingW')}" value="5000" min="500" step="100"></div>
+        </div>
+        <div class="field" style="margin-top:8px;">
+          <label>Pente (°) — commune à tous les pans</label>
+          <input type="number" id="${id('mpPente')}" value="25" min="1" max="80" step="0.5">
+        </div>
+        <div class="biais-hint" id="${id('mpAssumHint')}" style="margin-top:6px;"></div>
+        <button class="add-btn" id="${id('mpCalcBtn')}" type="button" style="margin-top:10px;">📐 Calculer</button>
+        <div id="${id('mpResults')}" style="margin-top:10px;"></div>
+        <div id="${id('mpPlanWrap')}" style="background:#fff;border-radius:8px;padding:8px;margin-top:10px;"></div>
+        <div id="${id('mpCanvas3d')}" style="width:100%;height:320px;border-radius:6px;background:linear-gradient(180deg,#a9cdec 0%,#d6e6f0 55%,#eef1ee 100%);position:relative;overflow:hidden;margin-top:10px;"></div>
+      </div>
+
+      <div class="panel" style="margin-top:16px;">
         <div class="panel-title"><span>Accessoires (rive, égout, faîtage)</span></div>
         <div id="${id('accessoiresWrap')}"></div>
       </div>
@@ -8732,6 +8787,7 @@ function createZincController(suffix, kind){
   let manualBacWidths = [];        // largeurs (mm, à l'égout) saisies à la main, mode 'manuel'
   let roofEdges = [];       // [{len, angle, role}] — description du versant, quel que soit le mode
   let openings = [];        // {uid, type, w, h, x, y}
+  let optSousFace = false, optVolige = false, optBandeZ = false;
   let roofVersants = [];    // versants enregistrés dans le projet (multi-pans)
   let currentVersantId = null;
 
@@ -9102,7 +9158,12 @@ function createZincController(suffix, kind){
       openingsTotal += perim;
       return Object.assign({}, o, { perim });
     });
-    return { riveTotal: geo.riveLen, egoutTotal: geo.egoutLen, faitageTotal: geo.faitageLen, openingsRows, openingsTotal };
+    return {
+      riveTotal: geo.riveLen, egoutTotal: geo.egoutLen, faitageTotal: geo.faitageLen, openingsRows, openingsTotal,
+      sousFaceTotal: optSousFace ? geo.egoutLen : 0,
+      bandeZTotal: optBandeZ ? geo.egoutLen : 0,
+      voligeAreaM2: optVolige ? geo.areaMm2 / 1e6 : 0
+    };
   }
 
   /* ---------- Ouvertures ---------- */
@@ -9152,6 +9213,249 @@ function createZincController(suffix, kind){
     redraw();
   });
 
+
+  /* ===================== CALCULATEUR MULTI-PANS ===================== */
+  // Hypothèses (indiquées à l'utilisateur) : pente unique pour tous les pans,
+  // ailes toujours en pignon (pas de croupe sur les ailes), arêtiers/noues à
+  // 45° en plan (cas standard, pentes égales de chaque côté), ailes moins
+  // larges que le corps sur lequel elles s'appuient.
+  let mp3dScene = null, mp3dRenderer = null, mp3dCamera = null, mp3dGroup = null, mp3dInit = false;
+
+  function mpHipLen(halfW, thRad){
+    const run = halfW * Math.SQRT2;
+    const rise = halfW * Math.tan(thRad);
+    return Math.sqrt(run * run + rise * rise);
+  }
+
+  // Construit un corps rectangulaire (pignon ou croupe) posé à (x0,y0), de
+  // dimensions L×W. Retourne les segments (faîtage/arêtiers), les points utiles
+  // (extrémités de faîtage) et les pans (pour le plan + la 3D).
+  function mpBuildBlock(x0, y0, L, W, hip, thRad, labelSuffix){
+    const H = (W / 2) * Math.tan(thRad);
+    const eaves = [{ x: x0, y: y0 }, { x: x0 + L, y: y0 }, { x: x0 + L, y: y0 + W }, { x: x0, y: y0 + W }];
+    const segs = [], pans = [];
+    if (!hip) {
+      const r0 = { x: x0, y: y0 + W / 2, h: H }, r1 = { x: x0 + L, y: y0 + W / 2, h: H };
+      segs.push({ kind: 'faitage', label: 'Faîtage' + labelSuffix, length: L });
+      pans.push({ pts: [{ ...eaves[0], h: 0 }, { ...eaves[1], h: 0 }, r1, r0], color: 0xc7cdd3 });
+      pans.push({ pts: [{ ...eaves[2], h: 0 }, { ...eaves[3], h: 0 }, r0, r1], color: 0xb9c2cc });
+      return { ridge0: r0, ridge1: r1, H, segs, pans, eaves };
+    }
+    const half = W / 2;
+    const rl = Math.max(0, L - W);
+    const r0 = { x: x0 + half, y: y0 + W / 2, h: H }, r1 = { x: x0 + L - half, y: y0 + W / 2, h: H };
+    if (rl > 0) segs.push({ kind: 'faitage', label: 'Faîtage' + labelSuffix, length: rl });
+    const hipLen = mpHipLen(half, thRad);
+    segs.push({ kind: 'aretier', label: 'Arêtier' + labelSuffix + ' (×4)', length: hipLen, qty: 4 });
+    pans.push({ pts: [{ ...eaves[0], h: 0 }, { ...eaves[1], h: 0 }, r1, r0], color: 0xc7cdd3 });
+    pans.push({ pts: [{ ...eaves[2], h: 0 }, { ...eaves[3], h: 0 }, r0, r1], color: 0xb9c2cc });
+    pans.push({ pts: [{ ...eaves[1], h: 0 }, { ...eaves[2], h: 0 }, r1], color: 0xcfd5da });
+    pans.push({ pts: [{ ...eaves[3], h: 0 }, { ...eaves[0], h: 0 }, r0], color: 0xcfd5da });
+    return { ridge0: r0, ridge1: r1, H, segs, pans, eaves };
+  }
+
+  // Aile en pignon accolée sur le côté "haut" (y = yBase) du corps porteur,
+  // depuis x = xStart sur wingL de long, wingW de large. Ajoute 2 noues.
+  function mpBuildWing(xStart, yBase, wingL, wingW, thRad, labelSuffix){
+    const half = wingW / 2;
+    const H = half * Math.tan(thRad);
+    const rl = Math.max(0, wingL - wingW);
+    const apex0 = { x: xStart + half, y: yBase + wingW, h: H };
+    const apex1 = { x: xStart + wingL - half, y: yBase + wingW, h: H };
+    const cornerL = { x: xStart, y: yBase }, cornerR = { x: xStart + wingL, y: yBase };
+    const tipL = { x: xStart, y: yBase + wingW, h: 0 }, tipR = { x: xStart + wingL, y: yBase + wingW, h: 0 };
+    const segs = [];
+    if (rl > 0) segs.push({ kind: 'faitage', label: 'Faîtage aile' + labelSuffix, length: rl });
+    const noueLen = mpHipLen(half, thRad);
+    segs.push({ kind: 'noue', label: 'Noue' + labelSuffix + ' (×2)', length: noueLen, qty: 2 });
+    const pans = [
+      { pts: [{ ...cornerL, h: 0 }, apex0, apex1, { ...cornerR, h: 0 }], color: 0xd7dde2 },
+      { pts: [{ ...cornerL, h: 0 }, tipL, apex0], color: 0xbec6cc },
+      { pts: [{ ...cornerR, h: 0 }, apex1, tipR], color: 0xbec6cc }
+    ];
+    return { segs, pans };
+  }
+
+  function computeMultiPanRoof(){
+    const type = $('mpType').value;
+    const thRad = (parseFloat($('mpPente').value) || 25) * Math.PI / 180;
+    const Lm = Math.max(500, parseFloat($('mpMainL').value) || 10000);
+    const Wm = Math.max(500, parseFloat($('mpMainW').value) || 7000);
+    const hipMain = $('mpMainHip').checked;
+    const Lw = Math.max(500, parseFloat($('mpWingL').value) || 5000);
+    const Ww = Math.max(500, parseFloat($('mpWingW').value) || 5000);
+    let segs = [], pans = [];
+    const main = mpBuildBlock(0, 0, Lm, Wm, hipMain, thRad, '');
+    segs = segs.concat(main.segs); pans = pans.concat(main.pans);
+    if (type === '2pans' || type === '4pans') {
+      // rien de plus : corps seul
+    } else if (type === 'L') {
+      const w = mpBuildWing(0, Wm, Lw, Math.min(Ww, Wm), thRad, ' (aile)');
+      segs = segs.concat(w.segs); pans = pans.concat(w.pans);
+    } else if (type === 'T') {
+      const xs = Math.max(0, (Lm - Lw) / 2);
+      const w = mpBuildWing(xs, Wm, Lw, Math.min(Ww, Wm), thRad, ' (aile)');
+      segs = segs.concat(w.segs); pans = pans.concat(w.pans);
+    } else if (type === 'U') {
+      const wA = mpBuildWing(0, Wm, Lw, Math.min(Ww, Wm), thRad, ' (aile 1)');
+      const wB = mpBuildWing(Math.max(0, Lm - Lw), Wm, Lw, Math.min(Ww, Wm), thRad, ' (aile 2)');
+      segs = segs.concat(wA.segs, wB.segs); pans = pans.concat(wA.pans, wB.pans);
+    }
+    return { segs, pans, Lm, Wm };
+  }
+
+  function mpUpdateAssumHint(){
+    const type = $('mpType').value;
+    const wrap = $('mpWingWrap');
+    wrap.style.display = (type === '2pans' || type === '4pans') ? 'none' : '';
+    const hint = $('mpAssumHint');
+    hint.textContent = (type === '2pans' || type === '4pans')
+      ? 'Hypothèse : pente identique sur les deux pans (pignon simple, sans arêtier ni noue).'
+      : 'Hypothèses : pente unique sur tout le bâtiment, aile(s) en pignon (pas de croupe), aile moins large que le corps principal, noues/arêtiers à 45° en plan (cas standard pente égale de chaque côté). Un vrai relevé de chantier peut différer légèrement — à vérifier sur place.';
+  }
+  $('mpType').addEventListener('change', mpUpdateAssumHint);
+  mpUpdateAssumHint();
+
+  function mpRenderResults(data){
+    const grouped = new Map();
+    data.segs.forEach(s => {
+      const qty = s.qty || 1;
+      const key = s.label;
+      if (!grouped.has(key)) grouped.set(key, { label: s.label, length: s.length, qty: 0, kind: s.kind });
+      grouped.get(key).qty += qty;
+    });
+    const KIND_LABEL = { faitage: 'Faîtage', aretier: 'Arêtier', noue: 'Noue' };
+    const rows = Array.from(grouped.values()).map(r =>
+      `<tr><td>${KIND_LABEL[r.kind]}</td><td>${r.label.replace(/ \(×\d+\)$/, '')}</td><td>${Math.round(r.length)} mm</td><td>${r.qty}</td><td>${Math.round(r.length * r.qty)} mm</td></tr>`
+    ).join('');
+    let totalFait = 0, totalAr = 0, totalNoue = 0;
+    grouped.forEach(r => { const t = r.length * r.qty; if (r.kind === 'faitage') totalFait += t; else if (r.kind === 'aretier') totalAr += t; else totalNoue += t; });
+    $('mpResults').innerHTML = `
+      <table class="biais-seg-table">
+        <thead><tr><th>Type</th><th>Détail</th><th>Longueur</th><th>Qté</th><th>Total</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="seg-summary-line">Faîtage total : <b style="color:var(--text);">${Math.round(totalFait)} mm</b> · Arêtiers : <b style="color:var(--text);">${Math.round(totalAr)} mm</b> · Noues : <b style="color:var(--text);">${Math.round(totalNoue)} mm</b></div>
+    `;
+  }
+
+  function mpDrawPlan(data){
+    const wrap = $('mpPlanWrap');
+    const allX = [], allY = [];
+    data.pans.forEach(p => p.pts.forEach(pt => { allX.push(pt.x); allY.push(pt.y); }));
+    const minX = Math.min(...allX), maxX = Math.max(...allX), minY = Math.min(...allY), maxY = Math.max(...allY);
+    const pad = Math.max(300, (maxX - minX) * 0.08);
+    const w = (maxX - minX) + pad * 2, h = (maxY - minY) + pad * 2;
+    let svg = `<svg viewBox="${minX - pad} ${minY - pad} ${w} ${h}" style="width:100%;height:auto;max-height:360px;">`;
+    // pans en pointillé fin (repère), arêtes de toit en trait fort
+    const seenEdges = new Set();
+    data.pans.forEach(p => {
+      const pts = p.pts.map(pt => `${pt.x},${pt.y}`).join(' ');
+      svg += `<polygon points="${pts}" fill="#f2f4f6" stroke="#cbd2d8" stroke-width="${Math.max(4,w*0.002)}"/>`;
+      for (let i = 0; i < p.pts.length; i++) {
+        const a = p.pts[i], b = p.pts[(i + 1) % p.pts.length];
+        const isRidgeLike = a.h > 0 && b.h > 0;
+        const key = [a.x, a.y, b.x, b.y].map(v => Math.round(v)).join('_');
+        if (isRidgeLike && !seenEdges.has(key)) {
+          seenEdges.add(key);
+          svg += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#e05a2b" stroke-width="${Math.max(6,w*0.003)}"/>`;
+        }
+      }
+    });
+    svg += `<rect x="${0}" y="${0}" width="${data.Lm}" height="${data.Wm}" fill="none" stroke="#1c1b1a" stroke-width="${Math.max(6,w*0.0035)}"/>`;
+    svg += `</svg>`;
+    wrap.innerHTML = svg;
+  }
+
+  function mpInit3D(){
+    const container = $('mpCanvas3d');
+    if (!container || mp3dInit || !container.clientWidth) return;
+    mp3dInit = true;
+    mp3dScene = new THREE.Scene();
+    mp3dScene.background = getSkyTexture();
+    mp3dCamera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 200000);
+    mp3dRenderer = new THREE.WebGLRenderer({ antialias: true });
+    mp3dRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    mp3dRenderer.setSize(container.clientWidth, container.clientHeight);
+    mp3dRenderer.domElement.style.cssText = 'display:block;width:100%;height:100%;touch-action:none;';
+    container.appendChild(mp3dRenderer.domElement);
+    mp3dScene.add(new THREE.HemisphereLight(0xffffff, 0x66717d, 1.1));
+    const key = new THREE.DirectionalLight(0xffffff, 1.1); key.position.set(900, 1200, 700); mp3dScene.add(key);
+    mp3dGroup = new THREE.Group();
+    mp3dScene.add(mp3dGroup);
+    let dragging = false, lastX = 0, lastY = 0;
+    const c = mp3dRenderer.domElement; c.style.cursor = 'grab';
+    c.addEventListener('pointerdown', e => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
+    c.addEventListener('pointerup', () => dragging = false);
+    c.addEventListener('pointercancel', () => dragging = false);
+    c.addEventListener('pointermove', e => {
+      if (!dragging) return;
+      mp3dGroup.rotation.y += (e.clientX - lastX) * 0.008;
+      mp3dGroup.rotation.x += (e.clientY - lastY) * 0.008;
+      lastX = e.clientX; lastY = e.clientY;
+      mp3dRenderer.render(mp3dScene, mp3dCamera);
+    });
+    c.addEventListener('wheel', e => { e.preventDefault(); mp3dCamera.position.multiplyScalar(Math.exp(e.deltaY * 0.0012)); mp3dRenderer.render(mp3dScene, mp3dCamera); }, { passive: false });
+    window.addEventListener('resize', () => {
+      if (!container.clientWidth) return;
+      mp3dCamera.aspect = container.clientWidth / container.clientHeight;
+      mp3dCamera.updateProjectionMatrix();
+      mp3dRenderer.setSize(container.clientWidth, container.clientHeight);
+      mp3dRenderer.render(mp3dScene, mp3dCamera);
+    });
+  }
+
+  function mpDraw3D(data){
+    if (!mp3dInit) mpInit3D();
+    if (!mp3dGroup) return;
+    while (mp3dGroup.children.length) {
+      const o = mp3dGroup.children.pop();
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) o.material.dispose();
+    }
+    const v3 = p => new THREE.Vector3(p.x - data.Lm / 2, p.h, p.y - data.Wm / 2);
+    data.pans.forEach(p => {
+      const pos = [];
+      p.pts.forEach(pt => { const v = v3(pt); pos.push(v.x, v.y, v.z); });
+      const idx = [];
+      for (let i = 1; i < p.pts.length - 1; i++) idx.push(0, i, i + 1);
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setIndex(idx); g.computeVertexNormals();
+      const mat = new THREE.MeshStandardMaterial({ color: p.color, roughness: 0.75, metalness: 0.15, side: THREE.DoubleSide });
+      const mesh = new THREE.Mesh(g, mat);
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      mp3dGroup.add(mesh);
+    });
+    // arêtes de toit (faîtage/arêtiers/noues) surlignées
+    const seen = new Set();
+    data.pans.forEach(p => {
+      for (let i = 0; i < p.pts.length; i++) {
+        const a = p.pts[i], b = p.pts[(i + 1) % p.pts.length];
+        if (a.h <= 0 || b.h <= 0) continue;
+        const key = [a.x, a.y, b.x, b.y].map(v => Math.round(v)).join('_');
+        if (seen.has(key)) continue; seen.add(key);
+        const g = new THREE.BufferGeometry().setFromPoints([v3(a), v3(b)]);
+        mp3dGroup.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xe05a2b, linewidth: 2 })));
+      }
+    });
+    const box = new THREE.Box3().setFromObject(mp3dGroup);
+    if (!box.isEmpty()) {
+      const sphere = new THREE.Sphere(); box.getBoundingSphere(sphere);
+      const dist = Math.max(500, sphere.radius * 2.3);
+      mp3dCamera.position.set(sphere.center.x + dist * 0.6, dist * 0.7, sphere.center.z + dist * 0.8);
+      mp3dCamera.lookAt(sphere.center);
+    }
+    mp3dRenderer.render(mp3dScene, mp3dCamera);
+  }
+
+  $('mpCalcBtn').addEventListener('click', () => {
+    const data = computeMultiPanRoof();
+    mpRenderResults(data);
+    mpDrawPlan(data);
+    setTimeout(() => mpDraw3D(data), 30);
+  });
+
   function renderAccessoires(data){
     const acc = computeAccessoires(data);
     const wrap = $('accessoiresWrap');
@@ -9166,12 +9470,18 @@ function createZincController(suffix, kind){
           <tr><td>Rive</td><td>${Math.round(acc.riveTotal)} mm</td></tr>
           <tr><td>Bande d'égout</td><td>${Math.round(acc.egoutTotal)} mm</td></tr>
           <tr><td>Faîtage</td><td>${Math.round(acc.faitageTotal)} mm</td></tr>
+          ${acc.sousFaceTotal ? `<tr><td>Sous-face (bas de pente)</td><td>${Math.round(acc.sousFaceTotal)} mm</td></tr>` : ''}
+          ${acc.bandeZTotal ? `<tr><td>Bande Z (bas de pente)</td><td>${Math.round(acc.bandeZTotal)} mm</td></tr>` : ''}
+          ${acc.voligeAreaM2 ? `<tr><td>Volige</td><td>${acc.voligeAreaM2.toFixed(2)} m²</td></tr>` : ''}
           ${openingRows}
         </tbody>
       </table>
-      <div class="seg-summary-line">Total accessoires (hors ouvertures) : <b style="color:var(--text);">${Math.round(acc.riveTotal + acc.egoutTotal + acc.faitageTotal)} mm</b>${acc.openingsRows.length ? ` · Solins ouvertures : <b style="color:var(--text);">${Math.round(acc.openingsTotal)} mm</b>` : ''}</div>
+      <div class="seg-summary-line">Total accessoires (hors ouvertures) : <b style="color:var(--text);">${Math.round(acc.riveTotal + acc.egoutTotal + acc.faitageTotal + acc.sousFaceTotal + acc.bandeZTotal)} mm</b>${acc.openingsRows.length ? ` · Solins ouvertures : <b style="color:var(--text);">${Math.round(acc.openingsTotal)} mm</b>` : ''}</div>
     `;
   }
+  $('optSousFace').addEventListener('change', e => { optSousFace = e.target.checked; redraw(); update3D(); });
+  $('optVolige').addEventListener('change', e => { optVolige = e.target.checked; redraw(); update3D(); });
+  $('optBandeZ').addEventListener('change', e => { optBandeZ = e.target.checked; redraw(); update3D(); });
 
   /* ---------- Schéma 2D du plan de versant ---------- */
   function drawSchema(){
@@ -9697,6 +10007,54 @@ function createZincController(suffix, kind){
     syncRotInputs();
   }
 
+  // ---- Compléments 3D : sous-face, volige, bande Z (best-effort, à vérifier) ----
+  function buildSousFaceMesh(widthMm, depthMm){
+    const g = new THREE.PlaneGeometry(widthMm, depthMm);
+    g.rotateX(-Math.PI / 2);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xd8d6ce, roughness: 0.85, metalness: 0.05, side: THREE.DoubleSide });
+    return new THREE.Mesh(g, mat);
+  }
+  function getVoligeTexture(){
+    if (getVoligeTexture._t) return getVoligeTexture._t;
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#c9a876'; ctx.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 8; i++) {
+      const yv = i * 32;
+      ctx.fillStyle = i % 2 ? '#bf9c68' : '#d2ad7e';
+      ctx.fillRect(0, yv, 256, 32);
+      ctx.strokeStyle = 'rgba(90,60,25,0.35)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(0, yv); ctx.lineTo(256, yv); ctx.stroke();
+      for (let k = 0; k < 5; k++) { ctx.beginPath(); const gx = 10 + k * 50 + (i % 2) * 20; ctx.arc(gx, yv + 16, 2.2, 0, Math.PI * 2); ctx.strokeStyle = 'rgba(90,60,25,0.25)'; ctx.stroke(); }
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    getVoligeTexture._t = tex;
+    return tex;
+  }
+  function buildVoligeMesh(widthMm, rampantMm){
+    const g = new THREE.PlaneGeometry(widthMm, rampantMm);
+    g.rotateX(-Math.PI / 2);
+    const tex = getVoligeTexture();
+    tex.repeat.set(Math.max(1, widthMm / 140), Math.max(1, rampantMm / 140));
+    const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0.02, side: THREE.DoubleSide });
+    return new THREE.Mesh(g, mat);
+  }
+  // Bande Z simple (retour haut, face, retour bas), en développé, extrudée sur
+  // la largeur d'égout ; posée devant l'égout comme habillage de bas de pente.
+  function buildBandeZMesh(widthMm, epaisseur){
+    const B = (angle, dir) => ({ type: 'bend', angle, dir, hemType: 'aucun', hemGap: 6 });
+    const S = len => ({ type: 'straight', len });
+    const raw = computeCrossSectionPoints([ S(25), B(90, -1), S(35), B(90, -1), S(25) ]).centerPoints;
+    const cross = raw.map(p => ({ x: p.x, y: p.y - 25 }));
+    const geom = buildTaperedStripGeometry(cross, cross, Math.max(0.6, epaisseur), -widthMm / 2, widthMm / 2);
+    const mat = new THREE.MeshPhysicalMaterial({ color: 0x9aa3ab, metalness: 0.6, roughness: 0.4, side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.rotation.z = Math.PI / 2;
+    mesh.rotation.y = Math.PI / 2;
+    return mesh;
+  }
+
   function update3D(){
     if (!init3dDone) init3D();
     if (!group3d) return;
@@ -9727,10 +10085,35 @@ function createZincController(suffix, kind){
     const grp = buildZincStripGroup(data.bac, reliefW, reliefH, epaisseur, data.geo.rampant, mat);
 
     const pente = parseFloat($('pente').value) || 0;
-    grp.rotation.x = -pente * Math.PI / 180;
+    const penteRad = pente * Math.PI / 180;
+    grp.rotation.x = -penteRad;
     group3d.add(grp);
     currentMesh = grp;
     applyZincRealisticExtras(grp);
+
+    // Compléments (best-effort, orientations à vérifier à l'écran) : posés dans
+    // le même repère que le bac, avec la même bascule de pente le cas échéant.
+    const widthAvg = (data.geo.egoutLen + data.geo.faitageLen) / 2;
+    if (optSousFace) {
+      const sf = buildSousFaceMesh(data.geo.egoutLen, 300);
+      const eaveLocal = new THREE.Vector3(0, 0, -data.geo.rampant / 2).applyEuler(new THREE.Euler(-penteRad, 0, 0));
+      sf.position.set(0, eaveLocal.y - 5, eaveLocal.z - 150);
+      sf.receiveShadow = true;
+      group3d.add(sf);
+    }
+    if (optVolige) {
+      const vg = buildVoligeMesh(widthAvg, data.geo.rampant);
+      vg.position.set(0, -8, 0);
+      vg.rotation.x = -penteRad;
+      vg.receiveShadow = true;
+      group3d.add(vg);
+    }
+    if (optBandeZ) {
+      const bz = buildBandeZMesh(data.geo.egoutLen, epaisseur);
+      const eaveLocal2 = new THREE.Vector3(0, 0, -data.geo.rampant / 2).applyEuler(new THREE.Euler(-penteRad, 0, 0));
+      bz.position.set(0, eaveLocal2.y - 10, eaveLocal2.z + 5);
+      group3d.add(bz);
+    }
 
     renderFrame();
   }
@@ -10217,11 +10600,12 @@ const PROFILE_LIBRARY = [
       {type:'straight',len:280}, {type:'bend',angle:90,dir:1,hemType:'aucun',hemGap:6},
       {type:'straight',len:40}
     ] },
-  { name: 'Couvertine acrotère (paramétrique)', category: 'Couvertine', desc: "Plat calculé automatiquement à partir de la largeur du mur (+ jeu) ; simples retombées droites, plat parfaitement horizontal (pas de casse-goutte, pas de pente).", type: 'couvertine-param',
+  { name: 'Couvertine acrotère (paramétrique)', category: 'Couvertine', desc: "Plat calculé automatiquement à partir de la largeur du mur (+ jeu) ; plat horizontal, retombées de 50 mm ; pli de 15 mm à 135° côté extérieur, à 90° côté intérieur.", type: 'couvertine-param',
     params: [
       { key: 'largeur', label: 'Largeur du mur', value: 200 },
       { key: 'jeu',     label: 'Jeu sur le plat', value: 50 },
-      { key: 'retombee',label: 'Hauteur des retombées', value: 50 }
+      { key: 'retombee',label: 'Hauteur des retombées', value: 50 },
+      { key: 'lip',     label: 'Casse-goutte (retour à 135°)', value: 15 }
     ],
     defaults: { mat: 'Alu', th: '0.8', len: 2000 },
     build: (v) => {
@@ -10229,7 +10613,8 @@ const PROFILE_LIBRARY = [
       const rt = Math.max(10, v.retombee || 50);
       const B = (angle, dir) => ({ type: 'bend', angle, dir, hemType: 'aucun', hemGap: 6 });
       const S = len => ({ type: 'straight', len: Math.max(1, Math.round(len * 100) / 100) });
-      return [ S(rt), B(90, -1), S(flat), B(90, -1), S(rt) ];
+      const lip = Math.max(5, v.lip || 15);
+      return [ B(90, 1), S(lip), B(90, -1), S(rt), B(90, -1), S(flat), B(90, -1), S(rt), B(135, -1), S(lip) ];
     } },
   // ---- Profils paramétrables (les champs sous l'aperçu recalculent le profil) ----
   { name: 'Bac acier 45.333.1000', category: 'Bac acier',
@@ -11514,23 +11899,30 @@ document.getElementById('acrotereExplodeRange').addEventListener('input', (e) =>
   renderAcrotereFrame();
 });
 
+const ACROTERE_LIP = 15; // casse-goutte : retour de 15 mm plié à 135° vers l'intérieur
 function buildAcrotereCouvertineSegments(flatWidth, retombee){
   const rt = Math.max(10, retombee || 50);
   const flat = Math.max(20, flatWidth);
   const B = (angle, dir) => ({ type: 'bend', angle, dir, hemType: 'aucun', hemGap: 6 });
   const S = len => ({ type: 'straight', len: Math.max(1, Math.round(len * 100) / 100) });
-  // Couvertine simple : deux retombées droites qui pendent du même côté (vers
-  // le bas) de chaque côté du plat — d'où les deux plis dans le même sens.
-  // Plat parfaitement horizontal, pas de casse-goutte, pas de pente.
-  return [ S(rt), B(90, -1), S(flat), B(90, -1), S(rt) ];
+  // Plat horizontal, deux retombées vers le bas.
+  //  · côté extérieur de la toiture (+x) : casse-goutte de 15 mm plié à 135° ;
+  //  · côté intérieur (-x)              : retour de 15 mm plié à 90°.
+  return [
+    B(90, 1), S(ACROTERE_LIP), B(90, -1), S(rt), B(90, -1),
+    S(flat),
+    B(90, -1), S(rt), B(135, -1), S(ACROTERE_LIP)
+  ];
 }
+let acrotereExtSign = 1; // +1 : l'extérieur du pourtour est du côté +x de la section, -1 : côté opposé
 // Points de la section, recentrés sur l'axe du mur (X) et calés pour que le
 // plat soit à y=0 (dessus du muret) et les retombées pendent vers y négatif.
 function getAcrotereCross(flatWidth, retombee){
-  const rt = Math.max(10, retombee || 50);
-  const flat = Math.max(20, flatWidth);
-  const raw = computeCrossSectionPoints(buildAcrotereCouvertineSegments(flat, rt)).centerPoints;
-  return raw.map(p => ({ x: p.x - flat / 2, y: p.y - rt }));
+  const raw = computeCrossSectionPoints(buildAcrotereCouvertineSegments(flatWidth, retombee)).centerPoints;
+  const yTop = Math.max(...raw.map(p => p.y));
+  const top = raw.filter(p => p.y > yTop - 1e-6);
+  const cx = (Math.min(...top.map(p => p.x)) + Math.max(...top.map(p => p.x))) / 2;
+  return raw.map(p => ({ x: (p.x - cx) * acrotereExtSign, y: p.y - yTop }));
 }
 // Éclisse : même forme que la couvertine, agrandie d'un jeu de recouvrement
 // sur chaque brin (comme addCouvertineEclisse) pour pouvoir se glisser
@@ -11551,27 +11943,62 @@ function getAcrotereFixationCross(flatWidth){
   return raw.map(p => ({ x: p.x + innerWidth / 2, y: p.y - 25 }));
 }
 
-// Angle fini : la couvertine est balayée le long du chemin A -> sommet -> B
-// avec une jonction à onglet exacte (décalage latéral / cos(demi-angle) au
-// sommet), donc les deux côtés se rejoignent à ras et recouvrent l'angle.
-function buildAcrotereCornerGeometry(cross, V, d1, d2, len){
-  const n1 = { x: d1.z, z: -d1.x }, n2 = { x: d2.z, z: -d2.x };
-  const den = Math.max(0.2, 1 + n1.x * n2.x + n1.z * n2.z);
-  const m = { x: (n1.x + n2.x) / den, z: (n1.z + n2.z) / den };
-  const path = [
-    { p: { x: V.x - d1.x * len, z: V.z - d1.z * len }, n: n1 },
-    { p: { x: V.x, z: V.z }, n: m },
-    { p: { x: V.x + d2.x * len, z: V.z + d2.z * len }, n: n2 }
-  ];
+// Résolution de l'intersection des deux droites décalées (a par rapport à l'axe
+// du mur A, b par rapport à l'axe du mur B) autour du sommet.
+function acrotereOffsetIntersect(nA, nB, a, b){
+  const det = nA.x * nB.z - nA.z * nB.x;
+  if (Math.abs(det) < 0.12) { // murs quasi alignés : simple moyenne
+    const t = (a + b) / 2;
+    return { x: nA.x * t, z: nA.z * t };
+  }
+  return { x: (a * nB.z - b * nA.z) / det, z: (nA.x * b - nB.x * a) / det };
+}
+// Angle fini : chaque côté garde la section de SON mur (largeurs différentes
+// possibles) ; au sommet, chaque point de la section est placé à l'intersection
+// exacte des deux lignes décalées, ce qui donne un onglet juste quel que soit
+// l'angle et l'écart de largeur.
+function buildAcrotereCornerGeometry(crossA, crossB, V, dA, dB, len){
+  const nA = { x: dA.z, z: -dA.x }, nB = { x: dB.z, z: -dB.x };
+  const K = crossA.length;
   const pos = [], idx = [];
-  path.forEach(pt => cross.forEach(c => pos.push(pt.p.x + pt.n.x * c.x, c.y, pt.p.z + pt.n.z * c.x)));
-  const K = cross.length;
-  for (let k = 0; k < path.length - 1; k++) {
+  const A0 = { x: V.x - dA.x * len, z: V.z - dA.z * len };
+  const B0 = { x: V.x + dB.x * len, z: V.z + dB.z * len };
+  for (let i = 0; i < K; i++) pos.push(A0.x + nA.x * crossA[i].x, crossA[i].y, A0.z + nA.z * crossA[i].x);
+  for (let i = 0; i < K; i++) {
+    const q = acrotereOffsetIntersect(nA, nB, crossA[i].x, crossB[i].x);
+    pos.push(V.x + q.x, crossA[i].y, V.z + q.z);
+  }
+  for (let i = 0; i < K; i++) pos.push(B0.x + nB.x * crossB[i].x, crossB[i].y, B0.z + nB.z * crossB[i].x);
+  for (let k = 0; k < 2; k++) {
     for (let i = 0; i < K - 1; i++) {
       const a = k * K + i, b = k * K + i + 1, c2 = (k + 1) * K + i, d = (k + 1) * K + i + 1;
       idx.push(a, b, c2, b, d, c2);
     }
   }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+// Remplissage du muret à un angle : quadrilatère (sommet, bord A, intersection,
+// bord B) de chaque côté, extrudé sur la hauteur du muret — comble le vide
+// extérieur quel que soit l'angle et la différence de largeur.
+function buildAcrotereWallFill(V, dA, dB, hA, hB, height, side){
+  const nA = { x: dA.z, z: -dA.x }, nB = { x: dB.z, z: -dB.x };
+  const sgn = side;
+  const q = acrotereOffsetIntersect(nA, nB, sgn * hA, sgn * hB);
+  const pts = [
+    { x: V.x, z: V.z },
+    { x: V.x + nA.x * sgn * hA, z: V.z + nA.z * sgn * hA },
+    { x: V.x + q.x, z: V.z + q.z },
+    { x: V.x + nB.x * sgn * hB, z: V.z + nB.z * sgn * hB }
+  ];
+  const pos = [], idx = [];
+  pts.forEach(p => pos.push(p.x, 0, p.z));
+  pts.forEach(p => pos.push(p.x, -height, p.z));
+  idx.push(0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6);
+  for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; idx.push(i, j, 4 + j, i, 4 + j, 4 + i); }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setIndex(idx);
@@ -11695,6 +12122,12 @@ function computeAcrotereLayout(){
     return { ...s, index: i, flat, startCut, endCut, runLen, nPieces, pieceLen, nCornerPieces, nEclisses, nFix };
   });
   const nCorners = closed ? walls.length : Math.max(0, walls.length - 1);
+  // Côté extérieur du pourtour : sens de rotation du tracé (aire signée si fermé,
+  // somme des virages sinon). Sens direct -> l'extérieur est à droite du mur (+x).
+  let area = 0;
+  segs.forEach(sg => { area += sg.x1 * sg.z2 - sg.x2 * sg.z1; });
+  const turnSum = segs.reduce((a, sg) => a + (sg.turn || 0), 0);
+  acrotereExtSign = (closed && Math.abs(area) > 1) ? (area > 0 ? 1 : -1) : (turnSum >= 0 ? 1 : -1);
   return { walls, gap, maxPiece, fixSpacing, nCorners, closed };
 }
 
@@ -11812,10 +12245,14 @@ document.getElementById('acrotereGenerateBtn').addEventListener('click', () => {
     Acier:  { color: 0x8a8f96, metalness: 0.65, roughness: 0.40 },
     Cuivre: { color: 0xd3894f, metalness: 0.80, roughness: 0.25 }
   }[matName] || { color: 0xb9bec2, metalness: 0.6, roughness: 0.38 };
-  const matCouv = new THREE.MeshPhysicalMaterial({ ...ACROTERE_MAT, side: THREE.DoubleSide });
+  const ralCode = document.getElementById('acrotereRal').value;
+  const usePaint = !!ralCode && (matName === 'Acier' || matName === 'Alu');
+  const matCouv = usePaint
+    ? new THREE.MeshPhysicalMaterial({ color: getRalHex(ralCode), ...getPaintFinishParams(document.getElementById('acrotereFinish').value), side: THREE.DoubleSide })
+    : new THREE.MeshPhysicalMaterial({ ...ACROTERE_MAT, side: THREE.DoubleSide });
   const matFix = new THREE.MeshStandardMaterial({ color: 0x8fa3b8, roughness: 0.45, metalness: 0.75, side: THREE.DoubleSide });
-  const matEclisse = new THREE.MeshStandardMaterial({ color: 0xe0a53a, roughness: 0.4, metalness: 0.6, side: THREE.DoubleSide });
-  const matWall = new THREE.MeshStandardMaterial({ color: 0xcac2b4, roughness: 0.92, metalness: 0.02 });
+  const matEclisse = usePaint ? matCouv : new THREE.MeshStandardMaterial({ color: 0xe0a53a, roughness: 0.4, metalness: 0.6, side: THREE.DoubleSide });
+  const matWall = new THREE.MeshStandardMaterial({ color: 0xcac2b4, roughness: 0.92, metalness: 0.02, side: THREE.DoubleSide });
 
   // Centre approximatif du pourtour (moyenne des milieux de mur), utilisé
   // comme origine des directions d'écartement de la vue éclatée.
@@ -11834,7 +12271,7 @@ document.getElementById('acrotereGenerateBtn').addEventListener('click', () => {
     const nW = layout.walls.length;
     const prevW = layout.walls[(w.index - 1 + nW) % nW];
     const ext = (turn) => Math.min(w.wallWidth * 1.5, (w.wallWidth / 2) * Math.tan(Math.min(75, Math.abs(turn) / 2) * Math.PI / 180));
-    const extS = w.startCut > 0 ? ext(prevW.turn) : 0, extE = w.endCut > 0 ? ext(w.turn) : 0;
+    const extS = 0, extE = 0;
     const wallLen = w.length + extS + extE;
     const wallGeom = new THREE.BoxGeometry(w.wallWidth, wallHeight, wallLen);
     const wallMesh = new THREE.Mesh(wallGeom, matWall);
@@ -11902,9 +12339,17 @@ document.getElementById('acrotereGenerateBtn').addEventListener('click', () => {
     if (cur.startCut <= 0) continue;
     const prev = layout.walls[(i - 1 + nAll) % nAll];
     const unit = (w) => ({ x: (w.x2 - w.x1) / w.length, z: (w.z2 - w.z1) / w.length });
-    const flatC = Math.max(prev.flat, cur.flat);
-    const crossC = getAcrotereCross(flatC, retombee);
-    const g = buildAcrotereCornerGeometry(crossC, { x: cur.x1, z: cur.z1 }, unit(prev), unit(cur), ACROTERE_CORNER_LEN);
+    const crossA = getAcrotereCross(prev.flat, retombee);
+    const crossB = getAcrotereCross(cur.flat, retombee);
+    const Vp = { x: cur.x1, z: cur.z1 };
+    const dA = unit(prev), dB = unit(cur);
+    const g = buildAcrotereCornerGeometry(crossA, crossB, Vp, dA, dB, ACROTERE_CORNER_LEN);
+    // Muret : remplissage exact du coin (deux côtés, celui du dedans est englobé par les murs).
+    [1, -1].forEach(sd => {
+      const fillMesh = new THREE.Mesh(buildAcrotereWallFill(Vp, dA, dB, prev.wallWidth / 2, cur.wallWidth / 2, wallHeight, sd), matWall);
+      fillMesh.receiveShadow = true;
+      acrotereGroup.add(fillMesh);
+    });
     const mesh = new THREE.Mesh(g, matCouv);
     mesh.castShadow = true; mesh.receiveShadow = true;
     addEdgeHighlight(mesh, { opacity: 0.4 });
@@ -11943,18 +12388,19 @@ function getAcrotereBom(){
     map.get(key).qty += qty;
   };
   layout.walls.forEach(w => {
-    const devC = 2 * rt + w.flat;
+    const devC = 2 * rt + w.flat + 2 * ACROTERE_LIP;
     add('couv', 'Couvertine droite', devC, w.pieceLen, w.nPieces, th, mat, w.flat, 'Mur ' + (w.index + 1));
-    const devE = 2 * (rt + 6) + w.flat + 6;
+    const devE = 2 * (rt + 6) + w.flat + 6 + 2 * ACROTERE_LIP;
     add('ecl', 'Éclisse', devE, ACROTERE_ACC_LEN, w.nEclisses, 0.75, mat, w.flat, 'recouvre le joint');
     add('fix', 'Patte de fixation (U)', 50 + Math.max(20, w.flat - 20), ACROTERE_ACC_LEN, w.nFix, 1, 'Acier galva', w.flat, '');
     if (w.startCut > 0) {
       const prev = layout.walls[(w.index - 1 + N) % N];
-      const flatC = Math.max(prev.flat, w.flat);
-      const devA = 2 * rt + flatC;
       const half = Math.min(75, Math.abs(prev.turn) / 2) * Math.PI / 180;
-      const lenA = ACROTERE_CORNER_LEN + (flatC / 2) * Math.tan(half);
-      add('ang', "Morceau d'angle (onglet à recouper)", devA, lenA, 2, th, mat, flatC, 'angle avant mur ' + (w.index + 1));
+      // Un côté par mur : chaque morceau reprend la largeur de plat de son mur.
+      [prev, w].forEach(side => {
+        const lenA = ACROTERE_CORNER_LEN + (Math.max(prev.flat, w.flat) / 2) * Math.tan(half);
+        add('ang', "Morceau d'angle (onglet à recouper)", 2 * rt + side.flat + 2 * ACROTERE_LIP, lenA, 1, th, mat, side.flat, 'angle avant mur ' + (w.index + 1));
+      });
     }
   });
   return { layout, rows: Array.from(map.values()), th, mat };
@@ -11966,61 +12412,147 @@ document.getElementById('acrotereDebitBtn').addEventListener('click', () => {
   showToast(rows.length + ' références ajoutées au plan de débit (largeur = développé, hauteur = longueur).');
   document.querySelector('.tab-btn[data-tab="tab-debit"]')?.click();
 });
+// Dessine une section (polyligne) dans une case du PDF, avec cotes.
+function acrotereDrawCrossPdf(doc, cross, x, y, boxW, boxH, labels){
+  const minCx = Math.min(...cross.map(p => p.x)), maxCx = Math.max(...cross.map(p => p.x));
+  const minCy = Math.min(...cross.map(p => p.y)), maxCy = Math.max(...cross.map(p => p.y));
+  const k = Math.min((boxW - 16) / Math.max(1, maxCx - minCx), (boxH - 14) / Math.max(1, maxCy - minCy));
+  const ox = x + 8, oy = y + 8;
+  const X = c => ox + (c - minCx) * k, Y = c => oy + (maxCy - c) * k;
+  doc.setDrawColor(20); doc.setLineWidth(0.8);
+  for (let i = 0; i < cross.length - 1; i++) doc.line(X(cross[i].x), Y(cross[i].y), X(cross[i + 1].x), Y(cross[i + 1].y));
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(180, 110, 0);
+  if (labels.top) doc.text(labels.top, (X(minCx) + X(maxCx)) / 2, oy - 2.5, { align: 'center' });
+  if (labels.side) doc.text(labels.side, X(minCx) - 1.5, (Y(maxCy) + Y(minCy)) / 2, { align: 'right' });
+  doc.setTextColor(0);
+}
+
 document.getElementById('acrotereQuoteBtn').addEventListener('click', () => {
   if (!acrotereWalls.length) { showToast('Ajoute au moins un mur.'); return; }
+  // Vue 3D : on (re)génère l'assemblage si besoin, sans éclaté, pour la capture.
+  let img3d = null, imgRatio = 1.6;
+  try {
+    if (!acrotereInit) initAcrotere3D();
+    if (acrotereGroup && !acrotereGroup.children.length) document.getElementById('acrotereGenerateBtn').click();
+    if (acrotereRenderer && acrotereGroup && acrotereGroup.children.length) {
+      const keep = acrotereExplodeAmount;
+      acrotereExplodeAmount = 0; applyAcrotereExplode(); renderAcrotereFrame();
+      img3d = acrotereRenderer.domElement.toDataURL('image/jpeg', 0.92);
+      imgRatio = acrotereRenderer.domElement.width / Math.max(1, acrotereRenderer.domElement.height);
+      acrotereExplodeAmount = keep; applyAcrotereExplode(); renderAcrotereFrame();
+    }
+  } catch (e) { img3d = null; }
+  if (img3d && img3d.length < 200) img3d = null;
+
   const { layout, rows, th, mat } = getAcrotereBom();
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), m = 14;
   let y = m;
-  const head = (t) => { doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.text('ALTEMA — ' + t, m, y); doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.text(new Date().toLocaleDateString(), W - m, y, { align: 'right' }); y += 8; };
-  head('Couvertines d\'acrotère');
-  doc.setFontSize(10);
-  doc.text('Matière : ' + mat + ' · épaisseur ' + th + ' mm · jeu sur le plat ' + layout.gap + ' mm · longueur max ' + layout.maxPiece + ' mm · pattes tous les ' + layout.fixSpacing + ' mm', m, y); y += 8;
+  const ensure = (need) => { if (y + need > H - m) { doc.addPage(); y = m + 4; } };
+  const title = (t) => { ensure(14); doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text(t, m, y); y += 6; doc.setFont('helvetica', 'normal'); };
 
-  // Plan de l'acrotère
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.text('ALTEMA — Couvertines d\'acrotère', m, y);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.text(new Date().toLocaleDateString(), W - m, y, { align: 'right' }); y += 8;
+  const ral = document.getElementById('acrotereRal').value;
+  doc.text('Matière : ' + mat + (ral && (mat === 'Acier' || mat === 'Alu') ? ' RAL ' + ral : '') + ' · épaisseur ' + th + ' mm · jeu sur le plat ' + layout.gap + ' mm · longueur max ' + layout.maxPiece + ' mm · pattes tous les ' + layout.fixSpacing + ' mm', m, y); y += 8;
+
+  // --- Plan (dessus) + vue 3D côte à côte ---
+  const colW = (W - 2 * m - 6) / 2, boxH = 62;
   const segs = computeAcroterePolygon(acrotereWalls);
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   segs.forEach(s2 => { [s2.x1, s2.x2].forEach(v => { minX = Math.min(minX, v); maxX = Math.max(maxX, v); }); [s2.z1, s2.z2].forEach(v => { minZ = Math.min(minZ, v); maxZ = Math.max(maxZ, v); }); });
-  const boxW = W - 2 * m, boxH = 60;
-  const sc = Math.min(boxW / Math.max(1, maxX - minX), boxH / Math.max(1, maxZ - minZ)) * 0.85;
-  const ox = m + (boxW - (maxX - minX) * sc) / 2, oy = y + (boxH - (maxZ - minZ) * sc) / 2;
-  doc.setDrawColor(30); doc.setLineWidth(0.6);
+  const sc = Math.min((colW - 8) / Math.max(1, maxX - minX), (boxH - 10) / Math.max(1, maxZ - minZ));
+  const ox = m + 4 + ((colW - 8) - (maxX - minX) * sc) / 2, oy = y + 5 + ((boxH - 10) - (maxZ - minZ) * sc) / 2;
+  doc.setDrawColor(190); doc.setLineWidth(0.3); doc.rect(m, y, colW, boxH);
+  doc.rect(m + colW + 6, y, colW, boxH);
+  doc.setDrawColor(30); doc.setLineWidth(0.7);
   segs.forEach((s2, si) => {
     const x1 = ox + (s2.x1 - minX) * sc, z1 = oy + (s2.z1 - minZ) * sc, x2 = ox + (s2.x2 - minX) * sc, z2 = oy + (s2.z2 - minZ) * sc;
     doc.line(x1, z1, x2, z2);
-    doc.setFontSize(8); doc.text(Math.round(s2.length) + ' (mur ' + (si + 1) + ')', (x1 + x2) / 2, (z1 + z2) / 2 - 1.5, { align: 'center' });
+    doc.setFontSize(7.5); doc.text('M' + (si + 1) + ' · ' + Math.round(s2.length), (x1 + x2) / 2, (z1 + z2) / 2 - 1.5, { align: 'center' });
   });
-  y += boxH + 6;
+  doc.setFontSize(8); doc.text('Plan de l\'acrotère (vue de dessus)', m + 2, y + boxH + 4);
+  if (img3d) {
+    let iw = colW - 4, ih = iw / imgRatio;
+    if (ih > boxH - 4) { ih = boxH - 4; iw = ih * imgRatio; }
+    doc.addImage(img3d, 'JPEG', m + colW + 6 + (colW - iw) / 2, y + (boxH - ih) / 2, iw, ih);
+  } else {
+    doc.setFontSize(8); doc.text('Vue 3D indisponible', m + colW + 10, y + boxH / 2);
+  }
+  doc.setFontSize(8); doc.text('Vue 3D de l\'ensemble posé', m + colW + 8, y + boxH + 4);
+  y += boxH + 10;
 
-  // Coupes : une par largeur de plat
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text('Coupes (profils)', m, y); y += 5;
+  // --- Profils : couvertine, éclisse, patte de fixation (une ligne par largeur de plat) ---
+  title('Profils (coupes) — couvertine, éclisse, patte de fixation');
   const flats = Array.from(new Set(layout.walls.map(w => Math.round(w.flat))));
-  let x = m;
+  const cw = (W - 2 * m) / 3, ch = 42;
   flats.forEach(f => {
-    const cross = getAcrotereCross(f, 50);
-    const minCx = Math.min(...cross.map(p => p.x)), maxCx = Math.max(...cross.map(p => p.x));
-    const minCy = Math.min(...cross.map(p => p.y)), maxCy = Math.max(...cross.map(p => p.y));
-    const k = Math.min(50 / (maxCx - minCx), 25 / Math.max(1, maxCy - minCy));
-    if (x + 55 > W - m) { x = m; y += 40; }
-    doc.setDrawColor(20); doc.setLineWidth(0.7);
-    for (let i = 0; i < cross.length - 1; i++) {
-      doc.line(x + (cross[i].x - minCx) * k, y + 25 - (cross[i].y - minCy) * k, x + (cross[i + 1].x - minCx) * k, y + 25 - (cross[i + 1].y - minCy) * k);
-    }
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-    doc.text('plat ' + f + ' mm · retombées 50 mm', x, y + 32);
-    x += 58;
+    ensure(ch + 12);
+    doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.text('Plat ' + f + ' mm (mur de ' + (f - layout.gap) + ' mm)', m, y); doc.setFont('helvetica', 'normal'); y += 3;
+    const rt = 50;
+    acrotereDrawCrossPdf(doc, getAcrotereCross(f, rt), m, y, cw, ch, { top: 'plat ' + f + ' · pli ext. 135° / int. 90° (' + ACROTERE_LIP + ')', side: 'retombée ' + rt });
+    doc.setFontSize(7.5); doc.text('Couvertine · développé ' + (2 * rt + f) + ' mm · ép. ' + th, m + 2, y + ch);
+    acrotereDrawCrossPdf(doc, getAcrotereEclisseCross(f, rt), m + cw, y, cw, ch, { top: 'plat ' + (f + 6), side: 'retombée ' + (rt + 6) });
+    doc.text('Éclisse ' + ACROTERE_ACC_LEN + ' mm · développé ' + (2 * (rt + 6) + f + 6 + 2 * ACROTERE_LIP) + ' mm · ép. 0.75', m + cw + 2, y + ch);
+    acrotereDrawCrossPdf(doc, getAcrotereFixationCross(f), m + 2 * cw, y, cw, ch, { top: 'largeur ' + Math.max(20, f - 20), side: 'aile 25' });
+    doc.text('Patte U ' + ACROTERE_ACC_LEN + ' mm · développé ' + (50 + Math.max(20, f - 20)) + ' mm · ép. 1', m + 2 * cw + 2, y + ch);
+    y += ch + 8;
   });
-  y += 42;
 
-  // Tableau des pièces
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text('Pièces à fabriquer', m, y); y += 6;
+  // --- Équerres (angles) : croquis de dessus avec les degrés ---
+  const N = layout.walls.length;
+  const corners = [];
+  layout.walls.forEach(w => { if (w.startCut > 0) corners.push({ prev: layout.walls[(w.index - 1 + N) % N], cur: w }); });
+  if (corners.length) {
+    title('Équerres (angles) — 2 morceaux de ' + ACROTERE_CORNER_LEN + ' mm, onglet à recouper');
+    const cwid = (W - 2 * m) / 3, chei = 46;
+    let col = 0, rowY = y;
+    corners.forEach((c, ci) => {
+      if (col === 0) { ensure(chei + 10); rowY = y; }
+      const cx0 = m + col * cwid;
+      const turn = c.prev.turn, interior = 180 - turn;
+      // croquis : jambe A arrive de la gauche, jambe B repart avec le virage
+      const L = 26, th2 = turn * Math.PI / 180;
+      const dA = { x: 1, z: 0 }, dB = { x: Math.cos(th2), z: Math.sin(th2) };
+      const V = { x: cx0 + cwid * 0.42, z: rowY + chei * 0.5 };
+      const nA = { x: dA.z, z: -dA.x }, nB = { x: dB.z, z: -dB.x };
+      const k2 = L / ACROTERE_CORNER_LEN;
+      const hA = c.prev.flat / 2 * k2, hB = c.cur.flat / 2 * k2;
+      const qL = acrotereOffsetIntersect(nA, nB, hA, hB), qR = acrotereOffsetIntersect(nA, nB, -hA, -hB);
+      const P = [
+        { x: V.x - dA.x * L + nA.x * hA, z: V.z - dA.z * L + nA.z * hA },
+        { x: V.x + qL.x, z: V.z + qL.z },
+        { x: V.x + dB.x * L + nB.x * hB, z: V.z + dB.z * L + nB.z * hB },
+        { x: V.x + dB.x * L - nB.x * hB, z: V.z + dB.z * L - nB.z * hB },
+        { x: V.x + qR.x, z: V.z + qR.z },
+        { x: V.x - dA.x * L - nA.x * hA, z: V.z - dA.z * L - nA.z * hA }
+      ];
+      doc.setDrawColor(20); doc.setLineWidth(0.6);
+      for (let i = 0; i < P.length; i++) { const q = P[(i + 1) % P.length]; doc.line(P[i].x, P[i].z, q.x, q.z); }
+      doc.setDrawColor(200, 110, 0); doc.setLineWidth(0.4);
+      if (doc.setLineDashPattern) doc.setLineDashPattern([1.2, 1.2], 0);
+      doc.line(V.x + qL.x, V.z + qL.z, V.x + qR.x, V.z + qR.z);
+      if (doc.setLineDashPattern) doc.setLineDashPattern([], 0);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+      doc.text('Angle ' + (ci + 1) + ' : ' + Math.round(interior * 10) / 10 + '°', cx0 + 2, rowY + 4);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+      doc.text('onglet ' + Math.round(interior / 2 * 10) / 10 + '° par côté', cx0 + 2, rowY + 8.5);
+      doc.text('M' + (c.prev.index + 1) + ' : plat ' + Math.round(c.prev.flat) + ' × ' + ACROTERE_CORNER_LEN, cx0 + 2, rowY + chei - 6);
+      doc.text('M' + (c.cur.index + 1) + ' : plat ' + Math.round(c.cur.flat) + ' × ' + ACROTERE_CORNER_LEN, cx0 + 2, rowY + chei - 2);
+      col++;
+      if (col === 3) { col = 0; y = rowY + chei + 4; }
+    });
+    if (col !== 0) y = rowY + chei + 4;
+  }
+
+  // --- Tableau des pièces ---
+  title('Pièces à fabriquer');
   const cols = [m, m + 62, m + 92, m + 117, m + 133, m + 160];
-  const hdr = () => { doc.setFontSize(9); ['Pièce', 'Développé', 'Longueur', 'Qté', 'Ép.', 'Matière'].forEach((t, i) => doc.text(t, cols[i], y)); y += 2; doc.setDrawColor(150); doc.line(m, y, W - m, y); y += 5; };
-  hdr();
-  doc.setFont('helvetica', 'normal');
+  const hdr = () => { doc.setFont('helvetica', 'bold'); doc.setFontSize(9); ['Pièce', 'Développé', 'Longueur', 'Qté', 'Ép.', 'Matière'].forEach((t, i) => doc.text(t, cols[i], y)); y += 2; doc.setDrawColor(150); doc.line(m, y, W - m, y); y += 5; doc.setFont('helvetica', 'normal'); };
+  ensure(20); hdr();
   rows.forEach(r => {
-    if (y > H - m - 10) { doc.addPage(); y = m + 4; hdr(); doc.setFont('helvetica', 'normal'); }
+    if (y > H - m - 10) { doc.addPage(); y = m + 4; hdr(); }
     doc.setFontSize(9);
     const lab = r.label + (r.note ? ' (' + r.note + ')' : '');
     doc.text(lab.length > 38 ? lab.slice(0, 37) + '…' : lab, cols[0], y);
@@ -12030,11 +12562,25 @@ document.getElementById('acrotereQuoteBtn').addEventListener('click', () => {
   });
   y += 4;
   doc.setFontSize(8); doc.setTextColor(110);
-  doc.text('Développé = largeur de tôle à débiter ; les morceaux d\'angle sont à recouper à l\'onglet sur place.', m, y);
+  doc.text('Développé = largeur de tôle à débiter ; les morceaux d\'angle sont à recouper à l\'onglet sur place.', m, Math.min(y, H - m));
   doc.setTextColor(0);
   doc.save('couvertines_acrotere.pdf');
   showToast('PDF des pièces exporté.');
 });
+
+
+(function initAcrotereRal(){
+  const sel = document.getElementById('acrotereRal');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Brut (sans laquage)</option>' + Object.keys(RAL_HEX_MAP).map(k => `<option value="${k}">RAL ${k}</option>`).join('');
+  const refresh = () => {
+    const m = document.getElementById('acrotereMaterial').value;
+    sel.disabled = (m === 'Zinc' || m === 'Cuivre');
+    sel.title = sel.disabled ? 'Le zinc et le cuivre restent en teinte naturelle (pas de RAL).' : '';
+  };
+  document.getElementById('acrotereMaterial').addEventListener('change', refresh);
+  refresh();
+})();
 
 renderAcrotereWalls();
 updateAcrotereAll();
