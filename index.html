@@ -1361,6 +1361,28 @@
           </button>
         </div>
 
+        <div class="panel" id="epPanel">
+          <div class="panel-title"><span>🧲 Emboîtement par points → Assemblage</span></div>
+          <div class="biais-hint" style="margin-top:-4px;">Choisis 2 points sur ce profil (A) et 2 points sur une autre pièce (B). B est tournée/déplacée pour que ses 2 points tombent exactement sur ceux de A, avec un aperçu 2D avant d'envoyer vers l'Assemblage. Les points de A sont pris tels quels (A non tourné, non déplacé) : c'est la pièce de référence.</div>
+
+          <div class="panel-title" style="font-size:12px;margin-top:14px;">A — ce profil <span id="epACount" style="color:var(--accent);">(0/2 points)</span></div>
+          <div id="epASvgWrap" style="background:#fff;border-radius:8px;padding:8px;"></div>
+          <button class="add-btn" id="epAResetBtn" type="button" style="margin-top:6px;">Réinitialiser les points de A</button>
+
+          <div class="panel-title" style="font-size:12px;margin-top:14px;">B — pièce à emboîter</div>
+          <select id="epBSelect" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--text);font-size:12.5px;padding:8px 10px;">
+            <option value="">— choisir —</option>
+          </select>
+          <div id="epBSvgWrap" style="background:#fff;border-radius:8px;padding:8px;margin-top:8px;"></div>
+          <div id="epBCount" style="font-size:11.5px;color:var(--text-dim);margin-top:4px;"></div>
+          <button class="add-btn" id="epBResetBtn" type="button" style="margin-top:6px;">Réinitialiser les points de B</button>
+
+          <button class="add-btn" id="epCalcBtn" type="button" style="margin-top:12px;font-weight:700;">📐 Calculer l'aperçu</button>
+          <div id="epPreviewWrap" style="background:#fff;border-radius:8px;padding:8px;margin-top:10px;"></div>
+          <div id="epPreviewInfo" style="font-size:11.5px;color:var(--text-dim);margin-top:6px;"></div>
+          <button class="add-btn" id="epSendBtn" type="button" style="margin-top:10px;font-weight:700;display:none;">✅ Envoyer vers Assemblage</button>
+        </div>
+
         <div class="panel" id="fixationsPanel">
           <div class="panel-title"><span>Fixations (vis / rivets)</span></div>
           <div class="biais-hint" style="margin-top:-4px;">Calcul du nombre de fixations pour cette pièce (couvertine, bac, bavette...), selon un entraxe réglable.</div>
@@ -3474,8 +3496,25 @@ let idSeq = 1;
 // Formats de tôle supplémentaires, chacun réservé à une ou plusieurs matières
 // (cases à cocher). Essayés en priorité, dans l'ordre de la liste, avant le
 // format par défaut (sheetW/sheetH) pour toute pièce dont la matière est cochée.
-let stockFormats = [];
+function mkStockFormat(w, h, mats){
+  const full = { Acier: false, Alu: false, Zinc: false, Cuivre: false, ...mats };
+  return { uid: 'f' + (stockFormatIdSeq++), w, h, mats: full };
+}
 let stockFormatIdSeq = 1;
+// Catalogue de formats de tôle courants chez Altéma — modifiable/complétable
+// librement (largeurs/longueurs, décoché ou retiré si besoin).
+let stockFormats = [
+  mkStockFormat(3000, 1500, { Alu: true }),                 // Alu laqué 1.5 mm
+  mkStockFormat(2000, 1000, { Alu: true }),                  // Alu brut 1 mm
+  mkStockFormat(500, 2000, { Zinc: true }),                  // Zinc 0.65 / 0.7 / 0.8 mm — larg. 500
+  mkStockFormat(650, 2000, { Zinc: true }),                  // Zinc — larg. 650
+  mkStockFormat(800, 2000, { Zinc: true }),                  // Zinc — larg. 800
+  mkStockFormat(1000, 2000, { Zinc: true }),                 // Zinc — larg. 1000
+  mkStockFormat(2000, 1000, { Cuivre: true }),                // Cuivre
+  mkStockFormat(4000, 1220, { Acier: true }),                 // Acier laqué
+  mkStockFormat(2000, 1220, { Acier: true }),                 // Acier laqué
+  mkStockFormat(2000, 1000, { Acier: true })                  // Galva 0.6 / 1 mm (matière "Acier")
+];
 let segments = [];
 let savedProfiles = JSON.parse(localStorage.getItem('altema_saved_profiles') || '[]');
 let lastPackedResult = null;
@@ -3871,7 +3910,12 @@ function packAll(pieces, sheetW, sheetH, kerf, allowRotate){
     }
     if(!placed){
       const candidates = candidateFormatsFor(piece);
-      const fmt = candidates.find(f => fitsFormat(f, piece.w, piece.h)) || candidates[candidates.length - 1];
+      // Parmi tous les formats où la pièce rentre, on prend le plus petit (surface
+      // minimale) pour limiter la chute — pas juste le premier de la liste.
+      const fitting = candidates.filter(f => fitsFormat(f, piece.w, piece.h));
+      const fmt = fitting.length
+        ? fitting.reduce((best, f) => (f.w * f.h < best.w * best.h ? f : best))
+        : candidates[candidates.length - 1];
       const newS = { freeRects:[{x:0,y:0,w:fmt.w,h:fmt.h}], placed:[], format: fmt, mat: piece.mat || '' };
       const fit = tryPlaceOnSheet(newS, piece.w, piece.h);
       if(fit){
@@ -5795,6 +5839,7 @@ function redrawProfile(){
     renderBiaisPiecesTable();
   }
   if (is3DInitialized) update3DModel();
+  if (typeof epRenderA === 'function') epRenderA();
 }
 
 // Nombre de fixations (vis/rivets) sur la longueur de la pièce, selon un entraxe
@@ -8693,6 +8738,11 @@ function createZincController(suffix, kind){
         <button class="add-btn" id="${id('mpCalcBtn')}" type="button" style="margin-top:10px;">📐 Calculer</button>
         <div id="${id('mpResults')}" style="margin-top:10px;"></div>
         <div id="${id('mpPlanWrap')}" style="background:#fff;border-radius:8px;padding:8px;margin-top:10px;"></div>
+        <div class="field" style="margin-top:10px;">
+          <label>Vue éclatée <span id="${id('mpExplodeVal')}" style="font-family:'JetBrains Mono',monospace;color:var(--accent);">0 mm</span></label>
+          <input type="range" id="${id('mpExplodeRange')}" min="0" max="900" step="20" value="0" style="width:100%;accent-color:var(--accent);">
+        </div>
+        <div class="biais-hint" style="margin-top:4px;">De bas en haut : volige, écran de sous-toiture, ${isTasseaux ? 'bacs à tasseaux (couvre-joints)' : 'bacs à joint debout'}, puis faîtage / bande d\'égout / rive. Glisse pour tourner, molette pour zoomer.</div>
         <div id="${id('mpCanvas3d')}" style="width:100%;height:320px;border-radius:6px;background:linear-gradient(180deg,#a9cdec 0%,#d6e6f0 55%,#eef1ee 100%);position:relative;overflow:hidden;margin-top:10px;"></div>
       </div>
 
@@ -9220,6 +9270,74 @@ function createZincController(suffix, kind){
   // 45° en plan (cas standard, pentes égales de chaque côté), ailes moins
   // larges que le corps sur lequel elles s'appuient.
   let mp3dScene = null, mp3dRenderer = null, mp3dCamera = null, mp3dGroup = null, mp3dInit = false;
+  let mpExplodeAmount = 0;
+  const MP_EXPLODE_MAX = 900;
+  let mpVoligeItems = [], mpEcranItems = [], mpAccItems = [];
+  function mpStagedOffset(startFraction){ return Math.max(0, mpExplodeAmount - MP_EXPLODE_MAX * startFraction); }
+  function mpApplyExplode(){
+    const apply = (list, startFraction, sign) => {
+      const off = mpStagedOffset(startFraction) * sign;
+      list.forEach(it => { it.mesh.position.set(it.n.x * off, it.n.y * off, it.n.z * off); });
+    };
+    apply(mpVoligeItems, 0, -1);
+    apply(mpEcranItems, 1 / 3, -1);
+    apply(mpAccItems, 2 / 3, 1);
+    if (mp3dRenderer) mp3dRenderer.render(mp3dScene, mp3dCamera);
+  }
+  function getVoligeTextureMp(){
+    if (getVoligeTextureMp._t) return getVoligeTextureMp._t;
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#c9a876'; ctx.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 8; i++) { ctx.fillStyle = i % 2 ? '#bf9c68' : '#d2ad7e'; ctx.fillRect(0, i * 32, 256, 32); ctx.strokeStyle = 'rgba(90,60,25,0.35)'; ctx.beginPath(); ctx.moveTo(0, i * 32); ctx.lineTo(256, i * 32); ctx.stroke(); }
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    getVoligeTextureMp._t = t; return t;
+  }
+  function getEcranTexture(){
+    if (getEcranTexture._t) return getEcranTexture._t;
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const ctx = c.getContext('2d');
+    const g = ctx.createLinearGradient(0, 0, 128, 128); g.addColorStop(0, '#cfd6da'); g.addColorStop(0.5, '#eef2f4'); g.addColorStop(1, '#cfd6da');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 128);
+    ctx.strokeStyle = 'rgba(60,70,80,0.25)'; ctx.lineWidth = 1;
+    for (let i = 0; i < 128; i += 16) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(128, i); ctx.stroke(); }
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    getEcranTexture._t = t; return t;
+  }
+  // Bac joint debout : lignes de relevés fines et régulières (largeur de bac type).
+  function getJointDeboutTexture(){
+    if (getJointDeboutTexture._t) return getJointDeboutTexture._t;
+    const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#c3c8cd'; ctx.fillRect(0, 0, 256, 256);
+    const step = 256 / 5;
+    for (let i = 0; i <= 5; i++) {
+      const x = i * step;
+      const g = ctx.createLinearGradient(x - 4, 0, x + 4, 0);
+      g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(80,90,100,0.55)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g; ctx.fillRect(x - 5, 0, 10, 256);
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x - 1, 0, 1.5, 256);
+    }
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    getJointDeboutTexture._t = t; return t;
+  }
+  // Bac à tasseaux : bandes plus larges avec un couvre-joint central clair (effet relief).
+  function getTasseauxTexture(){
+    if (getTasseauxTexture._t) return getTasseauxTexture._t;
+    const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#c9ced2'; ctx.fillRect(0, 0, 256, 256);
+    const step = 256 / 5;
+    for (let i = 0; i <= 5; i++) {
+      const x = i * step;
+      ctx.fillStyle = 'rgba(70,80,90,0.4)'; ctx.fillRect(x - 9, 0, 18, 256);
+      const g = ctx.createLinearGradient(x - 9, 0, x + 9, 0);
+      g.addColorStop(0, 'rgba(70,80,90,0.45)'); g.addColorStop(0.5, 'rgba(255,255,255,0.75)'); g.addColorStop(1, 'rgba(70,80,90,0.45)');
+      ctx.fillStyle = g; ctx.fillRect(x - 9, 0, 18, 256);
+    }
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    getTasseauxTexture._t = t; return t;
+  }
 
   function mpHipLen(halfW, thRad){
     const run = halfW * Math.SQRT2;
@@ -9237,8 +9355,8 @@ function createZincController(suffix, kind){
     if (!hip) {
       const r0 = { x: x0, y: y0 + W / 2, h: H }, r1 = { x: x0 + L, y: y0 + W / 2, h: H };
       segs.push({ kind: 'faitage', label: 'Faîtage' + labelSuffix, length: L });
-      pans.push({ pts: [{ ...eaves[0], h: 0 }, { ...eaves[1], h: 0 }, r1, r0], color: 0xc7cdd3 });
-      pans.push({ pts: [{ ...eaves[2], h: 0 }, { ...eaves[3], h: 0 }, r0, r1], color: 0xb9c2cc });
+      pans.push({ pts: [{ ...eaves[0], h: 0 }, { ...eaves[1], h: 0 }, r1, r0], color: 0xc7cdd3, gable: true });
+      pans.push({ pts: [{ ...eaves[2], h: 0 }, { ...eaves[3], h: 0 }, r0, r1], color: 0xb9c2cc, gable: true });
       return { ridge0: r0, ridge1: r1, H, segs, pans, eaves };
     }
     const half = W / 2;
@@ -9247,10 +9365,10 @@ function createZincController(suffix, kind){
     if (rl > 0) segs.push({ kind: 'faitage', label: 'Faîtage' + labelSuffix, length: rl });
     const hipLen = mpHipLen(half, thRad);
     segs.push({ kind: 'aretier', label: 'Arêtier' + labelSuffix + ' (×4)', length: hipLen, qty: 4 });
-    pans.push({ pts: [{ ...eaves[0], h: 0 }, { ...eaves[1], h: 0 }, r1, r0], color: 0xc7cdd3 });
-    pans.push({ pts: [{ ...eaves[2], h: 0 }, { ...eaves[3], h: 0 }, r0, r1], color: 0xb9c2cc });
-    pans.push({ pts: [{ ...eaves[1], h: 0 }, { ...eaves[2], h: 0 }, r1], color: 0xcfd5da });
-    pans.push({ pts: [{ ...eaves[3], h: 0 }, { ...eaves[0], h: 0 }, r0], color: 0xcfd5da });
+    pans.push({ pts: [{ ...eaves[0], h: 0 }, { ...eaves[1], h: 0 }, r1, r0], color: 0xc7cdd3, gable: false });
+    pans.push({ pts: [{ ...eaves[2], h: 0 }, { ...eaves[3], h: 0 }, r0, r1], color: 0xb9c2cc, gable: false });
+    pans.push({ pts: [{ ...eaves[1], h: 0 }, { ...eaves[2], h: 0 }, r1], color: 0xcfd5da, gable: false });
+    pans.push({ pts: [{ ...eaves[3], h: 0 }, { ...eaves[0], h: 0 }, r0], color: 0xcfd5da, gable: false });
     return { ridge0: r0, ridge1: r1, H, segs, pans, eaves };
   }
 
@@ -9269,9 +9387,9 @@ function createZincController(suffix, kind){
     const noueLen = mpHipLen(half, thRad);
     segs.push({ kind: 'noue', label: 'Noue' + labelSuffix + ' (×2)', length: noueLen, qty: 2 });
     const pans = [
-      { pts: [{ ...cornerL, h: 0 }, apex0, apex1, { ...cornerR, h: 0 }], color: 0xd7dde2 },
-      { pts: [{ ...cornerL, h: 0 }, tipL, apex0], color: 0xbec6cc },
-      { pts: [{ ...cornerR, h: 0 }, apex1, tipR], color: 0xbec6cc }
+      { pts: [{ ...cornerL, h: 0 }, apex0, apex1, { ...cornerR, h: 0 }], color: 0xd7dde2, gable: true },
+      { pts: [{ ...cornerL, h: 0 }, tipL, apex0], color: 0xbec6cc, gable: false },
+      { pts: [{ ...cornerR, h: 0 }, apex1, tipR], color: 0xbec6cc, gable: false }
     ];
     return { segs, pans };
   }
@@ -9405,6 +9523,89 @@ function createZincController(suffix, kind){
     });
   }
 
+  // Repère local d'un pan (u = le long de l'égout, v = pente, n = normale).
+  function mpPanBasis(pts){
+    const p0 = pts[0], p1 = pts[1];
+    const uVec = { x: p1.x - p0.x, y: p1.y - p0.y, h: 0 };
+    const uLen = Math.hypot(uVec.x, uVec.y) || 1;
+    const u = { x: uVec.x / uLen, y: uVec.y / uLen, h: 0 };
+    // point "haut" du pan pour définir v (le premier point avec h>0, sinon le dernier point)
+    const top = pts.find(p => p.h > 0) || pts[pts.length - 1];
+    const vVecRaw = { x: top.x - p0.x, y: top.y - p0.y, h: top.h - p0.h };
+    const dot = vVecRaw.x * u.x + vVecRaw.y * u.y;
+    const v = { x: vVecRaw.x - dot * u.x, y: vVecRaw.y - dot * u.y, h: vVecRaw.h };
+    const vLen = Math.hypot(v.x, v.y, v.h) || 1;
+    v.x /= vLen; v.y /= vLen; v.h /= vLen;
+    // normale = u × v (en repère x,y,h)
+    const n = {
+      x: u.y * v.h - u.h * v.y,
+      y: u.h * v.x - u.x * v.h,
+      h: u.x * v.y - u.y * v.x
+    };
+    const nLen = Math.hypot(n.x, n.y, n.h) || 1;
+    n.x /= nLen; n.y /= nLen; n.h /= nLen;
+    if (n.h < 0) { n.x *= -1; n.y *= -1; n.h *= -1; }
+    return { u, v, n, p0 };
+  }
+  function mpPanPointAlongEdge(A, B, mm, totalLen){
+    const t = totalLen > 0.01 ? mm / totalLen : 0;
+    return { x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t, h: A.h + (B.h - A.h) * t };
+  }
+  // Découpe un pan en vrais panneaux de largeur réelle, en réutilisant la même
+  // règle de répartition que le versant simple (largeurBac, mode uniforme/billard).
+  function mpBuildBacsForPan(p){
+    const pts = p.pts;
+    const largeurBac = parseFloat($('largeurBac').value) || 500;
+    const eaveA = pts[0], eaveB = pts[1];
+    const farA = pts.length === 4 ? pts[3] : pts[2];
+    const farB = pts[2];
+    const baseLen = Math.hypot(eaveB.x - eaveA.x, eaveB.y - eaveA.y);
+    const farLen = Math.hypot(farB.x - farA.x, farB.y - farA.y);
+    const bb = computeBacBoundaries(largeurBac, baseLen, farLen, pts.length === 4 ? 'uniforme' : 'billard', null);
+    const quads = [];
+    for (let i = 0; i < bb.nBacs; i++) {
+      const c1 = mpPanPointAlongEdge(eaveA, eaveB, bb.boundariesEgout[i], baseLen);
+      const c2 = mpPanPointAlongEdge(eaveA, eaveB, bb.boundariesEgout[i + 1], baseLen);
+      const c3 = mpPanPointAlongEdge(farA, farB, bb.boundariesFaitage[i + 1], farLen);
+      const c4 = mpPanPointAlongEdge(farA, farB, bb.boundariesFaitage[i], farLen);
+      quads.push([c1, c2, c3, c4]);
+    }
+    return quads;
+  }
+  function mpMakeLayerMesh(pts, center, tex, repeatU, repeatV, opts){
+    const v3 = p => new THREE.Vector3(p.x - center.x, p.h, p.y - center.y);
+    const pos = [], uv = [];
+    const basis = mpPanBasis(pts);
+    pts.forEach(pt => {
+      const v = v3(pt); pos.push(v.x, v.y, v.z);
+      const du = (pt.x - basis.p0.x) * basis.u.x + (pt.y - basis.p0.y) * basis.u.y;
+      const dv = (pt.x - basis.p0.x) * basis.v.x + (pt.y - basis.p0.y) * basis.v.y + (pt.h - basis.p0.h) * basis.v.h;
+      uv.push(du / repeatU, dv / repeatV);
+    });
+    const idx = []; for (let i = 1; i < pts.length - 1; i++) idx.push(0, i, i + 1);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx); g.computeVertexNormals();
+    const matOpts = { roughness: 0.7, metalness: 0.1, side: THREE.DoubleSide };
+    if (tex) { tex.repeat.set(1, 1); matOpts.map = tex; } else { matOpts.color = opts.color || 0xffffff; }
+    Object.assign(matOpts, opts.mat || {});
+    const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial(matOpts));
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    return { mesh, n: basis.n };
+  }
+  function mpMakeCapMesh(a, b, center, width, color){
+    const v3 = p => new THREE.Vector3(p.x - center.x, p.h, p.y - center.y);
+    const dir = new THREE.Vector3().subVectors(v3(b), v3(a));
+    const len = dir.length() || 1;
+    const geom = new THREE.BoxGeometry(width, width * 0.55, len);
+    const mesh = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ color, roughness: 0.45, metalness: 0.55, side: THREE.DoubleSide }));
+    const mid = v3(a).add(v3(b)).multiplyScalar(0.5);
+    mesh.position.copy(mid);
+    mesh.lookAt(v3(b));
+    mesh.castShadow = true;
+    return mesh;
+  }
   function mpDraw3D(data){
     if (!mp3dInit) mpInit3D();
     if (!mp3dGroup) return;
@@ -9413,32 +9614,65 @@ function createZincController(suffix, kind){
       if (o.geometry) o.geometry.dispose();
       if (o.material) o.material.dispose();
     }
-    const v3 = p => new THREE.Vector3(p.x - data.Lm / 2, p.h, p.y - data.Wm / 2);
+    mpVoligeItems = []; mpEcranItems = []; mpAccItems = [];
+    const center = { x: data.Lm / 2, y: data.Wm / 2 };
+    const bacTex = isTasseaux ? getTasseauxTexture() : getJointDeboutTexture();
+    const voligeTex = getVoligeTextureMp(), ecranTex = getEcranTexture();
+
     data.pans.forEach(p => {
-      const pos = [];
-      p.pts.forEach(pt => { const v = v3(pt); pos.push(v.x, v.y, v.z); });
-      const idx = [];
-      for (let i = 1; i < p.pts.length - 1; i++) idx.push(0, i, i + 1);
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-      g.setIndex(idx); g.computeVertexNormals();
-      const mat = new THREE.MeshStandardMaterial({ color: p.color, roughness: 0.75, metalness: 0.15, side: THREE.DoubleSide });
-      const mesh = new THREE.Mesh(g, mat);
-      mesh.castShadow = true; mesh.receiveShadow = true;
-      mp3dGroup.add(mesh);
+      // 1) Volige — sous tout, décalée vers l'intérieur.
+      const vol = mpMakeLayerMesh(p.pts, center, voligeTex, 260, 260, {});
+      vol.mesh.position.addScaledVector(new THREE.Vector3(vol.n.x, vol.n.h, vol.n.y), -22);
+      mp3dGroup.add(vol.mesh);
+      mpVoligeItems.push({ mesh: vol.mesh, n: { x: vol.n.x, y: vol.n.h, z: vol.n.y } });
+      // 2) Écran de sous-toiture — juste au-dessus de la volige.
+      const ec = mpMakeLayerMesh(p.pts, center, ecranTex, 400, 400, { mat: { roughness: 0.35, metalness: 0.25 } });
+      ec.mesh.position.addScaledVector(new THREE.Vector3(ec.n.x, ec.n.h, ec.n.y), -11);
+      mp3dGroup.add(ec.mesh);
+      mpEcranItems.push({ mesh: ec.mesh, n: { x: ec.n.x, y: ec.n.h, z: ec.n.y } });
+      // 3) Le bac — vrai calepinage : un panneau par largeur réelle (pas une texture
+      // étirée), calculé avec la même règle de répartition que le versant simple.
+      // Couche de référence : ne bouge jamais dans l'éclaté.
+      const bacs = mpBuildBacsForPan(p);
+      bacs.forEach((quad, bi) => {
+        const shade = bi % 2 === 0 ? 0xc7ccd0 : 0xbdc3c8;
+        const bm = mpMakeLayerMesh(quad, center, null, 1, 1, { color: shade, mat: { roughness: isTasseaux ? 0.55 : 0.35, metalness: isTasseaux ? 0.35 : 0.55 } });
+        mp3dGroup.add(bm.mesh);
+        if (bi > 0) {
+          // Joint entre ce panneau et le précédent, sur toute la pente (bord commun).
+          const capColor = isTasseaux ? 0xeef1f3 : 0x8c949b;
+          const capW = isTasseaux ? 42 : 16;
+          const cap = mpMakeCapMesh(quad[0], quad[3], center, capW, capColor);
+          mp3dGroup.add(cap);
+        }
+      });
     });
-    // arêtes de toit (faîtage/arêtiers/noues) surlignées
+
+    // 4) Accessoires : bande d'égout (bas), faîtage/arêtier/noue (haut des pans),
+    // rive (bords pignon) — au-dessus du bac, écartés en dernier dans l'éclaté.
     const seen = new Set();
+    const v3 = p => new THREE.Vector3(p.x - center.x, p.h, p.y - center.y);
     data.pans.forEach(p => {
+      const basis = mpPanBasis(p.pts);
+      const nrm = { x: basis.n.x, y: basis.n.h, z: basis.n.y };
       for (let i = 0; i < p.pts.length; i++) {
-        const a = p.pts[i], b = p.pts[(i + 1) % p.pts.length];
-        if (a.h <= 0 || b.h <= 0) continue;
-        const key = [a.x, a.y, b.x, b.y].map(v => Math.round(v)).join('_');
-        if (seen.has(key)) continue; seen.add(key);
-        const g = new THREE.BufferGeometry().setFromPoints([v3(a), v3(b)]);
-        mp3dGroup.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xe05a2b, linewidth: 2 })));
+        const A = p.pts[i], B = p.pts[(i + 1) % p.pts.length];
+        const key = [A.x, A.y, A.h, B.x, B.y, B.h].map(v => Math.round(v)).join('_');
+        const keyRev = [B.x, B.y, B.h, A.x, A.y, A.h].map(v => Math.round(v)).join('_');
+        if (seen.has(key) || seen.has(keyRev)) continue;
+        seen.add(key);
+        let mesh, color, width;
+        if (A.h === 0 && B.h === 0) { color = 0x3a7fc4; width = 45; }
+        else if (A.h > 0 && B.h > 0) { color = 0xe05a2b; width = 50; }
+        else { color = p.gable ? 0x9aa1a8 : 0xe08a2b; width = 45; }
+        mesh = mpMakeCapMesh(A, B, center, width, color);
+        mesh.position.addScaledVector(new THREE.Vector3(nrm.x, nrm.y, nrm.z), 6);
+        mp3dGroup.add(mesh);
+        mpAccItems.push({ mesh, n: nrm });
       }
     });
+
+    mpApplyExplode();
     const box = new THREE.Box3().setFromObject(mp3dGroup);
     if (!box.isEmpty()) {
       const sphere = new THREE.Sphere(); box.getBoundingSphere(sphere);
@@ -9448,6 +9682,11 @@ function createZincController(suffix, kind){
     }
     mp3dRenderer.render(mp3dScene, mp3dCamera);
   }
+  $('mpExplodeRange').addEventListener('input', e => {
+    mpExplodeAmount = parseFloat(e.target.value) || 0;
+    $('mpExplodeVal').textContent = mpExplodeAmount + ' mm';
+    mpApplyExplode();
+  });
 
   $('mpCalcBtn').addEventListener('click', () => {
     const data = computeMultiPanRoof();
@@ -12584,6 +12823,153 @@ document.getElementById('acrotereQuoteBtn').addEventListener('click', () => {
 
 renderAcrotereWalls();
 updateAcrotereAll();
+
+/* ===================== EMBOÎTEMENT PAR POINTS (A -> B) ===================== */
+let epAPts = [];              // jusqu'à 2 {x,y} choisis sur le profil A (repère local de A)
+let epBPts = [];              // jusqu'à 2 {x,y} choisis sur le profil B (repère local de B)
+let epBSource = null;         // { kind:'saved'|'assemble', id }
+let epBSegs = null;
+let epTransform = null;       // { angleDeg, dx, dy } calculé
+
+function epCrossOf(segs){
+  try { return computeCrossSectionPoints(segs).centerPoints; } catch (e) { return []; }
+}
+function epBBox(pts){
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+}
+// Dessine un profil avec ses points cliquables (sélection jusqu'à 2, dans l'ordre).
+function epRenderPicker(wrapId, pts, selectedArr, onChange){
+  const wrap = document.getElementById(wrapId);
+  if (!pts.length) { wrap.innerHTML = '<div style="padding:16px;color:#8a8f98;font-size:12px;">Profil vide.</div>'; return; }
+  const b = epBBox(pts);
+  const pad = Math.max(15, (b.maxX - b.minX) * 0.12 + 10);
+  const w = (b.maxX - b.minX) + pad * 2 || 100, h = (b.maxY - b.minY) + pad * 2 || 100;
+  const r = Math.max(3.5, w * 0.018);
+  let svg = `<svg viewBox="${b.minX - pad} ${-(b.maxY + pad)} ${w} ${h}" style="width:100%;height:auto;max-height:220px;">`;
+  const path = pts.map(p => `${p.x},${-p.y}`).join(' ');
+  svg += `<polyline points="${path}" fill="none" stroke="#1c1b1a" stroke-width="${Math.max(2, w * 0.008)}" stroke-linejoin="round"/>`;
+  pts.forEach((p, i) => {
+    const sel = selectedArr.findIndex(s => s.idx === i);
+    svg += `<circle data-idx="${i}" cx="${p.x}" cy="${-p.y}" r="${r}" fill="${sel >= 0 ? '#e05a2b' : '#ffffff'}" stroke="${sel >= 0 ? '#e05a2b' : '#8a8f98'}" stroke-width="${Math.max(1, w * 0.004)}" style="cursor:pointer;"/>`;
+    if (sel >= 0) svg += `<text x="${p.x}" y="${-p.y - r - 2}" font-size="${Math.max(9, w * 0.03)}" fill="#e05a2b" text-anchor="middle" font-family="JetBrains Mono, monospace">${sel + 1}</text>`;
+  });
+  svg += `</svg>`;
+  wrap.innerHTML = svg;
+  wrap.querySelectorAll('circle').forEach(c => {
+    c.addEventListener('click', () => {
+      const idx = parseInt(c.dataset.idx, 10);
+      const already = selectedArr.findIndex(s => s.idx === idx);
+      if (already >= 0) selectedArr.splice(already, 1);
+      else { selectedArr.push({ idx, x: pts[idx].x, y: pts[idx].y }); if (selectedArr.length > 2) selectedArr.shift(); }
+      onChange();
+    });
+  });
+}
+function epRenderA(){
+  const pts = epCrossOf(segments);
+  epRenderPicker('epASvgWrap', pts, epAPts, epRenderA);
+  document.getElementById('epACount').textContent = `(${epAPts.length}/2 points)`;
+}
+function epRenderB(){
+  const wrap = document.getElementById('epBSvgWrap');
+  if (!epBSegs) { wrap.innerHTML = ''; document.getElementById('epBCount').textContent = ''; return; }
+  const pts = epCrossOf(epBSegs);
+  epRenderPicker('epBSvgWrap', pts, epBPts, epRenderB);
+  document.getElementById('epBCount').textContent = `${epBPts.length}/2 points`;
+}
+function epPopulateBSelect(){
+  const sel = document.getElementById('epBSelect');
+  const cur = sel.value;
+  let html = '<option value="">— choisir —</option>';
+  if (savedProfiles.length) {
+    html += '<optgroup label="Mes profils enregistrés">' + savedProfiles.map(p => `<option value="saved:${p.id}">${p.name}</option>`).join('') + '</optgroup>';
+  }
+  if (assembleComponents.length) {
+    html += '<optgroup label="Pièces de l\'Assemblage">' + assembleComponents.filter(c => c.type === 'profile').map(c => `<option value="assemble:${c.uid}">${c.name}</option>`).join('') + '</optgroup>';
+  }
+  sel.innerHTML = html;
+  if (cur && sel.querySelector(`option[value="${cur}"]`)) sel.value = cur;
+}
+document.getElementById('epBSelect').addEventListener('click', epPopulateBSelect);
+document.getElementById('epBSelect').addEventListener('change', (e) => {
+  const val = e.target.value;
+  epBPts = []; epTransform = null;
+  document.getElementById('epSendBtn').style.display = 'none';
+  document.getElementById('epPreviewWrap').innerHTML = '';
+  document.getElementById('epPreviewInfo').textContent = '';
+  if (!val) { epBSource = null; epBSegs = null; epRenderB(); return; }
+  const [kind, id] = val.split(':');
+  if (kind === 'saved') {
+    const p = savedProfiles.find(x => String(x.id) === id);
+    if (!p) return;
+    epBSource = { kind: 'saved', id: p.id };
+    epBSegs = p.segments;
+  } else {
+    const c = assembleComponents.find(x => x.uid === id);
+    if (!c) return;
+    epBSource = { kind: 'assemble', id: c.uid };
+    epBSegs = c.segments;
+  }
+  epRenderB();
+});
+document.getElementById('epAResetBtn').addEventListener('click', () => { epAPts = []; epRenderA(); });
+document.getElementById('epBResetBtn').addEventListener('click', () => { epBPts = []; epRenderB(); });
+
+function epComputeTransform(a1, a2, b1, b2){
+  const angA = Math.atan2(a2.y - a1.y, a2.x - a1.x);
+  const angB = Math.atan2(b2.y - b1.y, b2.x - b1.x);
+  const rot = angA - angB;
+  const c = Math.cos(rot), s = Math.sin(rot);
+  const b1x = b1.x * c - b1.y * s, b1y = b1.x * s + b1.y * c;
+  return { angleDeg: rot * 180 / Math.PI, dx: a1.x - b1x, dy: a1.y - b1y };
+}
+document.getElementById('epCalcBtn').addEventListener('click', () => {
+  if (epAPts.length !== 2 || epBPts.length !== 2) { showToast('Choisis exactement 2 points sur A et 2 points sur B.'); return; }
+  const t = epComputeTransform(epAPts[0], epAPts[1], epBPts[0], epBPts[1]);
+  epTransform = t;
+  const aPts = epCrossOf(segments), bPts = epCrossOf(epBSegs);
+  const c = Math.cos(t.angleDeg * Math.PI / 180), s = Math.sin(t.angleDeg * Math.PI / 180);
+  const bT = bPts.map(p => ({ x: p.x * c - p.y * s + t.dx, y: p.x * s + p.y * c + t.dy }));
+  const all = aPts.concat(bT);
+  const b = epBBox(all);
+  const pad = Math.max(15, (b.maxX - b.minX) * 0.1 + 10);
+  const w = (b.maxX - b.minX) + pad * 2 || 100, h = (b.maxY - b.minY) + pad * 2 || 100;
+  let svg = `<svg viewBox="${b.minX - pad} ${-(b.maxY + pad)} ${w} ${h}" style="width:100%;height:auto;max-height:260px;">`;
+  svg += `<polyline points="${aPts.map(p => `${p.x},${-p.y}`).join(' ')}" fill="none" stroke="#1c1b1a" stroke-width="${Math.max(2, w * 0.006)}"/>`;
+  svg += `<polyline points="${bT.map(p => `${p.x},${-p.y}`).join(' ')}" fill="none" stroke="#2f6fb0" stroke-width="${Math.max(2, w * 0.006)}" stroke-dasharray="${w * 0.012},${w * 0.012}"/>`;
+  const r = Math.max(3, w * 0.012);
+  [epAPts[0], epAPts[1]].forEach(p => { svg += `<circle cx="${p.x}" cy="${-p.y}" r="${r}" fill="#e05a2b"/>`; });
+  svg += `</svg>`;
+  document.getElementById('epPreviewWrap').innerHTML = svg;
+  document.getElementById('epPreviewInfo').textContent = `A en noir, B (transformée) en pointillés bleus — les 2 points doivent coïncider. Rotation appliquée à B : ${Math.round(t.angleDeg * 10) / 10}°, décalage : (${Math.round(t.dx)}, ${Math.round(t.dy)}) mm.`;
+  document.getElementById('epSendBtn').style.display = '';
+});
+document.getElementById('epSendBtn').addEventListener('click', () => {
+  if (!epTransform || !epBSource) return;
+  const t = epTransform;
+  if (epBSource.kind === 'assemble') {
+    const c = assembleComponents.find(x => x.uid === epBSource.id);
+    if (!c) { showToast('Cette pièce a été supprimée de l\'Assemblage.'); return; }
+    c.posX = Math.round(t.dx * 100) / 100;
+    c.posY = Math.round(t.dy * 100) / 100;
+    c.rotationDeg = Math.round(t.angleDeg * 100) / 100;
+    assembleSelectedUid = c.uid;
+  } else {
+    const p = savedProfiles.find(x => x.id === epBSource.id);
+    if (!p) { showToast('Ce profil enregistré est introuvable.'); return; }
+    addAssembleProfile(p);
+    const created = assembleComponents[assembleComponents.length - 1];
+    created.posX = Math.round(t.dx * 100) / 100;
+    created.posY = Math.round(t.dy * 100) / 100;
+    created.rotationDeg = Math.round(t.angleDeg * 100) / 100;
+  }
+  renderAssembleComponentsList();
+  updateAssembleAll();
+  showToast('Pièce B positionnée dans l\'Assemblage.');
+  document.querySelector('.tab-btn[data-tab="tab-assemblage"]')?.click();
+});
+epRenderA();
 
 (function initInteractiveTutorial(){
   const overlay = document.getElementById('tutorialOverlay');
