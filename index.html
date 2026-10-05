@@ -726,6 +726,11 @@
   #fs3dOverlay.show { display: flex; }
   #fs3dContainer { flex: 1; width: 100%; height: 100%; border-radius: 8px; position: relative; }
 
+  /* Questionnaire pas-à-pas du calculateur multi-pans, en fenêtre dédiée */
+  .mp-wizard-overlay{display:none;position:fixed;inset:0;background:rgba(10,10,10,0.72);z-index:1000;align-items:center;justify-content:center;padding:20px;}
+  .mp-wizard-overlay.show{display:flex;}
+  .mp-wizard-box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;}
+
   /* Tracé à main levée -> import de profil */
   #freehandOverlay{display:none;position:fixed;inset:0;background:var(--canvas-bg);z-index:1000;padding:20px;flex-direction:column;}
   #freehandOverlay.show{display:flex;}
@@ -1158,8 +1163,8 @@
     <button class="tab-btn active" data-tab="tab-debit">Plan de débit</button>
     <button class="tab-btn" data-tab="tab-pliage">Plan de pliage</button>
     <button class="tab-btn" data-tab="tab-assemblage">Assemblage</button>
-    <button class="tab-btn" data-tab="tab-tasseaux">Bac à tasseaux</button>
-    <button class="tab-btn" data-tab="tab-jointdebout">Joint debout</button>
+    <button class="tab-btn" data-tab="tab-tasseaux" style="display:none">Bac à tasseaux</button>
+    <button class="tab-btn" data-tab="tab-jointdebout" id="zincTabBtn">Toiture zinc</button>
     <button class="tab-btn" data-tab="tab-couvertine">Couvertine acrotère</button>
   </div>
 
@@ -3548,11 +3553,11 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     }
     if (btn.dataset.tab === 'tab-tasseaux' && window.zincCtrl_tas) {
       zincCtrl_tas.redraw();
-      setTimeout(() => { zincCtrl_tas.init3D(); zincCtrl_tas.update3D(); zincCtrl_tas.fitCamera(); }, 100);
+      setTimeout(() => { zincCtrl_tas.init3D(); zincCtrl_tas.update3D(); zincCtrl_tas.fitCamera(); zincCtrl_tas.openMpWizard(); }, 100);
     }
     if (btn.dataset.tab === 'tab-jointdebout' && window.zincCtrl_jd) {
       zincCtrl_jd.redraw();
-      setTimeout(() => { zincCtrl_jd.init3D(); zincCtrl_jd.update3D(); zincCtrl_jd.fitCamera(); }, 100);
+      setTimeout(() => { zincCtrl_jd.init3D(); zincCtrl_jd.update3D(); zincCtrl_jd.fitCamera(); zincCtrl_jd.openMpWizard(); }, 100);
     }
     if (btn.dataset.tab === 'tab-couvertine') {
       updateAcrotereAll();
@@ -8707,43 +8712,60 @@ function createZincController(suffix, kind){
 
       <div class="panel" style="margin-top:16px;">
         <div class="panel-title"><span>Calculateur multi-pans (arêtiers, faîtage, noues)</span></div>
-        <div class="biais-hint">Pour un ensemble de toiture standard (pignon, croupe, L, T ou U), à pente unique. Donne les longueurs de faîtage, arêtiers et noues, avec un plan et un aperçu 3D — indépendant du versant calculé au-dessus.</div>
-        <div class="field" style="margin-top:10px;">
-          <label>Forme</label>
-          <select id="${id('mpType')}">
-            <option value="2pans">2 pans (pignon)</option>
-            <option value="4pans">4 pans (croupe)</option>
-            <option value="L">En L</option>
-            <option value="T">En T</option>
-            <option value="U">En U</option>
-          </select>
+        <div id="${id('mpSummaryLine')}" class="biais-hint" style="margin-top:6px;">Aucune toiture paramétrée pour l'instant.</div>
+        <button class="add-btn" id="${id('mpOpenWizardBtn')}" type="button" style="margin-top:10px;font-weight:700;">📐 Paramétrer la toiture</button>
+      </div>
+
+      <div class="mp-wizard-overlay" id="${id('mpWizardOverlay')}">
+        <div class="mp-wizard-box">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div class="panel-title" style="margin:0;"><span>Calculateur multi-pans</span></div>
+            <button class="fs-close" id="${id('mpWizardCloseBtn')}" type="button">✕ Fermer</button>
+          </div>
+          <div id="${id('mpStepProgress')}" style="font-size:11.5px;color:var(--text-dim);margin-top:4px;"></div>
+
+          <div id="${id('mpStep0')}" class="mp-step">
+            <div class="field">
+              <label>Forme de la toiture</label>
+              <select id="${id('mpType')}">
+                <option value="monopente">Monopente (1 pan)</option>
+                <option value="2pans">2 pans (pignon)</option>
+                <option value="4pans">4 pans (croupe)</option>
+                <option value="L">En L</option>
+                <option value="T">En T</option>
+                <option value="U">En U</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="${id('mpStep1')}" class="mp-step" style="display:none;">
+            <div class="toggle-row">
+              <input type="checkbox" id="${id('mpMainHip')}">
+              <span>Extrémités du corps principal en croupe (sinon pignon)</span>
+            </div>
+            <div class="field" style="margin-top:10px;"><label>Corps principal — longueur (mm)</label><input type="number" id="${id('mpMainL')}" value="10000" min="500" step="100"></div>
+            <div class="field" style="margin-top:8px;"><label>Corps principal — largeur (mm)</label><input type="number" id="${id('mpMainW')}" value="7000" min="500" step="100"></div>
+          </div>
+
+          <div id="${id('mpStep2')}" class="mp-step" style="display:none;">
+            <div class="field"><label>Aile — longueur (mm, ce qu'elle dépasse du corps)</label><input type="number" id="${id('mpWingL')}" value="5000" min="500" step="100"></div>
+            <div class="field" style="margin-top:8px;"><label>Aile — largeur (mm)</label><input type="number" id="${id('mpWingW')}" value="5000" min="500" step="100"></div>
+          </div>
+
+          <div id="${id('mpStep3')}" class="mp-step" style="display:none;">
+            <div class="field">
+              <label>Pente (°) — commune à tous les pans</label>
+              <input type="number" id="${id('mpPente')}" value="25" min="1" max="80" step="0.5">
+            </div>
+            <div class="biais-hint" id="${id('mpAssumHint')}" style="margin-top:8px;"></div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:16px;">
+            <button class="icon-action-btn" id="${id('mpPrevBtn')}" type="button" style="flex:1;display:none;">◀ Précédent</button>
+            <button class="add-btn" id="${id('mpNextBtn')}" type="button" style="flex:2;margin:0;">Suivant ▶</button>
+            <button class="add-btn" id="${id('mpCalcBtn')}" type="button" style="flex:2;margin:0;font-weight:700;display:none;">📐 Calculer</button>
+          </div>
         </div>
-        <div class="toggle-row" style="margin-top:8px;">
-          <input type="checkbox" id="${id('mpMainHip')}">
-          <span>Extrémités du corps principal en croupe (sinon pignon)</span>
-        </div>
-        <div class="sheet-fields" style="margin-top:8px;">
-          <div class="field"><label>Corps principal — longueur (mm)</label><input type="number" id="${id('mpMainL')}" value="10000" min="500" step="100"></div>
-          <div class="field"><label>Corps principal — largeur (mm)</label><input type="number" id="${id('mpMainW')}" value="7000" min="500" step="100"></div>
-        </div>
-        <div class="sheet-fields" id="${id('mpWingWrap')}" style="margin-top:8px;">
-          <div class="field"><label>Aile — longueur (mm)</label><input type="number" id="${id('mpWingL')}" value="5000" min="500" step="100"></div>
-          <div class="field"><label>Aile — largeur (mm)</label><input type="number" id="${id('mpWingW')}" value="5000" min="500" step="100"></div>
-        </div>
-        <div class="field" style="margin-top:8px;">
-          <label>Pente (°) — commune à tous les pans</label>
-          <input type="number" id="${id('mpPente')}" value="25" min="1" max="80" step="0.5">
-        </div>
-        <div class="biais-hint" id="${id('mpAssumHint')}" style="margin-top:6px;"></div>
-        <button class="add-btn" id="${id('mpCalcBtn')}" type="button" style="margin-top:10px;">📐 Calculer</button>
-        <div id="${id('mpResults')}" style="margin-top:10px;"></div>
-        <div id="${id('mpPlanWrap')}" style="background:#fff;border-radius:8px;padding:8px;margin-top:10px;"></div>
-        <div class="field" style="margin-top:10px;">
-          <label>Vue éclatée <span id="${id('mpExplodeVal')}" style="font-family:'JetBrains Mono',monospace;color:var(--accent);">0 mm</span></label>
-          <input type="range" id="${id('mpExplodeRange')}" min="0" max="900" step="20" value="0" style="width:100%;accent-color:var(--accent);">
-        </div>
-        <div class="biais-hint" style="margin-top:4px;">De bas en haut : volige, écran de sous-toiture, ${isTasseaux ? 'bacs à tasseaux (couvre-joints)' : 'bacs à joint debout'}, puis faîtage / bande d\'égout / rive. Glisse pour tourner, molette pour zoomer.</div>
-        <div id="${id('mpCanvas3d')}" style="width:100%;height:320px;border-radius:6px;background:linear-gradient(180deg,#a9cdec 0%,#d6e6f0 55%,#eef1ee 100%);position:relative;overflow:hidden;margin-top:10px;"></div>
       </div>
 
       <div class="panel" style="margin-top:16px;">
@@ -8759,14 +8781,14 @@ function createZincController(suffix, kind){
     </div>
 
     <div>
-      <div id="${id('schemaWrap')}" style="background:#fff;border-radius:10px;padding:14px;margin-bottom:16px;">
+      <div id="${id('schemaWrap')}" style="background:#fff;border-radius:10px;padding:14px;margin-bottom:16px;display:none;">
         <div class="canvas-head" style="margin-bottom:8px;">
           <span class="canvas-title" style="color:#1c1b1a;">Plan du versant (bacs, lés, ouvertures)</span>
         </div>
         <div id="${id('schemaSvgWrap')}"></div>
       </div>
 
-      <div class="panel">
+      <div class="panel" style="display:none;">
         <div class="canvas-head">
           <span class="canvas-title">Simulation 3D de la couverture</span>
         </div>
@@ -8810,6 +8832,23 @@ function createZincController(suffix, kind){
           <span>Afficher les cotes déportées sur la 3D</span>
         </div>
         <div id="${id('canvas3d')}" style="width:100%;height:460px;border-radius:6px;background:linear-gradient(180deg,#a9cdec 0%,#d6e6f0 55%,#eef1ee 100%);position:relative;overflow:hidden;margin-top:10px;"></div>
+      </div>
+
+      <div class="panel">
+        <div class="canvas-head">
+          <span class="canvas-title">Calepinage — plan 2D et 3D de la toiture (multi-pans)</span>
+        </div>
+        <div id="${id('mpPlanWrap')}" style="background:#fff;border-radius:8px;padding:8px;margin-top:10px;"></div>
+        <div class="panel-title" style="font-size:12px;margin-top:12px;">Sens de pose des bacs (par pan, posé en premier)</div>
+        <div id="${id('mpBacStartList')}" style="font-size:12px;color:var(--text-dim);">Calcule d'abord un plan pour régler le sens de pose de chaque pan.</div>
+        <div class="field" style="margin-top:10px;">
+          <label>Vue éclatée <span id="${id('mpExplodeVal')}" style="font-family:'JetBrains Mono',monospace;color:var(--accent);">0 mm</span></label>
+          <input type="range" id="${id('mpExplodeRange')}" min="0" max="900" step="20" value="0" style="width:100%;accent-color:var(--accent);">
+        </div>
+        <div class="biais-hint" style="margin-top:4px;">De bas en haut : pannes, volige, écran de sous-toiture, ${isTasseaux ? 'bacs à tasseaux (couvre-joints)' : 'bacs à joint debout'}, puis faîtage / bande d\'égout / rive. Les bacs se soulèvent progressivement depuis le bac de départ jusqu'au dernier posé. Glisse pour tourner, molette pour zoomer.</div>
+        <button class="add-btn" id="${id('mpReplayBtn')}" type="button" style="margin-top:10px;font-weight:700;">▶ Rejouer la pose</button>
+        <div id="${id('mpCanvas3d')}" style="width:100%;height:760px;border-radius:6px;background:linear-gradient(180deg,#a9cdec 0%,#d6e6f0 55%,#eef1ee 100%);position:relative;overflow:hidden;margin-top:10px;"></div>
+        <div id="${id('mpResults')}" style="margin-top:12px;"></div>
       </div>
 
       <div class="panel" style="margin-top:16px;">
@@ -9269,20 +9308,48 @@ function createZincController(suffix, kind){
   // ailes toujours en pignon (pas de croupe sur les ailes), arêtiers/noues à
   // 45° en plan (cas standard, pentes égales de chaque côté), ailes moins
   // larges que le corps sur lequel elles s'appuient.
-  let mp3dScene = null, mp3dRenderer = null, mp3dCamera = null, mp3dGroup = null, mp3dInit = false;
+  let mp3dScene = null, mp3dRenderer = null, mp3dCamera = null, mp3dGroup = null, mp3dInit = false, mp3dKeyLight = null;
   let mpExplodeAmount = 0;
   const MP_EXPLODE_MAX = 900;
-  let mpVoligeItems = [], mpEcranItems = [], mpAccItems = [];
+  
+  let mpLastData = null;
   function mpStagedOffset(startFraction){ return Math.max(0, mpExplodeAmount - MP_EXPLODE_MAX * startFraction); }
-  function mpApplyExplode(){
-    const apply = (list, startFraction, sign) => {
-      const off = mpStagedOffset(startFraction) * sign;
-      list.forEach(it => { it.mesh.position.set(it.n.x * off, it.n.y * off, it.n.z * off); });
-    };
-    apply(mpVoligeItems, 0, -1);
-    apply(mpEcranItems, 1 / 3, -1);
-    apply(mpAccItems, 2 / 3, 1);
-    if (mp3dRenderer) mp3dRenderer.render(mp3dScene, mp3dCamera);
+  // Sens de pose par pan : le bac de départ est posé en premier (ne bouge
+  // jamais dans l'éclaté), les autres se soulèvent en s'en éloignant.
+  let mpBacStartByPan = [];
+  function mpBacDistFrac(i, nBacs, panIdx){
+    const mode = mpBacStartByPan[panIdx] || 'left';
+    let start;
+    if (mode === 'right') start = nBacs - 1;
+    else if (mode === 'center') start = (nBacs - 1) / 2;
+    else start = 0;
+    const maxDist = Math.max(1, mode === 'center' ? Math.max(start, nBacs - 1 - start) : nBacs - 1);
+    return Math.abs(i - start) / maxDist;
+  }
+  function mpRenderBacStartControls(data){
+    const wrap = $('mpBacStartList');
+    if (!data.pans.length) { wrap.innerHTML = ''; return; }
+    // Un pan "gable" par groupe de toit correspond à un vrai plan de pose ;
+    // on affiche un réglage pour chaque pan qui porte des bacs.
+    wrap.innerHTML = '';
+    data.pans.forEach((p, i) => {
+      if (mpBacStartByPan[i] === undefined) mpBacStartByPan[i] = 'left';
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-top:6px;';
+      row.innerHTML = `<span style="font-size:12px;min-width:60px;">Pan ${i + 1}</span>
+        <select data-pi="${i}" style="flex:1;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;">
+          <option value="left">Depuis la gauche</option>
+          <option value="right">Depuis la droite</option>
+          <option value="center">Depuis le centre</option>
+        </select>`;
+      row.querySelector('select').value = mpBacStartByPan[i];
+      row.querySelector('select').addEventListener('change', (e) => {
+        mpBacStartByPan[i] = e.target.value;
+        if (mpLastData) mpDraw3D(mpLastData);
+        mpDrawPlan(mpLastData);
+      });
+      wrap.appendChild(row);
+    });
   }
   function getVoligeTextureMp(){
     if (getVoligeTextureMp._t) return getVoligeTextureMp._t;
@@ -9374,314 +9441,1655 @@ function createZincController(suffix, kind){
 
   // Aile en pignon accolée sur le côté "haut" (y = yBase) du corps porteur,
   // depuis x = xStart sur wingL de long, wingW de large. Ajoute 2 noues.
-  function mpBuildWing(xStart, yBase, wingL, wingW, thRad, labelSuffix){
-    const half = wingW / 2;
-    const H = half * Math.tan(thRad);
-    const rl = Math.max(0, wingL - wingW);
-    const apex0 = { x: xStart + half, y: yBase + wingW, h: H };
-    const apex1 = { x: xStart + wingL - half, y: yBase + wingW, h: H };
-    const cornerL = { x: xStart, y: yBase }, cornerR = { x: xStart + wingL, y: yBase };
-    const tipL = { x: xStart, y: yBase + wingW, h: 0 }, tipR = { x: xStart + wingL, y: yBase + wingW, h: 0 };
-    const segs = [];
-    if (rl > 0) segs.push({ kind: 'faitage', label: 'Faîtage aile' + labelSuffix, length: rl });
-    const noueLen = mpHipLen(half, thRad);
-    segs.push({ kind: 'noue', label: 'Noue' + labelSuffix + ' (×2)', length: noueLen, qty: 2 });
+  // Aile en pignon simple, perpendiculaire au corps principal : son propre
+  // faîtage part du mur du corps principal (yBase) et va jusqu'au bout de
+  // l'aile (yBase+depth) — deux pans en long, pas de bout en croupe. Les deux
+  // bords où l'aile rejoint le corps principal sont les noues.
+
+
+  function mpUpdateAssumHint(){
+    const type = $('mpType').value;
+    const hint = $('mpAssumHint');
+    hint.textContent = type === 'monopente'
+      ? 'Un seul pan, du mur bas au mur haut. Aucun accessoire de faîtage/arêtier ici (juste égout, rives et un habillage en tête de mur si besoin, à ajouter à la main). Pente = 0 donne une toiture-terrasse plate.'
+      : (type === '2pans' || type === '4pans')
+      ? 'Hypothèse : pente identique sur les deux pans (pignon simple, sans arêtier ni noue). Pente = 0 donne une toiture-terrasse plate.'
+      : "Hypothèses : pente unique sur tout le bâtiment, aile(s) en pignon (pas de croupe sur l'aile), aile moins large que le corps principal, corps principal posé en pignon quand il y a une aile (pas de croupe), noues à 45° en plan (approximation, cas standard pente égale de chaque côté). Un vrai relevé de chantier peut différer — à vérifier sur place.";
+  }
+
+  /* ---- Questionnaire pas à pas (au lieu d'un long formulaire) ---- */
+  let mpStepIdx = 0;
+  function mpWingNeeded(){ return ['L', 'T', 'U'].includes($('mpType').value); }
+  function mpStepList(){ return mpWingNeeded() ? [0, 1, 2, 3] : [0, 1, 3]; }
+  function mpShowStep(){
+    const list = mpStepList();
+    if (mpStepIdx >= list.length) mpStepIdx = list.length - 1;
+    if (mpStepIdx < 0) mpStepIdx = 0;
+    [0, 1, 2, 3].forEach(n => { $('mpStep' + n).style.display = 'none'; });
+    const stepNum = list[mpStepIdx];
+    $('mpStep' + stepNum).style.display = '';
+    $('mpStepProgress').textContent = `Étape ${mpStepIdx + 1} / ${list.length}`;
+    $('mpPrevBtn').style.display = mpStepIdx === 0 ? 'none' : '';
+    const isLast = mpStepIdx === list.length - 1;
+    $('mpNextBtn').style.display = isLast ? 'none' : '';
+    $('mpCalcBtn').style.display = isLast ? '' : 'none';
+    if (stepNum === 3) mpUpdateAssumHint();
+  }
+  $('mpNextBtn').addEventListener('click', () => { mpStepIdx++; mpShowStep(); });
+  $('mpPrevBtn').addEventListener('click', () => { mpStepIdx--; mpShowStep(); });
+  $('mpType').addEventListener('change', mpShowStep);
+  mpShowStep();
+
+  function mpOpenWizard(){ mpStepIdx = 0; mpShowStep(); $('mpWizardOverlay').classList.add('show'); }
+  function mpCloseWizard(){ $('mpWizardOverlay').classList.remove('show'); }
+  $('mpOpenWizardBtn').addEventListener('click', mpOpenWizard);
+  $('mpWizardCloseBtn').addEventListener('click', mpCloseWizard);
+  $('mpWizardOverlay').addEventListener('click', (e) => { if (e.target.id === id('mpWizardOverlay')) mpCloseWizard(); });
+
+  const MP_TYPE_LABEL = { monopente: 'Monopente', '2pans': '2 pans', '4pans': '4 pans (croupe)', L: 'En L', T: 'En T', U: 'En U' };
+  function mpUpdateSummaryLine(){
+    const t = $('mpType').value;
+    let txt = `${MP_TYPE_LABEL[t]} · corps ${$('mpMainL').value}×${$('mpMainW').value} mm`;
+    if (mpWingNeeded()) txt += ` · aile ${$('mpWingL').value}×${$('mpWingW').value} mm`;
+    txt += ` · pente ${$('mpPente').value}°`;
+    $('mpSummaryLine').textContent = txt;
+  }
+
+
+  const MP_EDGE_LEGEND = [
+    { color: '#aab1b8', label: 'Bac (panneau droit)' },
+    { color: '#3a7fc4', label: "Bande d'égout" },
+    { color: '#e05a2b', label: 'Faîtage' },
+    { color: '#e08a2b', label: 'Arêtier / noue' },
+    { color: '#9aa1a8', label: 'Rive' },
+    { color: '#8d6e63', label: 'Solin contre mur' },
+    { color: '#2f6fb0', label: 'Sens de pose' },
+    { color: '#f2b35e', label: 'Demi-bac / bac recoupé' }
+  ];
+
+
+  // Repère local d'un pan (u = le long de l'égout, v = pente, n = normale).
+  function mpPanPointAlongEdge(A, B, mm, totalLen){
+    const t = totalLen > 0.01 ? mm / totalLen : 0;
+    return { x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t, h: A.h + (B.h - A.h) * t };
+  }
+  function mpDot3(A, B){ return A.x * B.x + A.y * B.y + A.h * B.h; }
+  function mpLocalUV(basis, Q){
+    const d = { x: Q.x - basis.p0.x, y: Q.y - basis.p0.y, h: Q.h - basis.p0.h };
+    return { u: mpDot3(d, basis.u), v: mpDot3(d, basis.v) };
+  }
+  // Découpe un pan en vrais panneaux à largeur CONSTANTE (pas de queue de billard).
+  // Sur un pan triangulaire (arêtier/noue), chaque bac reste à largeur fixe mais
+  // est coupé net à la bonne longueur par la ligne d'arêtier (bord haut en biseau,
+  // comme une vraie pose : panneaux droits, coupés à l'arêtier sur place).
+  // Rejoue la pose : chaque pièce apparaît dans l'ordre réel de montage
+  // (volige, écran, puis les bacs dans l'ordre de pose choisi, puis les
+  // accessoires), comme une vidéo de chantier accélérée.
+  /* ===== MULTI-PANS v2 : géométrie réelle (noues), calepinage avec demi-bacs, 3D écorchée ===== */
+  const MP_SEAM_H = 26;
+  const MP_CUT = { bacs: 0.5, ecran: 0.72, volige: 0.9 };
+  let mpL = { pannes: [], volige: [], ecran: [], bacs: [], acc: [] };
+  let mpVis = { pannes: true, volige: true, ecran: true, bacs: true, acc: true, maison: true, pins: true };
+  let mpPlanZoom = 1;
+  let mpEcorche = true, mpPins = [], mpPinLayer = null, mpHouse = [], mpAnimating = false;
+  const mpCam = { th: 0.8, ph: 1.0, r: 1000, r0: 1000, t: null };
+  const mpKey = (A, B) => [A.x, A.y, A.h, B.x, B.y, B.h].map(v => Math.round(v)).join('_');
+
+  /* ---------- Outils polygones ---------- */
+  function mpPoly2Area(P){ let a = 0; for (let i = 0; i < P.length; i++) { const q = P[(i + 1) % P.length]; a += P[i][0] * q[1] - q[0] * P[i][1]; } return Math.abs(a) / 2; }
+  function mpClip2(P, k, val, keepGreater){
+    const out = [], inside = q => keepGreater ? q[k] >= val - 1e-6 : q[k] <= val + 1e-6;
+    for (let i = 0; i < P.length; i++) {
+      const a = P[i], b = P[(i + 1) % P.length], ia = inside(a), ib = inside(b);
+      if (ia) out.push(a);
+      if (ia !== ib) { const t = (val - a[k]) / (b[k] - a[k]); out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]); }
+    }
+    return out;
+  }
+  // Garde a*x + b*y <= c sur un polygone 3D {x,y,h} (h interpolé : pan plan).
+  function mpClipPlan(P, a, b, c){
+    const out = [], f = q => a * q.x + b * q.y - c;
+    for (let i = 0; i < P.length; i++) {
+      const p = P[i], q = P[(i + 1) % P.length], fp = f(p), fq = f(q), ip = fp <= 1e-6, iq = fq <= 1e-6;
+      if (ip) out.push(p);
+      if (ip !== iq) { const t = fp / (fp - fq); out.push({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t, h: p.h + (q.h - p.h) * t }); }
+    }
+    return out.length >= 3 && mpPoly2Area(out.map(q => [q.x, q.y])) > 1 ? out : [];
+  }
+  // Étendue d'un jeu de polygones 2D sur la droite coordonnée k = val.
+  function mpSpan(polys, k, val){
+    let lo = Infinity, hi = -Infinity;
+    polys.forEach(P => {
+      for (let i = 0; i < P.length; i++) {
+        const a = P[i], b = P[(i + 1) % P.length], da = a[k] - val, db = b[k] - val;
+        if ((da <= 0 && db >= 0) || (da >= 0 && db <= 0)) {
+          const o = 1 - k;
+          if (Math.abs(da - db) < 1e-9) { lo = Math.min(lo, a[o], b[o]); hi = Math.max(hi, a[o], b[o]); }
+          else { const t = da / (da - db), x = a[o] + (b[o] - a[o]) * t; lo = Math.min(lo, x); hi = Math.max(hi, x); }
+        }
+      }
+    });
+    return isFinite(lo) ? [lo, hi] : null;
+  }
+  function mpEdgeKind(A, B, u, valleys){
+    if (mpEdgeMap) { const k = mpEdgeMap.get(mpKey(A, B)); if (k) return k; }
+    if (mpVault) return Math.abs(B.x - A.x) > Math.abs(B.y - A.y) ? 'egout' : 'rive';
+    if (A.h < 1 && B.h < 1) return 'egout';
+    if (A.h >= 1 && B.h >= 1) return 'faitage';
+    if (valleys && valleys.has(mpKey(A, B))) return 'noue';
+    const dx = B.x - A.x, dy = B.y - A.y, l = Math.hypot(dx, dy) || 1;
+    return Math.abs((dx * u.x + dy * u.y) / l) < 0.25 ? 'rive' : 'aretier';
+  }
+
+  /* ---------- Géométrie ---------- */
+  // Aile en pignon raccordée au corps principal par deux vraies noues : son faîtage
+  // s'arrête là où il rencontre le versant du corps (à yBase - largeur/2).
+  function mpBuildWing(xs, yBase, depth, ww, thRad, sfx, valleys){
+    const half = ww / 2, H = half * Math.tan(thRad), rx = xs + half, yFar = yBase + depth, yJ = yBase - half;
     const pans = [
-      { pts: [{ ...cornerL, h: 0 }, apex0, apex1, { ...cornerR, h: 0 }], color: 0xd7dde2, gable: true },
-      { pts: [{ ...cornerL, h: 0 }, tipL, apex0], color: 0xbec6cc, gable: false },
-      { pts: [{ ...cornerR, h: 0 }, apex1, tipR], color: 0xbec6cc, gable: false }
+      { pts: [{ x: xs, y: yBase, h: 0 }, { x: xs, y: yFar, h: 0 }, { x: rx, y: yFar, h: H }, { x: rx, y: yJ, h: H }], color: 0xd7dde2, gable: true },
+      { pts: [{ x: xs + ww, y: yBase, h: 0 }, { x: xs + ww, y: yFar, h: 0 }, { x: rx, y: yFar, h: H }, { x: rx, y: yJ, h: H }], color: 0xcdd3d8, gable: true }
     ];
-    return { segs, pans };
+    pans.forEach(p => { const a = p.pts[3], b = p.pts[0]; valleys.add(mpKey(a, b)); valleys.add(mpKey(b, a)); });
+    const segs = [
+      { kind: 'faitage', label: 'Faîtage aile' + sfx, length: depth + half },
+      { kind: 'noue', label: 'Noue' + sfx + ' (×2)', length: mpHipLen(half, thRad), qty: 2 }
+    ];
+    return { segs, pans, H };
   }
 
   function computeMultiPanRoof(){
     const type = $('mpType').value;
-    const thRad = (parseFloat($('mpPente').value) || 25) * Math.PI / 180;
+    const thRad = (parseFloat($('mpPente').value) || 25) * Math.PI / 180, tan = Math.tan(thRad);
     const Lm = Math.max(500, parseFloat($('mpMainL').value) || 10000);
     const Wm = Math.max(500, parseFloat($('mpMainW').value) || 7000);
-    const hipMain = $('mpMainHip').checked;
+    mpVault = null; mpEdgeMap = null; if (type === 'modele') return mpModelCompute(Lm, Wm, thRad);
+    { const rl = $('mpRidge') ? parseFloat($('mpRidge').value) || 0 : 0, hp = ($('mpHips') && $('mpHips').value) || 'both';
+      if (type === '4pans' && (rl > 0 || hp !== 'both')) { const d = mpModelCompute(Lm, Wm, thRad, [{ id: 1, x: 0, y: 0, L: Lm, W: Wm, z: 0, roof: '4pans', axis: 'x', dir: 'd', rp: 0, rmode: 'pente', r: 0, n: 24, rl, hips: hp }]); d.type = '4pans'; return d; } }
+    if (type === 'voute') return mpVaultCompute(type, Lm, Wm, thRad);
+    const hipMain = $('mpMainHip').checked && !['L', 'T', 'U'].includes(type);
     const Lw = Math.max(500, parseFloat($('mpWingL').value) || 5000);
     const Ww = Math.max(500, parseFloat($('mpWingW').value) || 5000);
-    let segs = [], pans = [];
+    const valleys = new Set();
+    let segs = [], pans = [], rects = [];
+    const houseH = mpWallH > 0 ? mpWallH : Math.max(2200, Math.min(3200, Wm * 0.38));
     const main = mpBuildBlock(0, 0, Lm, Wm, hipMain, thRad, '');
-    segs = segs.concat(main.segs); pans = pans.concat(main.pans);
-    if (type === '2pans' || type === '4pans') {
-      // rien de plus : corps seul
-    } else if (type === 'L') {
-      const w = mpBuildWing(0, Wm, Lw, Math.min(Ww, Wm), thRad, ' (aile)');
-      segs = segs.concat(w.segs); pans = pans.concat(w.pans);
-    } else if (type === 'T') {
-      const xs = Math.max(0, (Lm - Lw) / 2);
-      const w = mpBuildWing(xs, Wm, Lw, Math.min(Ww, Wm), thRad, ' (aile)');
-      segs = segs.concat(w.segs); pans = pans.concat(w.pans);
-    } else if (type === 'U') {
-      const wA = mpBuildWing(0, Wm, Lw, Math.min(Ww, Wm), thRad, ' (aile 1)');
-      const wB = mpBuildWing(Math.max(0, Lm - Lw), Wm, Lw, Math.min(Ww, Wm), thRad, ' (aile 2)');
-      segs = segs.concat(wA.segs, wB.segs); pans = pans.concat(wA.pans, wB.pans);
+    segs = main.segs.slice(); pans = main.pans.slice();
+    const S = Wm, Hm = (Wm / 2) * tan;
+    rects.push({ x0: 0, y0: 0, sx: Lm, sy: Wm, fill: hipMain ? null : { axis: 'x', pts: [[40, 0], [S - 40, 0], [S - 40, 40 * tan], [S / 2, Hm], [40, 40 * tan]] } });
+    if (type === 'monopente') {
+      pans = []; segs = [];
+      const H = Wm * tan;
+      pans.push({ pts: [{ x: 0, y: 0, h: 0 }, { x: Lm, y: 0, h: 0 }, { x: Lm, y: Wm, h: H }, { x: 0, y: Wm, h: H }], color: 0xc7cdd3, gable: true });
+      rects = [{ x0: 0, y0: 0, sx: Lm, sy: Wm, fill: { axis: 'x', pts: [[40, 0], [S - 40, 0], [S - 40, (S - 40) * tan], [40, 40 * tan]] } }];
+    } else if (type === 'L' || type === 'T' || type === 'U') {
+      const ww = Math.min(Ww, Wm, Lm);
+      const xsList = type === 'L' ? [0] : type === 'T' ? [(Lm - ww) / 2] : [0, Lm - ww];
+      const notches = [];
+      xsList.forEach((x0, i) => {
+        const sfx = type === 'U' ? ' (aile ' + (i + 1) + ')' : ' (aile)';
+        const w = mpBuildWing(x0, Wm, Lw, ww, thRad, sfx, valleys);
+        segs = segs.concat(w.segs); pans = pans.concat(w.pans);
+        notches.push({ xa: x0, xb: x0 + ww });
+        rects.push({ x0, y0: Wm, sx: ww, sy: Lw, fill: { axis: 'y', pts: [[40, 0], [ww - 40, 0], [ww - 40, 40 * tan], [ww / 2, w.H], [40, 40 * tan]] } });
+      });
+      // Découpe du versant arrière du corps principal : encoches triangulaires des ailes.
+      const bp = pans[1];
+      bp.eA = bp.pts[0]; bp.eB = bp.pts[1]; bp.eT = bp.pts.find(q => q.h > 0);
+      let pieces = [bp.pts.map(q => ({ ...q }))];
+      const out = [bp.pts[0]];
+      notches.slice().sort((a, b) => b.xb - a.xb).forEach(nc => {
+        const xr = (nc.xa + nc.xb) / 2, half = (nc.xb - nc.xa) / 2, apex = { x: xr, y: Wm - half, h: half * tan };
+        out.push({ x: nc.xb, y: Wm, h: 0 }, apex, { x: nc.xa, y: Wm, h: 0 });
+        const next = [];
+        pieces.forEach(pc => {
+          [mpClipPlan(pc, 1, 0, nc.xa),
+           mpClipPlan(mpClipPlan(mpClipPlan(pc, -1, 0, -nc.xa), 1, 0, xr), 1, 1, nc.xa + Wm),
+           mpClipPlan(mpClipPlan(mpClipPlan(pc, -1, 0, -xr), 1, 0, nc.xb), -1, 1, Wm - nc.xb),
+           mpClipPlan(pc, -1, 0, -nc.xb)].forEach(r => { if (r.length >= 3) next.push(r); });
+        });
+        pieces = next;
+      });
+      out.push(bp.pts[1], bp.pts[2], bp.pts[3]);
+      bp.pts = out.filter((q, i) => { const r = out[(i + 1) % out.length]; return Math.hypot(q.x - r.x, q.y - r.y, q.h - r.h) > 1; });
+      bp.pieces = pieces;
     }
-    return { segs, pans, Lm, Wm };
+    return { segs, pans, Lm, Wm, rects, valleys, tan, houseH, type };
   }
 
-  function mpUpdateAssumHint(){
-    const type = $('mpType').value;
-    const wrap = $('mpWingWrap');
-    wrap.style.display = (type === '2pans' || type === '4pans') ? 'none' : '';
-    const hint = $('mpAssumHint');
-    hint.textContent = (type === '2pans' || type === '4pans')
-      ? 'Hypothèse : pente identique sur les deux pans (pignon simple, sans arêtier ni noue).'
-      : 'Hypothèses : pente unique sur tout le bâtiment, aile(s) en pignon (pas de croupe), aile moins large que le corps principal, noues/arêtiers à 45° en plan (cas standard pente égale de chaque côté). Un vrai relevé de chantier peut différer légèrement — à vérifier sur place.';
+  /* ---------- Calepinage : bacs entiers + demi-bacs / bacs recoupés ---------- */
+  function mpPanBasis(p){
+    const p0 = p.eA || p.pts[0], p1 = p.eB || p.pts[1];
+    const top = p.eT || p.pts.find(q => q.h > 0) || p.pts[p.pts.length - 1];
+    const len = Math.hypot(p1.x - p0.x, p1.y - p0.y) || 1;
+    const u = { x: (p1.x - p0.x) / len, y: (p1.y - p0.y) / len, h: 0 };
+    const rx = top.x - p0.x, ry = top.y - p0.y, dt = rx * u.x + ry * u.y;
+    const v = { x: rx - dt * u.x, y: ry - dt * u.y, h: top.h - p0.h };
+    const vl = Math.hypot(v.x, v.y, v.h) || 1; v.x /= vl; v.y /= vl; v.h /= vl;
+    const us = p.pts.map(q => (q.x - p0.x) * u.x + (q.y - p0.y) * u.y), umin = Math.min(...us), umax = Math.max(...us);
+    const n = { x: u.y * v.h - u.h * v.y, y: u.h * v.x - u.x * v.h, h: u.x * v.y - u.y * v.x };
+    const nl = Math.hypot(n.x, n.y, n.h) || 1; n.x /= nl; n.y /= nl; n.h /= nl;
+    if (n.h < 0) { n.x *= -1; n.y *= -1; n.h *= -1; }
+    return { u, v, n, p0: { x: p0.x + umin * u.x, y: p0.y + umin * u.y, h: p0.h }, len: Math.max(1, umax - umin) };
   }
-  $('mpType').addEventListener('change', mpUpdateAssumHint);
-  mpUpdateAssumHint();
+  function mpToWorld(bs, u, v){ return { x: bs.p0.x + u * bs.u.x + v * bs.v.x, y: bs.p0.y + u * bs.u.y + v * bs.v.y, h: bs.p0.h + u * bs.u.h + v * bs.v.h }; }
+  function mpBacLayout(L, W, mode){
+    const tol = 8;
+    if (L <= W + tol) return [[0, L]];
+    let segs = [];
+    if (mode === 'center') {
+      const c = L / 2, k = Math.floor((c - W / 2) / W + 1e-9), edge = c - W / 2 - k * W;
+      for (let i = -k; i <= k; i++) segs.push([c + i * W - W / 2, c + i * W + W / 2]);
+      if (edge > tol) { segs.unshift([0, edge]); segs.push([L - edge, L]); } else { segs[0][0] = 0; segs[segs.length - 1][1] = L; }
+      return segs;
+    }
+    const n = Math.floor(L / W + 1e-9), rem = L - n * W;
+    for (let i = 0; i < n; i++) segs.push([i * W, (i + 1) * W]);
+    if (rem > tol) segs.push([n * W, L]); else segs[n - 1][1] = L;
+    if (mode === 'right') segs = segs.map(s => [L - s[1], L - s[0]]).reverse();
+    return segs;
+  }
+  // Un bac = bande de largeur fixe découpée dans le pan (coupe d'arêtier / de noue
+  // incluse). La dernière bande (ou les deux bandes d'extrémité en départ centré)
+  // est un demi-bac / bac recoupé.
+  function mpBuildBacsForPan(p, panIdx){
+    const W = parseFloat($('largeurBac').value) || 500, bs = mpPanBasis(p);
+    const pieces2 = (p.pieces || [p.pts]).map(pc => pc.map(q => { const t = mpLocalUV(bs, q); return [t.u, t.v]; }));
+    const its = mpItems.filter(it => it.pan === panIdx), rects = its.map(it => mpItemRect(it, bs, it.type === 'velux' ? 15 : it.type === 'cheminee' ? 10 : 0));
+    if (p.single) {   // « queue de billard » : un seul bac effilé par pan (pointe ou largeur réduite vers le haut)
+      const polys = [];
+      pieces2.forEach(P2 => { let parts = [P2]; rects.forEach(r => { parts = parts.flatMap(P => mpSubRect(P, r)); }); parts.forEach(q => polys.push({ p2: q, p3: q.map(([u, v]) => mpToWorld(bs, u, v)) })); });
+      const vs = pieces2.flat().map(q => q[1]), vmax = Math.max(...vs), vmin = Math.min(...vs); let we = 0;
+      p.pts.forEach((a, i) => { const b = p.pts[(i + 1) % p.pts.length]; if (Math.abs(a.h - b.h) < 1 && a.h <= (p.hmin || 0) + 1) we = Math.max(we, Math.hypot(a.x - b.x, a.y - b.y)); });
+      const tp = mpSpan(pieces2, 1, vmax - 2), arr = [{ polys, cuts: [...new Set(its.map(mpItemName))], u1: 0, u2: we, w: we || bs.len, wTop: tp ? Math.max(0, tp[1] - tp[0]) : 0, cut: false, half: false, billard: true, lenMin: vmax - vmin, lenMax: vmax - vmin }];
+      arr.W = W; return arr;
+    }
+    const bacs = mpBacLayout(bs.len, W, mpBacStartByPan[panIdx] || 'left').map(([u1, u2]) => {
+      const polys = [];
+      pieces2.forEach(P2 => {
+        let c = mpClip2(P2, 0, u1, true);
+        if (c.length >= 3) c = mpClip2(c, 0, u2, false);
+        if (c.length >= 3 && mpPoly2Area(c) > 500) {
+          let parts = [c]; rects.forEach(r => { parts = parts.flatMap(P => mpSubRect(P, r)); });
+          parts.forEach(q => polys.push({ p2: q, p3: q.map(([u, v]) => mpToWorld(bs, u, v)) }));
+        }
+      });
+      const w = u2 - u1, ends = [u1 + 1, u2 - 1].map(u => { const s = mpSpan(pieces2, 0, u); return s ? s[1] - s[0] : 0; });
+      const cuts = [...new Set(its.filter((it, k) => rects[k].u2 > u1 && rects[k].u1 < u2).map(mpItemName))];
+      return { polys, cuts, u1, u2, w, cut: w < W - 2, half: Math.abs(w / W - 0.5) < 0.07 && w < W - 2, lenMin: Math.min(...ends), lenMax: Math.max(...ends) };
+    }).filter(b => b.polys.length);
+    bacs.W = W;
+    return bacs;
+  }
+  function mpBacType(b){ if (b.billard) return 'Queue de billard ' + Math.round(b.w) + ' → ' + Math.round(b.wTop) + ' mm' + (b.cuts && b.cuts.length ? ' · découpe ' + b.cuts.join(', ') : ''); return (!b.cut ? 'Entier' : (b.half ? '½ bac' : 'Recoupé') + ' ' + Math.round(b.w) + ' mm') + (b.cuts && b.cuts.length ? ' · découpe ' + b.cuts.join(', ') : ''); }
 
+  /* ---------- Résultats (quantités + débit des bacs) ---------- */
   function mpRenderResults(data){
     const grouped = new Map();
     data.segs.forEach(s => {
-      const qty = s.qty || 1;
       const key = s.label;
       if (!grouped.has(key)) grouped.set(key, { label: s.label, length: s.length, qty: 0, kind: s.kind });
-      grouped.get(key).qty += qty;
+      grouped.get(key).qty += (s.qty || 1);
     });
     const KIND_LABEL = { faitage: 'Faîtage', aretier: 'Arêtier', noue: 'Noue' };
     const rows = Array.from(grouped.values()).map(r =>
-      `<tr><td>${KIND_LABEL[r.kind]}</td><td>${r.label.replace(/ \(×\d+\)$/, '')}</td><td>${Math.round(r.length)} mm</td><td>${r.qty}</td><td>${Math.round(r.length * r.qty)} mm</td></tr>`
-    ).join('');
-    let totalFait = 0, totalAr = 0, totalNoue = 0;
-    grouped.forEach(r => { const t = r.length * r.qty; if (r.kind === 'faitage') totalFait += t; else if (r.kind === 'aretier') totalAr += t; else totalNoue += t; });
-    $('mpResults').innerHTML = `
+      `<tr><td>${KIND_LABEL[r.kind]}</td><td>${r.label.replace(/ \(×\d+\)$/, '')}</td><td>${Math.round(r.length)} mm</td><td>${r.qty}</td><td>${Math.round(r.length * r.qty)} mm</td></tr>`).join('');
+    let tF = 0, tA = 0, tN = 0;
+    grouped.forEach(r => { const t = r.length * r.qty; if (r.kind === 'faitage') tF += t; else if (r.kind === 'aretier') tA += t; else tN += t; });
+    const CLIP_SPACING = 500;
+    let clipRows = '', debit = '', nFull = 0, nCut = 0, surf = 0, lin = 0, nClips = 0;
+    data.pans.forEach((p, pi) => {
+      const bacs = mpBuildBacsForPan(p, pi);
+      if (!bacs.length) return;
+      const avg = bacs.reduce((s, b) => s + (b.lenMin + b.lenMax) / 2, 0) / bacs.length;
+      const perBac = Math.max(2, Math.ceil(avg / CLIP_SPACING) + 1);
+      nClips += bacs.length * perBac;
+      bacs.forEach(b => { surf += b.polys.reduce((t, pl) => t + mpPoly2Area(pl.p2), 0); lin += (b.lenMin + b.lenMax) / 2; });
+      clipRows += `<tr><td>Pan ${pi + 1}</td><td>${Math.round(avg)} mm</td><td>${perBac} / bac (1 fixe + ${perBac - 1} coulissante${perBac - 1 > 1 ? 's' : ''})</td><td>${bacs.length * perBac}</td></tr>`;
+      const order = bacs.map((_, bi) => bi).sort((a, b) => mpBacDistFrac(a, bacs.length, pi) - mpBacDistFrac(b, bacs.length, pi));
+      order.forEach((bi, rank) => {
+        const b = bacs[bi]; b.cut ? nCut++ : nFull++;
+        const len = Math.abs(b.lenMax - b.lenMin) > 20 ? `${Math.round(b.lenMin)} → ${Math.round(b.lenMax)} mm (coupe biaise)` : `${Math.round(b.lenMax)} mm`;
+        debit += `<tr><td>${pi + 1}.${rank + 1}</td><td>${b.billard ? Math.round(b.w) + ' → ' + Math.round(b.wTop) : Math.round(b.w)} mm</td><td>${len}</td><td>${mpBacType(b)}</td></tr>`;
+      });
+    });
+    const ed = { egout: 0, rive: 0, faitage: 0, aretier: 0, noue: 0, mur: 0 }, seenE = new Set();
+    data.pans.forEach(p => {
+      const bs = mpPanBasis(p);
+      p.pts.forEach((a, i) => {
+        const b = p.pts[(i + 1) % p.pts.length], k1 = mpKey(a, b), k2 = mpKey(b, a);
+        if (seenE.has(k1) || seenE.has(k2)) return;
+        seenE.add(k1); const kk = mpEdgeKind(a, b, bs.u, data.valleys);
+        if (ed[kk] !== undefined) ed[kk] += Math.hypot(b.x - a.x, b.y - a.y, b.h - a.h);
+      });
+    });
+    if (data.edgeTotals) Object.assign(ed, data.edgeTotals);
+    const mm = v => Math.round(v).toLocaleString('fr-FR') + ' mm', tr = (l, v) => `<tr><td>${l}</td><td style="text-align:right;"><b>${v}</b></td></tr>`;
+    const totals = `<div class="panel-title" style="font-size:12px;">Totaux du projet</div>
+      <table class="biais-seg-table"><tbody>
+        ${tr('Matière', mpMatNow().label)}
+        ${tr('Surface de couverture (bacs)', (surf / 1e6).toFixed(2).replace('.', ',') + ' m²')}
+        ${tr('Bacs entiers', nFull)}
+        ${tr('Demi-bacs / bacs recoupés', nCut)}
+        ${tr('Linéaire de bacs (somme des longueurs)', (lin / 1000).toFixed(1).replace('.', ',') + ' m')}
+        ${tr('Bande d\'égout', mm(ed.egout))}
+        ${tr('Rives (retombée 20 cm)', mm(ed.rive))}
+        ${ed.mur ? tr('Solins contre mur', mm(ed.mur)) : ''}
+        ${data.type === 'voute' ? '' : tr(data.type === 'monopente' ? 'Tête de mur (haut de pan)' : 'Faîtage', mm(ed.faitage))}
+        ${ed.aretier ? tr('Arêtiers', mm(ed.aretier)) : ''}
+        ${ed.noue ? tr('Noues', mm(ed.noue)) : ''}
+        ${tr('Pattes de fixation', nClips)}
+        ${mpItems.length ? tr('Éléments en toiture (bacs découpés)', mpItemsSummary()) : ''}
+      </tbody></table>`;
+    $('mpResults').innerHTML = totals + `
+      ${data.segs.length ? `<div class="panel-title" style="font-size:12px;margin-top:14px;">Détail faîtage / arêtiers / noues</div>
       <table class="biais-seg-table">
         <thead><tr><th>Type</th><th>Détail</th><th>Longueur</th><th>Qté</th><th>Total</th></tr></thead>
         <tbody>${rows}</tbody>
-      </table>
-      <div class="seg-summary-line">Faîtage total : <b style="color:var(--text);">${Math.round(totalFait)} mm</b> · Arêtiers : <b style="color:var(--text);">${Math.round(totalAr)} mm</b> · Noues : <b style="color:var(--text);">${Math.round(totalNoue)} mm</b></div>
-    `;
+      </table>` : ''}
+      <div class="panel-title" style="font-size:12px;margin-top:14px;">Débit des bacs — ${nFull} entiers · ${nCut} demi-bacs / recoupés</div>
+      <div style="margin:6px 0;"><button type="button" data-send-debit style="${MP_BTN}background:#e6f2ff;border-color:#7fb0e6;">→ Envoyer au plan de débit</button></div>
+      <div class="biais-hint" style="margin-top:-2px;">N° = pan.ordre de pose (identique au plan). Les bacs d'extrémité sont recoupés en largeur ; sur les croupes et noues, la longueur varie (coupe en biais).</div>
+      <div style="max-height:320px;overflow:auto;margin-top:6px;">
+        <table class="biais-seg-table"><thead><tr><th>N°</th><th>Largeur</th><th>Longueur</th><th>Type</th></tr></thead><tbody>${debit}</tbody></table>
+      </div>
+      <div class="panel-title" style="font-size:12px;margin-top:14px;">Pattes de fixation — préconisation</div>
+      <div class="biais-hint" style="margin-top:-2px;">1 patte fixe côté faîtage par bac (ancre la dilatation), le reste en coulissant, environ tous les ${CLIP_SPACING} mm. Règle courante — à confirmer selon la fiche technique du système.</div>
+      <table class="biais-seg-table" style="margin-top:6px;">
+        <thead><tr><th>Pan</th><th>Longueur moy.</th><th>Pattes/bac</th><th>Total pattes</th></tr></thead>
+        <tbody>${clipRows}</tbody>
+      </table>` + (data.type === 'voute' ? mpVaultHtml(data.vault) : '');
+    mpWireImport($('mpResults'));
   }
 
+  /* ---------- Plan 2D ---------- */
   function mpDrawPlan(data){
     const wrap = $('mpPlanWrap');
     const allX = [], allY = [];
     data.pans.forEach(p => p.pts.forEach(pt => { allX.push(pt.x); allY.push(pt.y); }));
     const minX = Math.min(...allX), maxX = Math.max(...allX), minY = Math.min(...allY), maxY = Math.max(...allY);
-    const pad = Math.max(300, (maxX - minX) * 0.08);
-    const w = (maxX - minX) + pad * 2, h = (maxY - minY) + pad * 2;
-    let svg = `<svg viewBox="${minX - pad} ${minY - pad} ${w} ${h}" style="width:100%;height:auto;max-height:360px;">`;
-    // pans en pointillé fin (repère), arêtes de toit en trait fort
-    const seenEdges = new Set();
-    data.pans.forEach(p => {
-      const pts = p.pts.map(pt => `${pt.x},${pt.y}`).join(' ');
-      svg += `<polygon points="${pts}" fill="#f2f4f6" stroke="#cbd2d8" stroke-width="${Math.max(4,w*0.002)}"/>`;
+    const pad = Math.max(700, (maxX - minX) * 0.13), w = (maxX - minX) + pad * 2, h = (maxY - minY) + pad * 2;
+    const bW = parseFloat($('largeurBac').value) || 500, fs = Math.min(w * 0.014, bW * 0.34), sw0 = Math.max(2, w * 0.0012);
+    let svg = `<svg viewBox="${minX - pad} ${minY - pad} ${w} ${h}" style="display:block;width:${Math.round(mpPlanZoom * 100)}%;min-width:${Math.round(760 * mpPlanZoom)}px;height:auto;">`;
+    const seen = new Set();
+    const COL = { egout: '#3a7fc4', faitage: '#e05a2b', aretier: '#e08a2b', noue: '#e08a2b', rive: '#9aa1a8', mur: '#8d6e63' };
+    data.pans.forEach((p, panIdx) => {
+      const bacs = mpBuildBacsForPan(p, panIdx), mode = mpBacStartByPan[panIdx] || 'left';
+      const order = bacs.map((_, bi) => bi).sort((a, b) => mpBacDistFrac(a, bacs.length, panIdx) - mpBacDistFrac(b, bacs.length, panIdx));
+      const num = {}; order.forEach((bi, r) => { num[bi] = r + 1; });
+      bacs.forEach((bc, bi) => {
+        const fill = bc.cut ? '#fde8c4' : (bi % 2 ? '#e4e7ea' : '#eef0f2');
+        bc.polys.forEach(pl => { svg += `<polygon points="${pl.p3.map(q => q.x + ',' + q.y).join(' ')}" fill="${fill}" stroke="${bc.cut ? '#d9962b' : '#aab1b8'}" stroke-width="${sw0}"/>`; });
+        const big = bc.polys.slice().sort((a, b) => mpPoly2Area(b.p2) - mpPoly2Area(a.p2))[0];
+        const cx = big.p3.reduce((s, q) => s + q.x, 0) / big.p3.length, cy = big.p3.reduce((s, q) => s + q.y, 0) / big.p3.length;
+        const roomy = mpPoly2Area(big.p2) > fs * fs * 6, narrow = bc.cut && bc.w < fs * 2.6;
+        if (narrow) svg += `<text transform="translate(${cx},${cy}) rotate(-90)" font-size="${fs * 0.8}" fill="#a2680f" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono, monospace" font-weight="700">${panIdx + 1}.${num[bi]} · ${bc.half ? '½ bac' : Math.round(bc.w) + ' mm'}</text>`;
+        else if (roomy) svg += `<text x="${cx}" y="${cy}" font-size="${fs}" fill="#4a5056" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono, monospace" font-weight="700">${panIdx + 1}.${num[bi]}</text>`;
+        if (bc.cut && roomy && !narrow) svg += `<text x="${cx}" y="${cy + fs * 1.1}" font-size="${fs * 0.72}" fill="#a2680f" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono, monospace">${bc.half ? '½ bac' : Math.round(bc.w)}</text>`;
+      });
+      const bs = mpPanBasis(p);
       for (let i = 0; i < p.pts.length; i++) {
         const a = p.pts[i], b = p.pts[(i + 1) % p.pts.length];
-        const isRidgeLike = a.h > 0 && b.h > 0;
-        const key = [a.x, a.y, b.x, b.y].map(v => Math.round(v)).join('_');
-        if (isRidgeLike && !seenEdges.has(key)) {
-          seenEdges.add(key);
-          svg += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#e05a2b" stroke-width="${Math.max(6,w*0.003)}"/>`;
-        }
+        const k1 = mpKey(a, b), k2 = mpKey(b, a);
+        if (seen.has(k1) || seen.has(k2)) continue;
+        seen.add(k1);
+        const kind = mpEdgeKind(a, b, bs.u, data.valleys);
+        if (!COL[kind]) continue;
+        svg += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${COL[kind]}" stroke-width="${Math.max(5, w * (kind === 'faitage' ? 0.0045 : 0.004))}" stroke-linecap="round"/>`;
       }
+      const eA = p.eA || p.pts[0], eB = p.eB || p.pts[1];
+      const arrow = (f0, f1, off) => {
+        const fx = eA.x + (eB.x - eA.x) * f0, fy = eA.y + (eB.y - eA.y) * f0 + off, tx = eA.x + (eB.x - eA.x) * f1, ty = eA.y + (eB.y - eA.y) * f1 + off;
+        const ang = Math.atan2(ty - fy, tx - fx), ah = Math.max(30, w * 0.018);
+        svg += `<line x1="${fx}" y1="${fy}" x2="${tx}" y2="${ty}" stroke="#2f6fb0" stroke-width="${Math.max(4, w * 0.0022)}"/>`;
+        svg += `<polygon points="${tx},${ty} ${tx - ah * Math.cos(ang - 0.4)},${ty - ah * Math.sin(ang - 0.4)} ${tx - ah * Math.cos(ang + 0.4)},${ty - ah * Math.sin(ang + 0.4)}" fill="#2f6fb0"/>`;
+      };
+      const off = Math.max(60, w * 0.02) * (panIdx % 2 === 0 ? -1 : 1);
+      if (bs.len < 1200) return;
+      if (mode === 'left') arrow(0.08, 0.85, off); else if (mode === 'right') arrow(0.92, 0.15, off); else { arrow(0.5, 0.12, off); arrow(0.5, 0.88, off); }
     });
-    svg += `<rect x="${0}" y="${0}" width="${data.Lm}" height="${data.Wm}" fill="none" stroke="#1c1b1a" stroke-width="${Math.max(6,w*0.0035)}"/>`;
-    svg += `</svg>`;
-    wrap.innerHTML = svg;
+    mpItems.forEach(it => { svg += mpItemG(it, data, fs); });
+    if (data.type === 'modele') svg += mpModelSvg(data, fs);
+    svg += mpCotesSvg(data, w, minX - pad, minY - pad, pad);
+    svg += '</svg>';
+    const legend = MP_EDGE_LEGEND.map(l => `<span style="display:inline-flex;align-items:center;gap:5px;margin-right:14px;"><span style="width:16px;height:4px;background:${l.color};display:inline-block;border-radius:2px;"></span>${l.label}</span>`).join('');
+    const btn = 'padding:5px 11px;border:1px solid #c9ced3;border-radius:6px;background:#f4f6f8;color:#2a2f35;font-size:12px;cursor:pointer;';
+    wrap.innerHTML = mpToolbarHtml() + `<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
+        <button type="button" data-z="out" style="${btn}">−</button><button type="button" data-z="in" style="${btn}">+</button>
+        <button type="button" data-z="fit" style="${btn}">Ajuster</button><button type="button" data-z="full" style="${btn}">⛶ Plein écran</button>
+        <span style="font-size:11px;color:#8a8f98;">Zoom ${Math.round(mpPlanZoom * 100)} % — fais défiler pour voir tous les bacs</span></div>
+      <div data-sc style="overflow:auto;max-height:78vh;border:1px solid #e3e6e9;border-radius:6px;background:#fff;">${svg}</div>
+      <div style="margin-top:8px;font-size:11.5px;color:#4a5056;display:flex;flex-wrap:wrap;">${legend}</div>
+      <div style="margin-top:4px;font-size:11px;color:#8a8f98;">${data.type === 'voute' ? 'Vue à plat (développé du cintre). ' : ''}Numéro = pan.ordre de pose (1 = bac de départ). Bacs en orange = demi-bacs / bacs recoupés (largeur indiquée).</div>`;
+    const sc = wrap.querySelector('[data-sc]');
+    wrap.querySelectorAll('[data-z]').forEach(b => b.addEventListener('click', () => {
+      const z = b.dataset.z;
+      if (z === 'full') {
+        const on = document.fullscreenElement === sc;
+        if (on) document.exitFullscreen(); else if (sc.requestFullscreen) { sc.requestFullscreen(); sc.style.maxHeight = '100vh'; }
+        return;
+      }
+      mpPlanZoom = z === 'fit' ? 1 : Math.min(8, Math.max(0.5, mpPlanZoom * (z === 'in' ? 1.5 : 1 / 1.5)));
+      mpDrawPlan(data);
+    }));
+    mpWireItems(wrap, data, fs);
+    sc.addEventListener('fullscreenchange', () => { if (document.fullscreenElement !== sc) sc.style.maxHeight = '78vh'; });
   }
 
+  /* ---------- 3D : init, caméra orbitale, rendu + repères ---------- */
+  function mpUpdateCam(){
+    const c = mpCam, sp = Math.sin(c.ph);
+    mp3dCamera.position.set(c.t.x + c.r * sp * Math.sin(c.th), c.t.y + c.r * Math.cos(c.ph), c.t.z + c.r * sp * Math.cos(c.th));
+    mp3dCamera.lookAt(c.t);
+  }
+  function mpZoom(f){ mpCam.r = Math.min(mpCam.r0 * 5, Math.max(mpCam.r0 * 0.3, mpCam.r * f)); mpUpdateCam(); }
+  function mpRender(){
+    if (!mp3dRenderer) return;
+    mp3dRenderer.render(mp3dScene, mp3dCamera);
+    const c = $('mpCanvas3d'), W = c.clientWidth, H = c.clientHeight, show = mpVis.pins && !mpAnimating;
+    mpPins.forEach(pn => {
+      const v = pn.p.clone().project(mp3dCamera), ok = show && v.z > -1 && v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05;
+      pn.el.style.display = ok ? 'flex' : 'none';
+      if (ok) { pn.el.style.left = ((v.x * 0.5 + 0.5) * W) + 'px'; pn.el.style.top = ((-v.y * 0.5 + 0.5) * H) + 'px'; }
+    });
+  }
   function mpInit3D(){
     const container = $('mpCanvas3d');
     if (!container || mp3dInit || !container.clientWidth) return;
     mp3dInit = true;
+    container.style.background = '#12151a';
     mp3dScene = new THREE.Scene();
-    mp3dScene.background = getSkyTexture();
-    mp3dCamera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 200000);
-    mp3dRenderer = new THREE.WebGLRenderer({ antialias: true });
+    mp3dScene.background = new THREE.Color(0x12151a).convertSRGBToLinear();
+    mp3dCamera = new THREE.PerspectiveCamera(38, container.clientWidth / container.clientHeight, 50, 600000);
+    mp3dRenderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     mp3dRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    mp3dRenderer.outputEncoding = THREE.sRGBEncoding;
+    mp3dRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+    mp3dRenderer.toneMappingExposure = 1.0;
+    mp3dRenderer.shadowMap.enabled = true;
+    mp3dRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
     mp3dRenderer.setSize(container.clientWidth, container.clientHeight);
     mp3dRenderer.domElement.style.cssText = 'display:block;width:100%;height:100%;touch-action:none;';
     container.appendChild(mp3dRenderer.domElement);
-    mp3dScene.add(new THREE.HemisphereLight(0xffffff, 0x66717d, 1.1));
-    const key = new THREE.DirectionalLight(0xffffff, 1.1); key.position.set(900, 1200, 700); mp3dScene.add(key);
-    mp3dGroup = new THREE.Group();
-    mp3dScene.add(mp3dGroup);
-    let dragging = false, lastX = 0, lastY = 0;
-    const c = mp3dRenderer.domElement; c.style.cursor = 'grab';
-    c.addEventListener('pointerdown', e => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
-    c.addEventListener('pointerup', () => dragging = false);
-    c.addEventListener('pointercancel', () => dragging = false);
+    // Studio : quelques panneaux lumineux pour donner des reflets au zinc.
+    try {
+      const pm = new THREE.PMREMGenerator(mp3dRenderer), es = new THREE.Scene();
+      es.background = new THREE.Color(0x2a313a);
+      const panel = (x, y, z, w, h, i) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(i, i, i), side: THREE.DoubleSide })); m.position.set(x, y, z); m.lookAt(0, 0, 0); es.add(m); };
+      panel(0, 9, 0, 10, 10, 4); panel(8, 3, 5, 5, 7, 2.5); panel(-8, 2, -4, 6, 6, 1.2); panel(0, -6, 0, 14, 14, 0.35);
+      mp3dScene.environment = pm.fromScene(es, 0.03).texture; pm.dispose();
+    } catch (e) { /* environnement facultatif */ }
+    mp3dScene.add(new THREE.HemisphereLight(0xffffff, 0x39424c, 0.45));
+    const key = new THREE.DirectionalLight(0xffffff, 1.7);
+    key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0004; key.shadow.normalBias = 6; key.shadow.radius = 3;
+    mp3dScene.add(key); mp3dScene.add(key.target); mp3dKeyLight = key;
+    const fill = new THREE.DirectionalLight(0xcfe0ff, 0.35); fill.position.set(-1200, 900, -900); mp3dScene.add(fill);
+    mp3dGroup = new THREE.Group(); mp3dScene.add(mp3dGroup);
+    mpPinLayer = document.createElement('div');
+    mpPinLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;';
+    container.appendChild(mpPinLayer);
+    mpCam.t = new THREE.Vector3();
+    const c = mp3dRenderer.domElement, ptrs = new Map(); let lastD = 0;
+    c.style.cursor = 'grab';
+    c.addEventListener('pointerdown', e => {
+      if (c.setPointerCapture) c.setPointerCapture(e.pointerId);
+      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; lastD = Math.hypot(a.x - b.x, a.y - b.y); }
+      c.style.cursor = 'grabbing';
+    });
+    const up = e => { ptrs.delete(e.pointerId); if (!ptrs.size) c.style.cursor = 'grab'; };
+    c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
     c.addEventListener('pointermove', e => {
-      if (!dragging) return;
-      mp3dGroup.rotation.y += (e.clientX - lastX) * 0.008;
-      mp3dGroup.rotation.x += (e.clientY - lastY) * 0.008;
-      lastX = e.clientX; lastY = e.clientY;
-      mp3dRenderer.render(mp3dScene, mp3dCamera);
+      const p = ptrs.get(e.pointerId); if (!p) return;
+      if (ptrs.size === 1) {
+        mpCam.th -= (e.clientX - p.x) * 0.008;
+        mpCam.ph = Math.min(1.5, Math.max(0.12, mpCam.ph - (e.clientY - p.y) * 0.006));
+      } else if (ptrs.size === 2) {
+        p.x = e.clientX; p.y = e.clientY;
+        const [a, b] = [...ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
+        if (lastD > 0 && d > 0) mpZoom(lastD / d);
+        lastD = d; mpRender(); return;
+      }
+      p.x = e.clientX; p.y = e.clientY;
+      mpUpdateCam(); mpRender();
     });
-    c.addEventListener('wheel', e => { e.preventDefault(); mp3dCamera.position.multiplyScalar(Math.exp(e.deltaY * 0.0012)); mp3dRenderer.render(mp3dScene, mp3dCamera); }, { passive: false });
-    window.addEventListener('resize', () => {
-      if (!container.clientWidth) return;
-      mp3dCamera.aspect = container.clientWidth / container.clientHeight;
-      mp3dCamera.updateProjectionMatrix();
-      mp3dRenderer.setSize(container.clientWidth, container.clientHeight);
-      mp3dRenderer.render(mp3dScene, mp3dCamera);
-    });
+    c.addEventListener('wheel', e => { e.preventDefault(); mpZoom(Math.exp(e.deltaY * 0.0012)); mpRender(); }, { passive: false });
+    const onResize = () => {
+      if (!container.clientWidth || !container.clientHeight) return;
+      mp3dCamera.aspect = container.clientWidth / container.clientHeight; mp3dCamera.updateProjectionMatrix();
+      mp3dRenderer.setSize(container.clientWidth, container.clientHeight); mpRender();
+    };
+    window.addEventListener('resize', onResize);
+    if (window.ResizeObserver) new ResizeObserver(onResize).observe(container);
   }
 
-  // Repère local d'un pan (u = le long de l'égout, v = pente, n = normale).
-  function mpPanBasis(pts){
-    const p0 = pts[0], p1 = pts[1];
-    const uVec = { x: p1.x - p0.x, y: p1.y - p0.y, h: 0 };
-    const uLen = Math.hypot(uVec.x, uVec.y) || 1;
-    const u = { x: uVec.x / uLen, y: uVec.y / uLen, h: 0 };
-    // point "haut" du pan pour définir v (le premier point avec h>0, sinon le dernier point)
-    const top = pts.find(p => p.h > 0) || pts[pts.length - 1];
-    const vVecRaw = { x: top.x - p0.x, y: top.y - p0.y, h: top.h - p0.h };
-    const dot = vVecRaw.x * u.x + vVecRaw.y * u.y;
-    const v = { x: vVecRaw.x - dot * u.x, y: vVecRaw.y - dot * u.y, h: vVecRaw.h };
-    const vLen = Math.hypot(v.x, v.y, v.h) || 1;
-    v.x /= vLen; v.y /= vLen; v.h /= vLen;
-    // normale = u × v (en repère x,y,h)
-    const n = {
-      x: u.y * v.h - u.h * v.y,
-      y: u.h * v.x - u.x * v.h,
-      h: u.x * v.y - u.y * v.x
-    };
-    const nLen = Math.hypot(n.x, n.y, n.h) || 1;
-    n.x /= nLen; n.y /= nLen; n.h /= nLen;
-    if (n.h < 0) { n.x *= -1; n.y *= -1; n.h *= -1; }
-    return { u, v, n, p0 };
-  }
-  function mpPanPointAlongEdge(A, B, mm, totalLen){
-    const t = totalLen > 0.01 ? mm / totalLen : 0;
-    return { x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t, h: A.h + (B.h - A.h) * t };
-  }
-  // Découpe un pan en vrais panneaux de largeur réelle, en réutilisant la même
-  // règle de répartition que le versant simple (largeurBac, mode uniforme/billard).
-  function mpBuildBacsForPan(p){
-    const pts = p.pts;
-    const largeurBac = parseFloat($('largeurBac').value) || 500;
-    const eaveA = pts[0], eaveB = pts[1];
-    const farA = pts.length === 4 ? pts[3] : pts[2];
-    const farB = pts[2];
-    const baseLen = Math.hypot(eaveB.x - eaveA.x, eaveB.y - eaveA.y);
-    const farLen = Math.hypot(farB.x - farA.x, farB.y - farA.y);
-    const bb = computeBacBoundaries(largeurBac, baseLen, farLen, pts.length === 4 ? 'uniforme' : 'billard', null);
-    const quads = [];
-    for (let i = 0; i < bb.nBacs; i++) {
-      const c1 = mpPanPointAlongEdge(eaveA, eaveB, bb.boundariesEgout[i], baseLen);
-      const c2 = mpPanPointAlongEdge(eaveA, eaveB, bb.boundariesEgout[i + 1], baseLen);
-      const c3 = mpPanPointAlongEdge(farA, farB, bb.boundariesFaitage[i + 1], farLen);
-      const c4 = mpPanPointAlongEdge(farA, farB, bb.boundariesFaitage[i], farLen);
-      quads.push([c1, c2, c3, c4]);
-    }
-    return quads;
-  }
-  function mpMakeLayerMesh(pts, center, tex, repeatU, repeatV, opts){
-    const v3 = p => new THREE.Vector3(p.x - center.x, p.h, p.y - center.y);
-    const pos = [], uv = [];
-    const basis = mpPanBasis(pts);
-    pts.forEach(pt => {
-      const v = v3(pt); pos.push(v.x, v.y, v.z);
-      const du = (pt.x - basis.p0.x) * basis.u.x + (pt.y - basis.p0.y) * basis.u.y;
-      const dv = (pt.x - basis.p0.x) * basis.v.x + (pt.y - basis.p0.y) * basis.v.y + (pt.h - basis.p0.h) * basis.v.h;
-      uv.push(du / repeatU, dv / repeatV);
-    });
-    const idx = []; for (let i = 1; i < pts.length - 1; i++) idx.push(0, i, i + 1);
+  /* ---------- 3D : briques de construction ---------- */
+  const mpV3 = (c, p) => new THREE.Vector3(p.x - c.x, p.h, p.y - c.y);
+  const mpDir = d => new THREE.Vector3(d.x, d.h, d.y).normalize();
+  function mpPolyMesh(p3, mat){
+    const pos = []; p3.forEach(q => pos.push(q.x, q.y, q.z));
+    const idx = []; for (let i = 1; i < p3.length - 1; i++) idx.push(0, i, i + 1);
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    g.setIndex(idx); g.computeVertexNormals();
-    const matOpts = { roughness: 0.7, metalness: 0.1, side: THREE.DoubleSide };
-    if (tex) { tex.repeat.set(1, 1); matOpts.map = tex; } else { matOpts.color = opts.color || 0xffffff; }
-    Object.assign(matOpts, opts.mat || {});
-    const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial(matOpts));
-    mesh.castShadow = true; mesh.receiveShadow = true;
-    return { mesh, n: basis.n };
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, mat); m.castShadow = true; m.receiveShadow = true; return m;
   }
-  function mpMakeCapMesh(a, b, center, width, color){
-    const v3 = p => new THREE.Vector3(p.x - center.x, p.h, p.y - center.y);
-    const dir = new THREE.Vector3().subVectors(v3(b), v3(a));
-    const len = dir.length() || 1;
-    const geom = new THREE.BoxGeometry(width, width * 0.55, len);
-    const mesh = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ color, roughness: 0.45, metalness: 0.55, side: THREE.DoubleSide }));
-    const mid = v3(a).add(v3(b)).multiplyScalar(0.5);
-    mesh.position.copy(mid);
-    mesh.lookAt(v3(b));
-    mesh.castShadow = true;
-    return mesh;
+  // Prisme à faces planes (volige, écran) : polygone du dessus extrudé vers le bas.
+  function mpPrism(top, n, t, uvs, mat){
+    const pos = [], uv = [], k = top.length, bot = top.map(q => q.clone().addScaledVector(n, -t));
+    const tri = (a, b, c, ua, ub, uc) => { [a, b, c].forEach(q => pos.push(q.x, q.y, q.z)); uv.push(ua[0], ua[1], ub[0], ub[1], uc[0], uc[1]); };
+    for (let i = 1; i < k - 1; i++) { tri(top[0], top[i], top[i + 1], uvs[0], uvs[i], uvs[i + 1]); tri(bot[0], bot[i + 1], bot[i], uvs[0], uvs[i + 1], uvs[i]); }
+    for (let i = 0; i < k; i++) { const j = (i + 1) % k; tri(top[i], bot[i], bot[j], uvs[i], uvs[i], uvs[j]); tri(top[i], bot[j], top[j], uvs[i], uvs[j], uvs[j]); }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, mat); m.castShadow = true; m.receiveShadow = true; return m;
   }
-  function mpDraw3D(data){
+  // Boîte orientée : ex = axe long, ey = axe « haut » (normale du pan), ez = ex × ey.
+  function mpBox(c, ex, ey, sx, sy, sz, mat){
+    const ez = new THREE.Vector3().crossVectors(ex, ey).normalize();
+    const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat);
+    m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(ex.clone().normalize(), ey.clone().normalize(), ez));
+    m.position.copy(c); m.castShadow = true; m.receiveShadow = true; return m;
+  }
+
+  function mpOff(layer, it){
+    const a = mpExplodeAmount;
+    if (layer === 'pannes') return -a * 1.05;
+    if (layer === 'volige') return -a * 0.7;
+    if (layer === 'ecran') return -a * 0.35;
+    if (layer === 'bacs') return a * it.dist;
+    return a * 1.3;
+  }
+  function mpApplyVisibility(){
+    Object.keys(mpL).forEach(k => mpL[k].forEach(it => { it.mesh.visible = mpVis[k]; }));
+    mpHouse.forEach(m => { m.visible = mpVis.maison; });
+  }
+  function mpApplyExplode(){
+    Object.keys(mpL).forEach(k => mpL[k].forEach(it => { it.mesh.position.copy(it.base).addScaledVector(it.n, mpOff(k, it)); }));
+    mpRender();
+  }
+
+  function mpDraw3D(data, keepCam){
     if (!mp3dInit) mpInit3D();
     if (!mp3dGroup) return;
-    while (mp3dGroup.children.length) {
-      const o = mp3dGroup.children.pop();
-      if (o.geometry) o.geometry.dispose();
-      if (o.material) o.material.dispose();
-    }
-    mpVoligeItems = []; mpEcranItems = []; mpAccItems = [];
-    const center = { x: data.Lm / 2, y: data.Wm / 2 };
-    const bacTex = isTasseaux ? getTasseauxTexture() : getJointDeboutTexture();
+    if (mpAnimFrame) { cancelAnimationFrame(mpAnimFrame); mpAnimFrame = null; }
+    mpAnimating = false;
+    while (mp3dGroup.children.length) { const o = mp3dGroup.children.pop(); if (o.geometry) o.geometry.dispose(); }
+    mpL = { pannes: [], volige: [], ecran: [], bacs: [], acc: [] }; mpPins = []; mpHouse = []; mpPinLayer.innerHTML = '';
+    const C = { x: data.Lm / 2, y: data.Wm / 2 }, V = p => mpV3(C, p), eco = mpEcorche;
     const voligeTex = getVoligeTextureMp(), ecranTex = getEcranTexture();
+    [voligeTex, ecranTex].forEach(t => { t.encoding = THREE.sRGBEncoding; t.needsUpdate = true; });
+    const DS = THREE.DoubleSide;
+    const std = (o) => { if (o.color !== undefined) o.color = new THREE.Color(o.color).convertSRGBToLinear(); return new THREE.MeshStandardMaterial(Object.assign({ side: DS }, o)); };
+    const MT = mpMatNow();
+    const M = {
+      velFrame: std({ color: 0x3d444b, metalness: 0.6, roughness: 0.45 }), glass: std({ color: 0x15222e, metalness: 0.25, roughness: 0.06 }),
+      brick: std({ color: 0xa4543b, roughness: 0.95, metalness: 0 }), cap: std({ color: 0xbdbdb8, roughness: 0.9, metalness: 0 }),
+      dark: std({ color: 0x141414, roughness: 1, metalness: 0 }), pipe: std({ color: 0x6e7378, metalness: 0.5, roughness: 0.5 }),
+      volige: std({ map: voligeTex, roughness: 0.85, metalness: 0 }),
+      ecran: std({ map: ecranTex, color: 0x9aa7b4, roughness: 0.5, metalness: 0.15 }),
+      panne: std({ color: 0xb98a55, roughness: 0.9, metalness: 0 }),
+      bac: [0.95, 1.04].map(f => std({ color: mpShade(MT.c, f), metalness: MT.m, roughness: MT.r })),
+      seam: std({ color: mpShade(MT.c, 1.12), metalness: MT.m, roughness: MT.r * 0.9 }),
+      acc: Object.fromEntries([['faitage', 1.12], ['aretier', 1.06], ['noue', 0.82], ['rive', 1.0], ['egout', 0.88], ['mur', 0.95]].map(([k, f]) => [k, std({ color: mpShade(MT.c, f), metalness: MT.m, roughness: MT.r })]))
+    };
+    const add = (layer, mesh, n, revealAt, dist) => { mp3dGroup.add(mesh); mpL[layer].push({ mesh, n, base: mesh.position.clone(), revealAt, dist: dist || 0 }); };
+    const pinSeen = {}, pinList = [];
+    const addPin = (txt, p) => { if (!pinSeen[txt]) { pinSeen[txt] = 1; pinList.push([txt, p]); } };
 
-    data.pans.forEach(p => {
-      // 1) Volige — sous tout, décalée vers l'intérieur.
-      const vol = mpMakeLayerMesh(p.pts, center, voligeTex, 260, 260, {});
-      vol.mesh.position.addScaledVector(new THREE.Vector3(vol.n.x, vol.n.h, vol.n.y), -22);
-      mp3dGroup.add(vol.mesh);
-      mpVoligeItems.push({ mesh: vol.mesh, n: { x: vol.n.x, y: vol.n.h, z: vol.n.y } });
-      // 2) Écran de sous-toiture — juste au-dessus de la volige.
-      const ec = mpMakeLayerMesh(p.pts, center, ecranTex, 400, 400, { mat: { roughness: 0.35, metalness: 0.25 } });
-      ec.mesh.position.addScaledVector(new THREE.Vector3(ec.n.x, ec.n.h, ec.n.y), -11);
-      mp3dGroup.add(ec.mesh);
-      mpEcranItems.push({ mesh: ec.mesh, n: { x: ec.n.x, y: ec.n.h, z: ec.n.y } });
-      // 3) Le bac — vrai calepinage : un panneau par largeur réelle (pas une texture
-      // étirée), calculé avec la même règle de répartition que le versant simple.
-      // Couche de référence : ne bouge jamais dans l'éclaté.
-      const bacs = mpBuildBacsForPan(p);
-      bacs.forEach((quad, bi) => {
-        const shade = bi % 2 === 0 ? 0xc7ccd0 : 0xbdc3c8;
-        const bm = mpMakeLayerMesh(quad, center, null, 1, 1, { color: shade, mat: { roughness: isTasseaux ? 0.55 : 0.35, metalness: isTasseaux ? 0.35 : 0.55 } });
-        mp3dGroup.add(bm.mesh);
-        if (bi > 0) {
-          // Joint entre ce panneau et le précédent, sur toute la pente (bord commun).
-          const capColor = isTasseaux ? 0xeef1f3 : 0x8c949b;
-          const capW = isTasseaux ? 42 : 16;
-          const cap = mpMakeCapMesh(quad[0], quad[3], center, capW, capColor);
-          mp3dGroup.add(cap);
-        }
+    data.pans.forEach((p, pi) => {
+      if (p.curved) { mpVault3D(data, { M, add, addPin, eco }); return; }
+      const bs = mpPanBasis(p), n3 = mpDir(bs.n), v3d = mpDir(bs.v), L = bs.len;
+      const pieces2 = (p.pieces || [p.pts]).map(pc => pc.map(q => { const t = mpLocalUV(bs, q); return [t.u, t.v]; }));
+      const mode = mpBacStartByPan[pi] || 'left';
+      const keep = f => mode === 'right' ? [L * (1 - f), L] : mode === 'center' ? [L / 2 - L * f / 2, L / 2 + L * f / 2] : [0, L * f];
+      const uAt = t => mode === 'right' ? L - t * L : mode === 'center' ? L / 2 + t * L / 2 : t * L;
+      const clipKeep = (P2, f) => { if (!eco) return P2; const [a, b] = keep(f), c = mpClip2(P2, 0, a, true); return c.length < 3 ? c : mpClip2(c, 0, b, false); };
+      const toW = P2 => P2.map(([u, v]) => V(mpToWorld(bs, u, v)));
+      const frac = pi / Math.max(1, data.pans.length);
+
+      // 1) Pannes — parallèles à l'égout, sous la volige.
+      const vmax = Math.max(...pieces2.flat().map(q => q[1]));
+      const nP = vmax < 500 ? 1 : Math.max(2, Math.round(vmax / 1800) + 1), pvs = [];
+      for (let i = 0; i < nP; i++) pvs.push(nP === 1 ? vmax / 2 : 120 + (vmax - 240) * i / (nP - 1));
+      pvs.forEach((v, i) => {
+        const sp = mpSpan(pieces2, 1, v); if (!sp || sp[1] - sp[0] < 300) return;
+        const a = V(mpToWorld(bs, sp[0] + 60, v)), b = V(mpToWorld(bs, sp[1] - 60, v)), len = a.distanceTo(b);
+        const c = a.clone().add(b).multiplyScalar(0.5).addScaledVector(n3, -48 - 200);
+        add('pannes', mpBox(c, mpDir(bs.u), n3, len, 200, 90, M.panne), n3, 0.03 + 0.1 * (i / Math.max(1, nP - 1)));
       });
-    });
-
-    // 4) Accessoires : bande d'égout (bas), faîtage/arêtier/noue (haut des pans),
-    // rive (bords pignon) — au-dessus du bac, écartés en dernier dans l'éclaté.
-    const seen = new Set();
-    const v3 = p => new THREE.Vector3(p.x - center.x, p.h, p.y - center.y);
-    data.pans.forEach(p => {
-      const basis = mpPanBasis(p.pts);
-      const nrm = { x: basis.n.x, y: basis.n.h, z: basis.n.y };
+      { // Chevrons 60×100 tous les ~600 mm, entre les pannes et la volige.
+        const us = pieces2.flat().map(q => q[0]), u0 = Math.min(...us), u1 = Math.max(...us), nC = Math.max(2, Math.floor((u1 - u0) / 600));
+        for (let i = 0; i <= nC; i++) {
+          const u = u0 + 30 + (u1 - u0 - 60) * i / nC, sp = mpSpan(pieces2, 0, u); if (!sp || sp[1] - sp[0] < 200) continue;
+          const a = V(mpToWorld(bs, u, sp[0] + 20)), b = V(mpToWorld(bs, u, sp[1] - 20)), len = a.distanceTo(b);
+          add('pannes', mpBox(a.clone().add(b).multiplyScalar(0.5).addScaledVector(n3, -48 - 50), v3d, n3, len, 100, 60, M.panne), n3, 0.05 + 0.1 * (i / nC));
+        }
+      }
+      // 2) Volige (planches, 22 mm) puis 3) écran de sous-toiture.
+      pieces2.forEach(P2 => {
+        const cv = clipKeep(P2, MP_CUT.volige);
+        if (cv.length >= 3 && mpPoly2Area(cv) > 500) add('volige', mpPrism(toW(cv).map(q => q.addScaledVector(n3, -26)), n3, 22, cv.map(([u, v]) => [u / 1200, v / 1200]), M.volige), n3, 0.14 + 0.1 * frac);
+        const ce = clipKeep(P2, MP_CUT.ecran);
+        if (ce.length >= 3 && mpPoly2Area(ce) > 500) add('ecran', mpPrism(toW(ce).map(q => q.addScaledVector(n3, -12)), n3, 2, ce.map(([u, v]) => [u / 700, v / 700]), M.ecran), n3, 0.27 + 0.08 * frac);
+      });
+      // 4) Bacs : un panneau par bande + joints debout / couvre-joints en relief.
+      const bacs = mpBuildBacsForPan(p, pi), dists = bacs.map((_, bi) => mpBacDistFrac(bi, bacs.length, pi)), shown = dists.map(d => !eco || d <= MP_CUT.bacs + 1e-9);
+      bacs.forEach((bc, bi) => {
+        if (!shown[bi]) return;
+        bc.polys.forEach(pl => add('bacs', mpPolyMesh(pl.p3.map(V), M.bac[bi % 2]), n3, 0.4 + 0.45 * dists[bi], dists[bi]));
+      });
+      for (let b = 1; b < bacs.length; b++) {
+        if (!shown[b] && !shown[b - 1]) continue;
+        const d = Math.min(dists[b], dists[b - 1]);
+        bacs[b].polys.forEach(pl => {
+          const pts = pl.p2.filter(q => Math.abs(q[0] - bacs[b].u1) < 0.6);
+          if (pts.length < 2) return;
+          const v0 = Math.min(...pts.map(q => q[1])), v1 = Math.max(...pts.map(q => q[1]));
+          if (v1 - v0 < 60) return;
+          const A = V(mpToWorld(bs, bacs[b].u1, v0)), B = V(mpToWorld(bs, bacs[b].u1, v1)), len = A.distanceTo(B), mid = A.clone().add(B).multiplyScalar(0.5);
+          const reveal = 0.4 + 0.45 * d, mk = (h, w, lift, mat) => add('bacs', mpBox(mid.clone().addScaledVector(n3, lift + h / 2), v3d, n3, len, h, w, mat), n3, reveal, d);
+          if (isTasseaux) { mk(40, 58, 0, M.seam); mk(3, 96, 0, M.seam); }
+          else { mk(MP_SEAM_H - 6, 9, 0, M.seam); mk(7, 18, MP_SEAM_H - 7, M.seam); }
+        });
+      }
+      // 5) Accessoires : égout, rives, faîtage / arêtiers / noues (bandes qui épousent chaque pan).
+      const cen = p.pts.reduce((s, q) => s.add(V(q)), new THREE.Vector3()).multiplyScalar(1 / p.pts.length);
       for (let i = 0; i < p.pts.length; i++) {
-        const A = p.pts[i], B = p.pts[(i + 1) % p.pts.length];
-        const key = [A.x, A.y, A.h, B.x, B.y, B.h].map(v => Math.round(v)).join('_');
-        const keyRev = [B.x, B.y, B.h, A.x, A.y, A.h].map(v => Math.round(v)).join('_');
-        if (seen.has(key) || seen.has(keyRev)) continue;
-        seen.add(key);
-        let mesh, color, width;
-        if (A.h === 0 && B.h === 0) { color = 0x3a7fc4; width = 45; }
-        else if (A.h > 0 && B.h > 0) { color = 0xe05a2b; width = 50; }
-        else { color = p.gable ? 0x9aa1a8 : 0xe08a2b; width = 45; }
-        mesh = mpMakeCapMesh(A, B, center, width, color);
-        mesh.position.addScaledVector(new THREE.Vector3(nrm.x, nrm.y, nrm.z), 6);
-        mp3dGroup.add(mesh);
-        mpAccItems.push({ mesh, n: nrm });
+        const A0 = p.pts[i], B0 = p.pts[(i + 1) % p.pts.length], kind = mpEdgeKind(A0, B0, bs.u, data.valleys);
+        if (kind === 'none') continue;
+        if (kind === 'seam') {   // joint debout entre deux bacs « queue de billard »
+          const Av = V(A0), Bv = V(B0), ev = Bv.clone().sub(Av), ln = ev.length();
+          if (ln > 50) {
+            ev.normalize(); const mid2 = Av.clone().add(Bv).multiplyScalar(0.5), h1 = isTasseaux ? 40 : MP_SEAM_H - 6;
+            add('bacs', mpBox(mid2.clone().addScaledVector(n3, h1 / 2), ev, n3, ln, h1, isTasseaux ? 58 : 9, M.seam), n3, 0.55, 0);
+            if (!isTasseaux) add('bacs', mpBox(mid2.clone().addScaledVector(n3, MP_SEAM_H - 3.5), ev, n3, ln, 7, 18, M.seam), n3, 0.55, 0);
+          }
+          continue;
+        }
+        const A = V(A0), B = V(B0), e = B.clone().sub(A), len = e.length(); if (len < 50) continue;
+        e.normalize();
+        const mid = A.clone().add(B).multiplyScalar(0.5), s = cen.clone().sub(mid); s.addScaledVector(e, -s.dot(e)); s.addScaledVector(n3, -s.dot(n3)); s.normalize();
+        const wS = { egout: 160, faitage: 150, aretier: 130, noue: 120, rive: 110, mur: 120 }[kind], lift = kind === 'noue' ? 5 : kind === 'egout' ? 8 : MP_SEAM_H + 8;
+        const shift = kind === 'egout' ? 20 : wS / 2 - 6, reveal = { egout: 0.9, rive: 0.93, faitage: 0.96, aretier: 0.96, noue: 0.94, mur: 0.94 }[kind];
+        const c = mid.clone().addScaledVector(s, shift).addScaledVector(n3, lift + 3);
+        add('acc', mpBox(c, e, n3, len, 6, wS, M.acc[kind]), n3, reveal);
+        if (kind === 'egout') {
+          const lc = mid.clone().addScaledVector(s, -58).addScaledVector(n3, 4).add(new THREE.Vector3(0, -22, 0));
+          add('acc', mpBox(lc, e, new THREE.Vector3(0, 1, 0), len, 48, 4, M.acc.egout), n3, reveal);
+        }
+        if (kind === 'rive' || kind === 'mur') {
+          const up = new THREE.Vector3(0, 1, 0).addScaledVector(e, -e.y).normalize(), out = s.clone().negate(), drop = kind === 'rive' ? -MP_RIVE_DROP / 2 : 75;
+          add('acc', mpBox(mid.clone().addScaledVector(out, kind === 'rive' ? 6 : 2).addScaledVector(n3, lift - 3).addScaledVector(up, drop), e, up, len, kind === 'rive' ? MP_RIVE_DROP : 150, 4, M.acc[kind]), n3, reveal);
+        }
+        const lbl = { egout: 'Bande d\'égout', faitage: 'Faîtage', aretier: 'Arêtier', noue: 'Noue', rive: 'Rive (retombée 20 cm)', mur: 'Solin contre mur' }[kind];
+        addPin(lbl, c.clone().addScaledVector(n3, 6));
+      }
+      const [kA, kB] = keep(MP_CUT.bacs);
+      mpItems.filter(it => it.pan === pi && (!eco || (it.u >= kA && it.u <= kB))).forEach(it => mpItem3D(it, { bs, V, n3, v3d, M, add, addPin }));
+      // Repères (écorché) sur le premier pan.
+      if (pi === 0 && bacs.length) {
+        const order = bacs.map((_, bi) => bi).sort((a, b) => dists[a] - dists[b]), bc = bacs[order[Math.floor((order.length - 1) * 0.3)]];
+        const pl = bc.polys[0], ctr = pl.p3.reduce((s, q) => s.add(V(q)), new THREE.Vector3()).multiplyScalar(1 / pl.p3.length);
+        addPin(isTasseaux ? 'Bacs zinc à tasseaux' : 'Bacs zinc joint debout', ctr.addScaledVector(n3, 4));
+        if (eco) {
+          const pinAt = (txt, t, off) => {
+            const u = uAt(t), sp = mpSpan(pieces2, 0, u); if (!sp) return;
+            const v = sp[0] + (sp[1] - sp[0]) * 0.5;
+            addPin(txt, V(mpToWorld(bs, u, v)).addScaledVector(n3, off));
+          };
+          pinAt('Écran sous-toiture', (MP_CUT.bacs + MP_CUT.ecran) / 2, -10);
+          pinAt('Volige', (MP_CUT.ecran + MP_CUT.volige) / 2, -26);
+          const uP = uAt((MP_CUT.volige + 1) / 2);
+          let best = null;
+          pvs.forEach(v => { const sp = mpSpan(pieces2, 1, v); if (sp && uP >= sp[0] + 60 && uP <= sp[1] - 60 && (best === null || Math.abs(v - vmax / 2) < Math.abs(best - vmax / 2))) best = v; });
+          if (best !== null) addPin('Pannes', V(mpToWorld(bs, uP, best)).addScaledVector(n3, -48));
+        }
       }
     });
 
-    mpApplyExplode();
-    const box = new THREE.Box3().setFromObject(mp3dGroup);
-    if (!box.isEmpty()) {
-      const sphere = new THREE.Sphere(); box.getBoundingSphere(sphere);
-      const dist = Math.max(500, sphere.radius * 2.3);
-      mp3dCamera.position.set(sphere.center.x + dist * 0.6, dist * 0.7, sphere.center.z + dist * 0.8);
-      mp3dCamera.lookAt(sphere.center);
+    // Maison : murs + pignons fermés (sinon le dessous du toit est visible).
+    const roofBox = new THREE.Box3().setFromObject(mp3dGroup), houseH = data.houseH;
+    const wallMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(0xece6da).convertSRGBToLinear(), roughness: 0.95, metalness: 0, side: DS }); mpWallMat = wallMat;
+    data.rects.forEach(r => {
+      const z0 = r.z || 0, hh = houseH + z0; let wall;
+      if (r.poly) {
+        const cx0 = r.poly.reduce((q, p) => q + p[0], 0) / r.poly.length, cy0 = r.poly.reduce((q, p) => q + p[1], 0) / r.poly.length, sh = new THREE.Shape();
+        r.poly.forEach((p, i) => { const d = Math.hypot(p[0] - cx0, p[1] - cy0) || 1, k = Math.max(0, 1 - 40 / d), px = cx0 + (p[0] - cx0) * k, py = cy0 + (p[1] - cy0) * k; if (i) sh.lineTo(px, py); else sh.moveTo(px, py); });
+        const g = new THREE.ExtrudeGeometry(sh, { depth: hh, bevelEnabled: false });
+        g.applyMatrix4(new THREE.Matrix4().makeBasis(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, -1, 0)).setPosition(-C.x, z0, -C.y));
+        wall = new THREE.Mesh(g, wallMat);
+      } else {
+        wall = new THREE.Mesh(new THREE.BoxGeometry(Math.max(10, r.sx - 80), hh, Math.max(10, r.sy - 80)), wallMat);
+        wall.position.set(r.x0 + r.sx / 2 - C.x, z0 - hh / 2, r.y0 + r.sy / 2 - C.y);
+      }
+      wall.castShadow = true; wall.receiveShadow = true; mp3dGroup.add(wall); mpHouse.push(wall);
+      if (r.fill) {
+        const sh = new THREE.Shape(); r.fill.pts.forEach((q, i) => i ? sh.lineTo(q[0], q[1]) : sh.moveTo(q[0], q[1]));
+        const depth = r.fill.depth || ((r.fill.axis === 'x' ? r.sx : r.sy) - 80);
+        const g = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: false });
+        const mx = new THREE.Matrix4();
+        if (r.fill.axis === 'x') mx.makeBasis(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 1, 0), new THREE.Vector3(-1, 0, 0)).setPosition((r.fill.end === 'min' ? r.x0 + 40 + depth : r.x0 + r.sx - 40) - C.x, z0, r.y0 - C.y);
+        else mx.makeBasis(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)).setPosition(r.x0 - C.x, z0, (r.fill.end === 'max' ? r.y0 + r.sy - 40 - depth : r.y0 + 40) - C.y);
+        g.applyMatrix4(mx);
+        const gm = new THREE.Mesh(g, wallMat); gm.castShadow = true; gm.receiveShadow = true; mp3dGroup.add(gm); mpHouse.push(gm);
+      }
+    });
+    mpApplyGhost();
+    addPin('Maçonnerie', new THREE.Vector3(0, -houseH * 0.45, data.Wm / 2 - 40));
+
+    // Repères HTML.
+    pinList.forEach(([txt, p]) => {
+      const el = document.createElement('div');
+      el.style.cssText = 'position:absolute;display:none;align-items:center;transform:translate(-7px,-50%);white-space:nowrap;';
+      el.innerHTML = '<i style="width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid #e5484d;box-shadow:0 0 0 3px rgba(229,72,77,.28);box-sizing:border-box;flex:none;"></i><b style="width:14px;height:1px;background:rgba(255,255,255,.55);flex:none;"></b><span style="background:rgba(24,27,32,.92);color:#f2f4f6;font:600 11.5px/1 Inter,system-ui,sans-serif;padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.14);"></span>';
+      el.querySelector('span').textContent = txt;
+      mpPinLayer.appendChild(el); mpPins.push({ el, p });
+    });
+
+    // Sol, grille, caméra, lumière.
+    const sphere = new THREE.Sphere(); roofBox.getBoundingSphere(sphere);
+    const R = Math.max(1000, sphere.radius);
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(R * 8, R * 8), new THREE.ShadowMaterial({ opacity: 0.4 }));
+    ground.rotation.x = -Math.PI / 2; ground.position.set(sphere.center.x, -houseH, sphere.center.z); ground.receiveShadow = true; mp3dGroup.add(ground);
+    const grid = new THREE.GridHelper(R * 6, 24, 0x2c333b, 0x20262d); grid.position.set(sphere.center.x, -houseH + 2, sphere.center.z); mp3dGroup.add(grid);
+    mpCam.t.set(sphere.center.x, sphere.center.y - R * 0.25, sphere.center.z);
+    const ratio = keepCam ? mpCam.r / mpCam.r0 : 1; mpCam.r0 = R * 2.9; mpCam.r = mpCam.r0 * ratio;
+    if (!keepCam) { mpCam.th = 0.75; mpCam.ph = 1.0; }
+    mp3dCamera.near = Math.max(50, R * 0.05); mp3dCamera.far = R * 40; mp3dCamera.updateProjectionMatrix();
+    if (mp3dKeyLight) {
+      mp3dKeyLight.target.position.copy(mpCam.t);
+      mp3dKeyLight.position.copy(mpCam.t).add(new THREE.Vector3(0.55, 1, 0.45).multiplyScalar(R * 3));
+      const sc = R * 1.5, sh = mp3dKeyLight.shadow.camera;
+      sh.left = -sc; sh.right = sc; sh.top = sc; sh.bottom = -sc; sh.near = 10; sh.far = R * 8; sh.updateProjectionMatrix();
     }
-    mp3dRenderer.render(mp3dScene, mp3dCamera);
+    mpUpdateCam(); mpApplyVisibility(); mpApplyExplode();
   }
+
+  // Rejoue la pose dans l'ordre réel : pannes, volige, écran, bacs (depuis le bac de
+  // départ), puis égout, rives et faîtage. Chaque pièce « se pose » depuis le dessus.
+  let mpAnimFrame = null;
+  let mpGhost = true, mpWallMat = null;
+  function mpApplyGhost(){ if (!mpWallMat) return; mpWallMat.transparent = mpGhost; mpWallMat.opacity = mpGhost ? 0.2 : 1; mpWallMat.depthWrite = !mpGhost; mpWallMat.needsUpdate = true; }
+  function mpPlayInstallation(){
+    if (!mp3dRenderer || !Object.keys(mpL).some(k => mpL[k].length)) { showToast('Calcule un plan avant de rejouer la pose.'); return; }
+    if (mpAnimFrame) cancelAnimationFrame(mpAnimFrame);
+    const items = []; Object.keys(mpL).forEach(k => mpL[k].forEach(it => items.push([k, it])));
+    items.forEach(([k, it]) => { it.mesh.visible = false; });
+    mpAnimating = true;
+    const dur = 5200, t0 = performance.now();
+    const step = now => {
+      const prog = Math.min(1, (now - t0) / dur);
+      items.forEach(([k, it]) => {
+        const t = Math.max(0, Math.min(1, (prog - it.revealAt) / 0.05)), e = 1 - Math.pow(1 - t, 3);
+        it.mesh.visible = mpVis[k] && prog >= it.revealAt;
+        it.mesh.position.copy(it.base).addScaledVector(it.n, mpOff(k, it) + (1 - e) * 350);
+      });
+      if (prog < 1) { mp3dRenderer.render(mp3dScene, mp3dCamera); mpAnimFrame = requestAnimationFrame(step); }
+      else { mpAnimFrame = null; mpAnimating = false; mpApplyVisibility(); mpApplyExplode(); }
+    };
+    mpAnimFrame = requestAnimationFrame(step);
+  }
+
+  function mpBuildControls(){
+    const rb = $('mpReplayBtn');
+    if (!rb || !rb.parentNode) return;
+    const bar = document.createElement('div');
+    bar.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:12px;color:var(--text);align-items:center;';
+    [['ecorche', 'Vue écorchée'], ['ghost', 'Murs transparents'], ['pannes', 'Charpente (pannes + chevrons)'], ['volige', 'Volige'], ['ecran', 'Écran sous-toiture'], ['bacs', 'Bacs zinc'], ['acc', 'Rives / faîtage / égout'], ['maison', 'Maison'], ['pins', 'Repères']].forEach(([k, label]) => {
+      const l = document.createElement('label'); l.style.cssText = 'display:inline-flex;align-items:center;gap:5px;cursor:pointer;';
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = k === 'ecorche' ? mpEcorche : k === 'ghost' ? mpGhost : mpVis[k];
+      cb.addEventListener('change', () => {
+        if (k === 'ecorche') { mpEcorche = cb.checked; if (mpLastData) mpDraw3D(mpLastData, true); }
+        else if (k === 'ghost') { mpGhost = cb.checked; mpApplyGhost(); mpRender(); }
+        else { mpVis[k] = cb.checked; mpApplyVisibility(); mpRender(); }
+      });
+      l.appendChild(cb); l.appendChild(document.createTextNode(label)); bar.appendChild(l);
+    });
+    rb.parentNode.insertBefore(bar, rb);
+  }
+  /* ===== v3 : éléments de toiture (Velux, cheminée, sortie), cotes éditables, synchro système ===== */
+  const MP_VELUX = { CK02: [550, 780], CK04: [550, 980], MK04: [780, 980], MK06: [780, 1180], PK06: [940, 1180], SK06: [1140, 1180] };
+  const MP_BTN = 'padding:5px 11px;border:1px solid #c9ced3;border-radius:6px;background:#f4f6f8;color:#2a2f35;font-size:12px;cursor:pointer;';
+  const MP_DIM_LABEL = { mpMainL: 'Longueur du corps principal', mpMainW: 'Largeur du corps principal', mpWingL: 'Profondeur de l\'aile', mpWingW: 'Largeur de l\'aile', mpPente: 'Pente', mpRayon: 'Rayon du cintre', mpWallH: 'Hauteur des murs' };
+  let mpItems = [], mpSel = null, mpArm = null, mpItemSeq = 1;
+
+  const mpItemName = it => it.type === 'velux' ? 'Velux ' + it.sz : it.type === 'cheminee' ? 'Cheminée' : 'Sortie de toit';
+  function mpItemsSummary(){
+    const c = t => mpItems.filter(i => i.type === t).length, o = [];
+    if (c('velux')) o.push(c('velux') + ' Velux'); if (c('cheminee')) o.push(c('cheminee') + ' cheminée' + (c('cheminee') > 1 ? 's' : '')); if (c('sortie')) o.push(c('sortie') + ' sortie' + (c('sortie') > 1 ? 's' : '') + ' de toit');
+    return o.join(' · ');
+  }
+  function mpPanPieces2(p, bs){ return (p.pieces || [p.pts]).map(pc => pc.map(q => { const t = mpLocalUV(bs, q); return [t.u, t.v]; })); }
+  function mpIn2(P, u, v){
+    let s = 0;
+    for (let i = 0; i < P.length; i++) {
+      const a = P[i], b = P[(i + 1) % P.length], c = (b[0] - a[0]) * (v - a[1]) - (b[1] - a[1]) * (u - a[0]);
+      if (Math.abs(c) < 1) continue;
+      if (s && Math.sign(c) !== s) return false; s = Math.sign(c);
+    }
+    return true;
+  }
+  function mpPlanToUV(bs, x, y){
+    const dx = x - bs.p0.x, dy = y - bs.p0.y, a = bs.u.x, b = bs.v.x, c = bs.u.y, d = bs.v.y, det = a * d - b * c || 1e-9;
+    return { u: (dx * d - b * dy) / det, v: (a * dy - c * dx) / det };
+  }
+  function mpItemRect(it, bs, m){
+    const cs = Math.hypot(bs.v.x, bs.v.y) || 1, g = m || 0;
+    let w, h;
+    if (it.type === 'velux') { w = it.w; h = it.h; } else if (it.type === 'cheminee') { w = it.w; h = it.d / cs; } else { w = h = it.w + 60; }
+    return { u1: it.u - w / 2 - g, u2: it.u + w / 2 + g, v1: it.v - h / 2 - g, v2: it.v + h / 2 + g };
+  }
+  function mpItemFits(it, p, bs){
+    const r = mpItemRect(it, bs), P = mpPanPieces2(p, bs);
+    return [[r.u1, r.v1], [r.u2, r.v1], [r.u2, r.v2], [r.u1, r.v2], [it.u, it.v]].every(([u, v]) => P.some(pc => mpIn2(pc, u, v)));
+  }
+  function mpFitItems(data){
+    if (data.type === 'voute') { mpItems = []; mpSel = null; return; }
+    mpItems = mpItems.filter(it => {
+      const p = data.pans[it.pan]; if (!p) return false;
+      const bs = mpPanBasis(p), P = mpPanPieces2(p, bs); let cu = 0, cv = 0, n = 0;
+      P.forEach(pc => pc.forEach(q => { cu += q[0]; cv += q[1]; n++; })); cu /= n; cv /= n;
+      for (let k = 0; k < 25; k++) { if (mpItemFits(it, p, bs)) return true; it.u += (cu - it.u) * 0.15; it.v += (cv - it.v) * 0.15; }
+      return mpItemFits(it, p, bs);
+    });
+    if (mpSel && !mpItems.some(i => i.id === mpSel)) mpSel = null;
+  }
+  // Retire un rectangle d'un polygone convexe (u,v) → jusqu'à 4 morceaux convexes.
+  function mpSubRect(P, r){
+    const out = [], push = c => { if (c.length >= 3 && mpPoly2Area(c) > 500) out.push(c); };
+    push(mpClip2(P, 0, r.u1, false)); push(mpClip2(P, 0, r.u2, true));
+    const mid = mpClip2(mpClip2(P, 0, r.u1, true), 0, r.u2, false);
+    if (mid.length >= 3) { push(mpClip2(mid, 1, r.v1, false)); push(mpClip2(mid, 1, r.v2, true)); }
+    return out;
+  }
+  function mpRefresh(){
+    if (!mpLastData) return;
+    mpRenderResults(mpLastData); mpDrawPlan(mpLastData);
+    if (mp3dGroup) mpDraw3D(mpLastData, true);
+  }
+  function mpRecalc(){
+    const data = computeMultiPanRoof(); mpLastData = data; mpFitItems(data);
+    mpUpdateSummaryLine(); mpRenderResults(data); mpRenderBacStartControls(data); mpDrawPlan(data);
+    if (mp3dGroup) mpDraw3D(data, true);
+  }
+
+  /* ---------- Plan : rendu SVG des éléments et des cotes ---------- */
+  function mpItemInner(it, data, fs, sel){
+    const p = data.pans[it.pan]; if (!p) return '';
+    const bs = mpPanBasis(p), r = mpItemRect(it, bs);
+    const c = [[r.u1, r.v1], [r.u2, r.v1], [r.u2, r.v2], [r.u1, r.v2]].map(([u, v]) => mpToWorld(bs, u, v));
+    const cx = (c[0].x + c[2].x) / 2, cy = (c[0].y + c[2].y) / 2, ymin = Math.min(...c.map(q => q.y));
+    const col = it.type === 'velux' ? ['#7fb6e8', '#1f5fa6'] : it.type === 'cheminee' ? ['#b5654a', '#6d3a29'] : ['#9aa0a6', '#3a3f44'];
+    let s = `<polygon points="${c.map(q => q.x + ',' + q.y).join(' ')}" fill="${col[0]}" fill-opacity=".9" stroke="${sel ? '#ff8a00' : col[1]}" stroke-width="${fs * (sel ? 0.26 : 0.12)}"${sel ? ` stroke-dasharray="${fs * 0.5} ${fs * 0.3}"` : ''}/>`;
+    if (it.type === 'sortie') s += `<circle cx="${cx}" cy="${cy}" r="${it.w / 2}" fill="#4b5056" stroke="#1d2024" stroke-width="${fs * 0.08}"/>`;
+    else s += `<line x1="${c[0].x}" y1="${c[0].y}" x2="${c[2].x}" y2="${c[2].y}" stroke="${col[1]}" stroke-width="${fs * 0.06}"/><line x1="${c[1].x}" y1="${c[1].y}" x2="${c[3].x}" y2="${c[3].y}" stroke="${col[1]}" stroke-width="${fs * 0.06}"/>`;
+    s += `<text x="${cx}" y="${ymin - fs * 0.5}" font-size="${fs * 0.85}" text-anchor="middle" fill="#1d2024" stroke="#fff" stroke-width="${fs * 0.22}" paint-order="stroke" font-weight="700" font-family="Inter, sans-serif">${mpItemName(it)}</text>`;
+    return s;
+  }
+  const mpItemG = (it, data, fs) => `<g data-item="${it.id}" style="cursor:move;touch-action:none;">${mpItemInner(it, data, fs, it.id === mpSel)}</g>`;
+  function mpCotesSvg(data, w, minX, minY, pad){
+    const fs = Math.max(18, w * 0.016), col = '#0f766e', fmt = v => Math.round(v).toLocaleString('fr-FR') + ' mm';
+    const pill = (x, y, txt, dim, rot) => {
+      const tw = txt.length * fs * 0.62 + fs * 2.2;
+      return `<g data-dim="${dim}" style="cursor:pointer;"${rot ? ` transform="rotate(-90 ${x} ${y})"` : ''}><rect x="${x - tw / 2}" y="${y - fs * 0.9}" width="${tw}" height="${fs * 1.8}" rx="${fs * 0.9}" fill="#fff" stroke="${col}" stroke-width="${fs * 0.1}"/><text x="${x}" y="${y}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle" fill="${col}" font-weight="700" font-family="Inter, sans-serif">${txt} ✎</text></g>`;
+    };
+    const line = (x1, y1, x2, y2) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="${fs * 0.1}"/>` +
+      (y1 === y2 ? [x1, x2].map(x => `<line x1="${x}" y1="${y1 - fs * 0.5}" x2="${x}" y2="${y1 + fs * 0.5}" stroke="${col}" stroke-width="${fs * 0.1}"/>`).join('') : [y1, y2].map(y => `<line x1="${x1 - fs * 0.5}" y1="${y}" x2="${x1 + fs * 0.5}" y2="${y}" stroke="${col}" stroke-width="${fs * 0.1}"/>`).join(''));
+    const wallPill = (x, y) => pill(x, y - fs * 2.6, 'Murs ' + fmt(data.houseH), 'mpWallH');
+    if (data.type === 'voute') {
+      const v = data.vault, L = data.Lm, yT0 = minY + pad * 0.45, xL0 = minX + pad * 0.45;
+      return line(0, yT0, L, yT0) + pill(L * 0.5, yT0, fmt(L), 'mpMainL') + pill(L * 0.14, yT0, 'Corde ' + fmt(v.C), 'mpMainW') + pill(L * 0.86, yT0, 'Rayon ' + fmt(v.R), 'mpRayon') +
+             line(xL0, 0, xL0, v.S) + pill(xL0, v.S / 2, 'Développé ' + fmt(v.S), 'none', true) + wallPill(L * 0.5, yT0);
+    }
+    if (data.type === 'modele') return pill(minX + pad + data.Lm * 0.12, minY + pad * 0.45, 'Pente ' + (parseFloat($('mpPente').value) || 25) + ' °', 'mpPente');
+    const m = data.rects[0], yT = minY + pad * 0.45, xL = minX + pad * 0.45;
+    let s = line(m.x0, yT, m.x0 + m.sx, yT) + pill(m.x0 + m.sx / 2, yT, fmt(data.Lm), 'mpMainL') +
+            line(xL, m.y0, xL, m.y0 + m.sy) + pill(xL, m.y0 + m.sy / 2, fmt(data.Wm), 'mpMainW', true) +
+            pill(m.x0 + m.sx * 0.9, yT, 'Pente ' + (parseFloat($('mpPente').value) || 25) + ' °', 'mpPente') + wallPill(m.x0 + m.sx * 0.5, yT);
+    const wg = data.rects[1];
+    if (wg && data.type !== 'monopente') {
+      const xr = wg.x0 + wg.sx + pad * 0.35, yb = wg.y0 + wg.sy + pad * 0.4;
+      s += line(xr, wg.y0, xr, wg.y0 + wg.sy) + pill(xr, wg.y0 + wg.sy / 2, fmt(wg.sy), 'mpWingL', true) +
+           line(wg.x0, yb, wg.x0 + wg.sx, yb) + pill(wg.x0 + wg.sx / 2, yb, fmt(wg.sx), 'mpWingW');
+    }
+    return s;
+  }
+  function mpToolbarHtml(){
+    const b = (t, l) => `<button type="button" data-add="${t}" style="${MP_BTN}${mpArm === t ? 'background:#ffe3b8;border-color:#ff8a00;' : ''}">${l}</button>`;
+    const vt = mpLastData && mpLastData.type === 'voute';
+    return mpMatHtml() + mpImportHtml() + (mpLastData && mpLastData.type === 'modele' ? mpModelHtml() : '') + (vt ? '<div style="font-size:11.5px;color:#6b7178;margin-bottom:6px;">Cintré : les Velux, cheminées et sorties ne sont pas disponibles sur ce type de toit. <button type="button" data-recalc style="${MP_BTN}background:#e6f2ff;border-color:#7fb0e6;">↻ Recalculer</button></div><div data-panel></div>' : `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;"><span style="font-size:11.5px;color:#4a5056;font-weight:600;">Ajouter :</span>${b('velux', '+ Velux')}${b('cheminee', '+ Cheminée')}${b('sortie', '+ Sortie de toit')}<button type="button" data-recalc style="${MP_BTN}background:#e6f2ff;border-color:#7fb0e6;">↻ Recalculer</button>
+      ${mpArm ? '<span style="font-size:11.5px;color:#b45f00;">Touche un pan du plan pour le placer</span>' : ''}</div><div data-panel>${mpPanelHtml()}</div>`);
+  }
+  function mpPanelHtml(){
+    const it = mpItems.find(i => i.id === mpSel);
+    if (!it) return `<div style="font-size:11.5px;color:#6b7178;margin:2px 0 8px;">Touche un élément pour le modifier, glisse-le pour le déplacer. Touche une cote (✎) pour changer les mesures du toit.${mpItems.length ? ' · ' + mpItemsSummary() : ''}</div>`;
+    const inp = (k, l, v) => `<label style="font-size:11px;display:flex;flex-direction:column;gap:2px;color:#4a5056;">${l}<input data-f="${k}" type="number" value="${Math.round(v)}" style="width:96px;padding:5px 6px;border:1px solid #c9ced3;border-radius:6px;font-size:12px;"></label>`;
+    let f = '';
+    if (it.type === 'velux') f = `<label style="font-size:11px;display:flex;flex-direction:column;gap:2px;color:#4a5056;">Modèle<select data-f="sz" style="padding:5px 6px;border:1px solid #c9ced3;border-radius:6px;font-size:12px;">${Object.keys(MP_VELUX).map(k => `<option value="${k}"${k === it.sz ? ' selected' : ''}>${k} (${MP_VELUX[k][0] / 10}×${MP_VELUX[k][1] / 10})</option>`).join('')}</select></label>` + inp('w', 'Largeur (mm)', it.w) + inp('h', 'Hauteur (mm)', it.h);
+    else if (it.type === 'cheminee') f = inp('w', 'Largeur (mm)', it.w) + inp('d', 'Profondeur (mm)', it.d) + inp('hh', 'Hauteur hors toit (mm)', it.hh);
+    else f = inp('w', 'Diamètre (mm)', it.w);
+    return `<div style="border:1px solid #e3e6e9;border-radius:8px;padding:8px;margin-bottom:8px;background:#fafbfc;">
+      <div style="font-size:12px;font-weight:700;color:#2a2f35;margin-bottom:6px;">${mpItemName(it)} — pan ${it.pan + 1}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">${f}${inp('u', 'Décalage horiz. (mm)', it.u)}${inp('v', 'Distance à l\'égout (mm)', it.v)}
+      <button type="button" data-del style="${MP_BTN}color:#b3261e;border-color:#e6b8b4;">Supprimer</button></div></div>`;
+  }
+  function mpWireItems(wrap, data, fs){
+    const svg = wrap.querySelector('svg'), panel = wrap.querySelector('[data-panel]');
+    const toPlan = e => { const m = svg.getScreenCTM(); if (!m) return null; const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; return pt.matrixTransform(m.inverse()); };
+    const redrawG = id => { const it = mpItems.find(i => i.id === id), g = svg.querySelector(`[data-item="${id}"]`); if (it && g) g.innerHTML = mpItemInner(it, data, fs, it.id === mpSel); };
+    const wirePanel = () => {
+      const it = mpItems.find(i => i.id === mpSel); if (!it) return;
+      panel.querySelectorAll('[data-f]').forEach(el => el.addEventListener('change', () => {
+        const k = el.dataset.f, old = Object.assign({}, it), p = data.pans[it.pan], bs = mpPanBasis(p);
+        if (k === 'sz') { it.sz = el.value; it.w = MP_VELUX[it.sz][0]; it.h = MP_VELUX[it.sz][1]; }
+        else { const n = parseFloat(el.value); it[k] = (k === 'u' || k === 'v') ? (isFinite(n) ? n : old[k]) : Math.max(50, n || old[k]); }
+        if (!mpItemFits(it, p, bs)) { Object.assign(it, old); showToast('L\'élément doit rester dans le pan.'); }
+        mpRefresh();
+      }));
+      const del = panel.querySelector('[data-del]');
+      if (del) del.addEventListener('click', () => { mpItems = mpItems.filter(i => i.id !== mpSel); mpSel = null; mpRefresh(); });
+    };
+    const select = id => {
+      const old = mpSel; mpSel = id; if (old) redrawG(old); if (id) redrawG(id);
+      panel.innerHTML = mpPanelHtml(); wirePanel();
+    };
+    wirePanel(); mpWireImport(wrap); mpWireMat(wrap);
+    if (data.type === 'modele') mpWireModel(wrap, data, fs);
+    wrap.querySelectorAll('[data-recalc]').forEach(b => b.addEventListener('click', () => { if (data.type === 'modele') mpModelChanged(); else mpRecalc(); showToast('Calepinage recalculé.'); }));
+    wrap.querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', () => { mpArm = mpArm === b.dataset.add ? null : b.dataset.add; mpDrawPlan(data); }));
+    wrap.querySelectorAll('[data-dim]').forEach(g => g.addEventListener('click', () => {
+      const id = g.dataset.dim; if (!MP_DIM_LABEL[id]) return;
+      const nv = prompt(MP_DIM_LABEL[id] + (id === 'mpPente' ? ' (°)' : ' (mm)'), id === 'mpWallH' ? Math.round(mpWallH || (mpLastData && mpLastData.houseH) || 3000) : $(id).value);
+      if (nv === null) return;
+      let n = parseFloat(String(nv).replace(',', '.').replace(/\s/g, '')); if (!(n > 0)) return;
+      if (id === 'mpPente') n = Math.min(70, Math.max(5, n)); else n = Math.max(id === 'mpWallH' ? 1500 : 500, n);
+      if (id === 'mpWallH') mpWallH = n; else $(id).value = n;
+      mpRecalc();
+    }));
+    let drag = null;
+    svg.addEventListener('touchmove', e => { if (drag) e.preventDefault(); }, { passive: false });
+    svg.addEventListener('pointerdown', e => {
+      if (e.target.closest('[data-dim]') || e.target.closest('[data-vh]')) return;
+      const P = toPlan(e); if (!P) return;
+      const g = e.target.closest('[data-item]');
+      if (mpArm && !g) {
+        for (let i = 0; i < data.pans.length; i++) {
+          const bs = mpPanBasis(data.pans[i]), uv = mpPlanToUV(bs, P.x, P.y);
+          if (!mpPanPieces2(data.pans[i], bs).some(pc => mpIn2(pc, uv.u, uv.v))) continue;
+          const d = mpArm === 'velux' ? { sz: 'MK04', w: 780, h: 980 } : mpArm === 'cheminee' ? { w: 600, d: 600, hh: 900 } : { w: 125 };
+          const it = Object.assign({ id: mpItemSeq++, type: mpArm, pan: i, u: uv.u, v: uv.v }, d);
+          if (!mpItemFits(it, data.pans[i], bs)) { showToast('Trop près du bord du pan : place-le plus à l\'intérieur.'); return; }
+          mpItems.push(it); mpSel = it.id; mpArm = null; mpRefresh(); return;
+        }
+        showToast('Touche l\'intérieur d\'un pan.'); return;
+      }
+      if (g) {
+        const id = +g.dataset.item, it = mpItems.find(i => i.id === id); if (!it) return;
+        const bs = mpPanBasis(data.pans[it.pan]), uv = mpPlanToUV(bs, P.x, P.y);
+        drag = { id, du: it.u - uv.u, dv: it.v - uv.v, moved: false };
+        if (svg.setPointerCapture) svg.setPointerCapture(e.pointerId);
+        select(id); e.preventDefault();
+      } else if (mpSel) select(null);
+    });
+    svg.addEventListener('pointermove', e => {
+      if (!drag) return;
+      const it = mpItems.find(i => i.id === drag.id), P = toPlan(e); if (!it || !P) return;
+      const tries = [[it.pan, true]].concat(data.pans.map((_, i) => [i, false]).filter(t => t[0] !== it.pan));
+      for (const [pi, useOff] of tries) {
+        const p = data.pans[pi], bs = mpPanBasis(p), uv = mpPlanToUV(bs, P.x, P.y);
+        const t = Object.assign({}, it, { pan: pi, u: uv.u + (useOff ? drag.du : 0), v: uv.v + (useOff ? drag.dv : 0) });
+        if (mpItemFits(t, p, bs)) { Object.assign(it, { pan: pi, u: t.u, v: t.v }); drag.moved = true; redrawG(it.id); break; }
+      }
+    });
+    const end = () => { if (!drag) return; const mv = drag.moved; drag = null; if (mv) mpRefresh(); };
+    svg.addEventListener('pointerup', end); svg.addEventListener('pointercancel', end);
+  }
+
+  /* ---------- 3D : éléments en toiture ---------- */
+  function mpItem3D(it, c){
+    const { bs, V, n3, v3d, M, add, addPin } = c, uD = mpDir(bs.u), r = mpItemRect(it, bs), AT = (u, v, l) => V(mpToWorld(bs, u, v)).addScaledVector(n3, l);
+    const uc = (r.u1 + r.u2) / 2, vc = (r.v1 + r.v2) / 2, ul = r.u2 - r.u1, vl = r.v2 - r.v1, A = (mesh) => add('acc', mesh, n3, 0.975);
+    const ring = (R, wd, lift, th, mat, inward) => {
+      const a = R.u2 - R.u1, b = R.v2 - R.v1, ux = (R.u1 + R.u2) / 2, vx = (R.v1 + R.v2) / 2, o = inward ? -wd / 2 : wd / 2, lo = inward ? a : a + 2 * wd, lv = inward ? b - 2 * wd : b;
+      A(mpBox(AT(ux, R.v1 - o, lift + th / 2), uD, n3, lo, th, wd, mat)); A(mpBox(AT(ux, R.v2 + o, lift + th / 2), uD, n3, lo, th, wd, mat));
+      A(mpBox(AT(R.u1 - o, vx, lift + th / 2), v3d, n3, lv, th, wd, mat)); A(mpBox(AT(R.u2 + o, vx, lift + th / 2), v3d, n3, lv, th, wd, mat));
+    };
+    if (it.type === 'velux') {
+      ring(r, 110, 28, 5, M.acc.rive, false); ring(r, 65, 0, 70, M.velFrame, true);
+      A(mpBox(AT(uc, vc, 52), uD, n3, ul - 120, 12, vl - 120, M.glass));
+      addPin('Fenêtre de toit Velux', AT(uc, vc, 70));
+    } else if (it.type === 'cheminee') {
+      const ys = [[r.u1, r.v1], [r.u2, r.v1], [r.u2, r.v2], [r.u1, r.v2]].map(([u, v]) => V(mpToWorld(bs, u, v)).y);
+      const y0 = Math.min(...ys) - 300, top = Math.max(...ys) + it.hh, ctr = V(mpToWorld(bs, uc, vc)), ex = new THREE.Vector3(uD.x, 0, uD.z).normalize(), ey = new THREE.Vector3(0, 1, 0);
+      A(mpBox(new THREE.Vector3(ctr.x, (y0 + top) / 2, ctr.z), ex, ey, it.w, top - y0, it.d, M.brick));
+      A(mpBox(new THREE.Vector3(ctr.x, top + 30, ctr.z), ex, ey, it.w + 120, 60, it.d + 120, M.cap));
+      A(mpBox(new THREE.Vector3(ctr.x, top + 62, ctr.z), ex, ey, it.w * 0.5, 4, it.d * 0.5, M.dark));
+      ring(r, 120, 28, 5, M.acc.rive, false);
+      addPin('Cheminée', new THREE.Vector3(ctr.x, top + 70, ctr.z));
+    } else {
+      const ctr = AT(uc, vc, 0), rad = it.w / 2;
+      A(mpBox(AT(uc, vc, 32), uD, n3, ul + 120, 5, vl + 120, M.acc.rive));
+      const cyl = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, 420, 24), M.pipe); cyl.position.set(ctr.x, ctr.y + 170, ctr.z); cyl.castShadow = cyl.receiveShadow = true; A(cyl);
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(rad * 1.45, rad * 1.45, 10, 24), M.pipe); cap.position.set(ctr.x, ctr.y + 392, ctr.z); cap.castShadow = true; A(cap);
+      addPin('Sortie de toit', new THREE.Vector3(ctr.x, ctr.y + 400, ctr.z));
+    }
+  }
+
+  /* ---------- Synchro entre les deux systèmes (joint debout ↔ tasseaux) ---------- */
+  const MP_IN = ['mpType', 'mpPente', 'mpMainL', 'mpMainW', 'mpWingL', 'mpWingW', 'largeurBac', 'mpRayon', 'mpRidge', 'mpHips'];
+  function mpExport(){
+    const v = {}; MP_IN.forEach(k => { v[k] = $(k).value; });
+    return { v, wallH: mpWallH, mat: Object.assign({}, mpMat), model: JSON.parse(JSON.stringify(mpModel)), hip: $('mpMainHip').checked, starts: mpBacStartByPan.slice(), items: JSON.parse(JSON.stringify(mpItems)), calc: !!mpLastData };
+  }
+  function mpImport(st){
+    if (!st) return;
+    MP_IN.forEach(k => { if (st.v[k] !== undefined) $(k).value = st.v[k]; });
+    $('mpType').dispatchEvent(new Event('change')); $('mpMainHip').checked = !!st.hip; mpWallH = st.wallH || 0; if (st.mat) mpMat = Object.assign({}, st.mat); if (st.model) mpModel = JSON.parse(JSON.stringify(st.model));
+    mpItems = st.items || []; mpItemSeq = mpItems.reduce((m, i) => Math.max(m, i.id + 1), 1); mpSel = null; mpArm = null;
+    if (st.calc) { $('mpCalcBtn').click(); mpBacStartByPan = (st.starts || []).slice(); mpRenderBacStartControls(mpLastData); mpDrawPlan(mpLastData); mpRenderResults(mpLastData); }
+  }
+  /* ===== v4 : matières & coloris, toiture cintrée, import Excel / DXF, envoi au plan de débit ===== */
+  const MP_MATS = [
+    { k: 'zn', fam: 'Zinc', name: 'Zinc naturel', c: 0x9aa6af, m: 0.8, r: 0.33 },
+    { k: 'zq', fam: 'Zinc', name: 'Zinc prépatiné clair (Quartz)', c: 0xb4bbbf, m: 0.75, r: 0.4 },
+    { k: 'za', fam: 'Zinc', name: 'Zinc prépatiné ardoise', c: 0x4f565c, m: 0.7, r: 0.42 },
+    { k: 'pf', fam: 'Alu', name: 'Alu Prefa', prefa: true, m: 0.55, r: 0.45 },
+    { k: 'al', fam: 'Alu', name: 'Alu laqué', custom: true, m: 0.5, r: 0.45 },
+    { k: 'ac', fam: 'Acier', name: 'Acier laqué', custom: true, m: 0.45, r: 0.5 },
+    { k: 'cu', fam: 'Cuivre', name: 'Cuivre', c: 0xb8733a, m: 0.9, r: 0.3 }
+  ];
+  const MP_PREFA = [['P.10 Anthracite', 0x3b3f44], ['P.10 Noir', 0x1f2124], ['P.10 Brun noyer', 0x5a3d2b], ['P.10 Brun foncé', 0x3d2b22], ['P.10 Rouge tuile', 0x8c3a2a], ['P.10 Gris clair', 0xa7abae], ['P.10 Gris pierre', 0x7d7f7d], ['P.10 Blanc', 0xe9e9e6], ['Gris argent métallisé', 0x9ea5ab], ['Naturel (brut)', 0xb7bcc0]];
+  let mpMat = { k: 'zn', pf: 0, custom: '#3b3f44' }, mpVault = null;
+  const mpDev = { w: 55, l: 50 };
+  function mpMatNow(){
+    const m = MP_MATS.find(x => x.k === mpMat.k) || MP_MATS[0];
+    let c = m.c, label = m.name;
+    if (m.prefa) { c = MP_PREFA[mpMat.pf][1]; label = 'Alu Prefa — ' + MP_PREFA[mpMat.pf][0]; }
+    else if (m.custom) { c = parseInt(mpMat.custom.slice(1), 16); label = m.name + ' ' + mpMat.custom.toUpperCase(); }
+    return { fam: m.fam, c, m: m.m, r: m.r, label };
+  }
+  const mpShade = (c, f) => { const r = Math.min(255, ((c >> 16) & 255) * f), g = Math.min(255, ((c >> 8) & 255) * f), b = Math.min(255, (c & 255) * f); return (r << 16) | (g << 8) | b; };
+  function mpMatHtml(){
+    const sel = 'padding:5px 6px;border:1px solid #c9ced3;border-radius:6px;font-size:12px;';
+    const m = MP_MATS.find(x => x.k === mpMat.k) || MP_MATS[0];
+    return `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;"><span style="font-size:11.5px;color:#4a5056;font-weight:600;">Matière :</span>
+      <select data-mat style="${sel}">${MP_MATS.map(x => `<option value="${x.k}"${x.k === mpMat.k ? ' selected' : ''}>${x.name}</option>`).join('')}</select>
+      ${m.prefa ? `<select data-prefa style="${sel}">${MP_PREFA.map((x, i) => `<option value="${i}"${i === mpMat.pf ? ' selected' : ''}>${x[0]}</option>`).join('')}</select>` : ''}
+      ${m.custom ? `<input data-custom type="color" value="${mpMat.custom}" style="width:36px;height:28px;border:1px solid #c9ced3;border-radius:6px;padding:1px;"><span style="font-size:11px;color:#6b7178;">teinte RAL au choix</span>` : ''}</div>`;
+  }
+  const mpImportHtml = () => `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;">
+      <span style="font-size:11.5px;color:#4a5056;font-weight:600;">Rendez-vous :</span>
+      <button type="button" data-xl="tpl" style="${MP_BTN}">⬇ Modèle Excel</button>
+      <label style="${MP_BTN}">⬆ Importer Excel<input type="file" data-xlfile accept=".xlsx,.xls,.csv" style="display:none;"></label>
+      <label style="${MP_BTN}">⬆ Importer DXF / DWG<input type="file" data-dxffile accept=".dxf,.dwg" style="display:none;"></label>
+      <button type="button" data-send-debit style="${MP_BTN}background:#e6f2ff;border-color:#7fb0e6;">→ Envoyer au plan de débit</button></div>`;
+
+  /* ---------- Envoi au plan de débit ---------- */
+  function mpSendDebit(){
+    if (!mpLastData) { showToast('Calcule d\'abord le calepinage.'); return; }
+    const a = prompt('Majoration du développé en largeur (relevés de joint, mm) :', mpDev.w); if (a === null) return;
+    const b = prompt('Majoration en longueur (relevés égout / faîtage, mm) :', mpDev.l); if (b === null) return;
+    mpDev.w = Math.max(0, parseFloat(a) || 0); mpDev.l = Math.max(0, parseFloat(b) || 0);
+    const MT = mpMatNow(), groups = new Map();
+    mpLastData.pans.forEach((p, pi) => mpBuildBacsForPan(p, pi).forEach(bc => {
+      const w = Math.round(bc.w + mpDev.w), len = Math.round(bc.lenMax + mpDev.l), key = w + 'x' + len + (bc.billard ? 'b' : '');
+      if (!groups.has(key)) groups.set(key, { w, len, qty: 0, cut: bc.cut, billard: !!bc.billard, names: [] });
+      const g = groups.get(key); g.qty++; if (g.names.length < 3) g.names.push((pi + 1) + '.' + (g.qty));
+    }));
+    let n = 0;
+    groups.forEach(g => { addCut(g.w, g.len, g.qty, `Bac ${isTasseaux ? 'tasseaux' : 'joint debout'}${g.cut ? ' recoupé' : ''}${g.billard ? ' queue de billard (effilé)' : ''} — ${MT.label}`, null, null, MT.fam); n += g.qty; });
+    showToast(`${n} bacs (${groups.size} formats) envoyés au plan de débit — matière ${MT.fam}.`);
+    const tb = document.querySelector('.tab-btn[data-tab="tab-debit"]'); if (tb) tb.click();
+  }
+
+  /* ---------- Toiture cintrée : points de corde ---------- */
+  function mpVaultInfo(C, Rin){
+    const R = Math.max(C / 2 + 1, Rin || C * 0.75), f = R - Math.sqrt(R * R - C * C / 4), th0 = Math.asin(C / (2 * R));
+    return { R, C, f, th0, S: 2 * R * th0 };
+  }
+  function mpVaultHtml(v){
+    const step = v.C <= 4000 ? 250 : v.C <= 9000 ? 500 : 1000, rows = [];
+    for (let x = -Math.floor(v.C / 2 / step) * step; x <= v.C / 2 + 1; x += step) rows.push([x, Math.sqrt(v.R * v.R - x * x) - (v.R - v.f)]);
+    return `<div class="panel-title" style="font-size:12px;margin-top:14px;">Cintrage — traçage du gabarit</div>
+      <table class="biais-seg-table"><tbody>
+        <tr><td>Corde (portée)</td><td style="text-align:right;"><b>${Math.round(v.C)} mm</b></td></tr>
+        <tr><td>Rayon</td><td style="text-align:right;"><b>${Math.round(v.R)} mm</b></td></tr>
+        <tr><td>Flèche (hauteur au centre)</td><td style="text-align:right;"><b>${Math.round(v.f)} mm</b></td></tr>
+        <tr><td>Angle d'ouverture</td><td style="text-align:right;"><b>${(v.th0 * 2 * 180 / Math.PI).toFixed(1)} °</b></td></tr>
+        <tr><td>Longueur développée d'un bac (arc)</td><td style="text-align:right;"><b>${Math.round(v.S)} mm</b></td></tr></tbody></table>
+      <div class="biais-hint" style="margin-top:6px;">Points de corde : depuis le milieu de la corde, hauteur de l'arc au-dessus de la ligne d'appui (tous les ${step} mm).</div>
+      <div style="max-height:220px;overflow:auto;"><table class="biais-seg-table"><thead><tr><th>Distance au centre</th><th>Hauteur (flèche)</th></tr></thead><tbody>${rows.map(r => `<tr><td>${r[0] > 0 ? '+' : ''}${r[0]} mm</td><td>${Math.round(r[1])} mm</td></tr>`).join('')}</tbody></table></div>`;
+  }
+  function mpVaultCompute(type, Lm, C, thRad){
+    const v = mpVaultInfo(C, parseFloat($('mpRayon').value)), houseH = mpWallH > 0 ? mpWallH : Math.max(2200, Math.min(3200, C * 0.38)), arc = [[40, 0], [C - 40, 0]];
+    for (let i = 0; i <= 24; i++) { const ph = v.th0 - 2 * v.th0 * i / 24; arc.push([C / 2 + v.R * Math.sin(ph), v.f - v.R + v.R * Math.cos(ph)]); }
+    mpVault = v;
+    return { segs: [], pans: [{ pts: [{ x: 0, y: 0, h: 0 }, { x: Lm, y: 0, h: 0 }, { x: Lm, y: v.S, h: 0 }, { x: 0, y: v.S, h: 0 }], color: 0xc7cdd3, curved: true }],
+      Lm, Wm: C, rects: [{ x0: 0, y0: 0, sx: Lm, sy: C, fill: { axis: 'x', pts: arc } }], valleys: new Set(), tan: 0, houseH, type: 'voute', vault: v };
+  }
+
+  /* ---------- 3D du cintré ---------- */
+  function mpVault3D(data, c){
+    const { M, add, addPin, eco } = c, v = data.vault, L = data.Lm, S = v.S, nb = Math.max(10, Math.ceil(S / 200)), cx0 = L / 2;
+    const P = (u, w, off) => { const ph = -v.th0 + w / v.R, rr = v.R + off; return new THREE.Vector3(u - cx0, v.f - v.R + rr * Math.cos(ph), rr * Math.sin(ph)); };
+    const N = w => { const ph = -v.th0 + w / v.R; return new THREE.Vector3(0, Math.cos(ph), Math.sin(ph)); };
+    const T = w => { const ph = -v.th0 + w / v.R; return new THREE.Vector3(0, -Math.sin(ph), Math.cos(ph)); };
+    const nMid = N(S / 2), mode = mpBacStartByPan[0] || 'left';
+    const keep = f => mode === 'right' ? [L * (1 - f), L] : mode === 'center' ? [L / 2 - L * f / 2, L / 2 + L * f / 2] : [0, L * f];
+    const sheet = (u1, u2, off, uvs, mat) => {
+      const pos = [], uv = [], idx = [];
+      for (let j = 0; j <= nb; j++) { const w = S * j / nb; [u1, u2].forEach(u => { const p = P(u, w, off); pos.push(p.x, p.y, p.z); uv.push(uvs ? u / uvs : 0, uvs ? w / uvs : 0); }); }
+      for (let j = 0; j < nb; j++) { const a = j * 2; idx.push(a, a + 1, a + 3, a, a + 3, a + 2); }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+      const m = new THREE.Mesh(g, mat); m.castShadow = true; m.receiveShadow = true; return m;
+    };
+    const ribbon = (u, H, hw, mat) => {
+      const pos = [], idx = [], K = Math.max(12, nb);
+      for (let j = 0; j <= K; j++) { const w = S * j / K; [P(u, w, 0), P(u, w, H), P(u - hw, w, H), P(u + hw, w, H)].forEach(p => pos.push(p.x, p.y, p.z)); }
+      for (let j = 0; j < K; j++) { const a = j * 4, b = a + 4; idx.push(a, a + 1, b + 1, a, b + 1, b, a + 2, a + 3, b + 3, a + 2, b + 3, b + 2); }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+      const m = new THREE.Mesh(g, mat); m.castShadow = true; return m;
+    };
+    // Cintres (pannes courbes)
+    const nU = Math.max(2, Math.round(L / 1200) + 1), K = 20, sl = S / K;
+    for (let i = 0; i < nU; i++) {
+      const u = 100 + (L - 200) * i / (nU - 1);
+      for (let j = 0; j < K; j++) { const w = (j + 0.5) * sl, n = N(w); add('pannes', mpBox(P(u, w, -148), T(w), n, sl * 1.04, 200, 90, M.panne), n, 0.03 + 0.1 * i / nU); }
+    }
+    const cut = (f, off, uvs, mat, layer, rv) => { const [a, b] = keep(eco ? f : 1); add(layer, sheet(a, b, off, uvs, mat), nMid, rv); };
+    cut(MP_CUT.volige, -26, 1200, M.volige, 'volige', 0.16); cut(MP_CUT.ecran, -12, 700, M.ecran, 'ecran', 0.28);
+    const bacs = mpBuildBacsForPan(data.pans[0], 0), dists = bacs.map((_, bi) => mpBacDistFrac(bi, bacs.length, 0)), shown = dists.map(d => !eco || d <= MP_CUT.bacs + 1e-9);
+    bacs.forEach((bc, bi) => { if (shown[bi]) add('bacs', sheet(bc.u1, bc.u2, 0, 0, M.bac[bi % 2]), nMid, 0.4 + 0.45 * dists[bi], dists[bi]); });
+    for (let b = 1; b < bacs.length; b++) {
+      if (!shown[b] && !shown[b - 1]) continue;
+      const d = Math.min(dists[b], dists[b - 1]);
+      add('bacs', isTasseaux ? ribbon(bacs[b].u1, 40, 29, M.seam) : ribbon(bacs[b].u1, MP_SEAM_H, 8, M.seam), nMid, 0.4 + 0.45 * d, d);
+    }
+    // Égouts (bords courbes) et rives
+    [80, S - 80].forEach(w => add('acc', mpBox(P(L / 2, w, 11), new THREE.Vector3(1, 0, 0), N(w), L, 6, 160, M.acc.egout), N(w), 0.92));
+    [[0, 110], [L - 110, L]].forEach(([a, b]) => add('acc', sheet(a, b, MP_SEAM_H + 8, 0, M.acc.rive), nMid, 0.95));
+    addPin('Bacs cintrés', P(L * 0.3, S * 0.5, 4)); addPin('Bande d\'égout', P(L * 0.5, 80, 20)); addPin('Rive', P(L - 55, S * 0.6, MP_SEAM_H + 12));
+    if (eco) { const [a, b] = keep((MP_CUT.bacs + MP_CUT.ecran) / 2); addPin('Écran sous-toiture', P((a + b) / 2, S * 0.5, -12)); const [a2, b2] = keep((MP_CUT.ecran + MP_CUT.volige) / 2); addPin('Volige', P((a2 + b2) / 2, S * 0.5, -26)); addPin('Cintres (pannes)', P(100 + (L - 200) * 0.2, S * 0.5, -148)); }
+  }
+
+  /* ---------- Import Excel ---------- */
+  const mpNorm = s => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9.]/g, '');
+  function mpXlsxTemplate(){
+    const toit = [['Paramètre', 'Valeur', 'Aide'],
+      ['Type de toit', '2 pans', 'monopente · 2 pans · 4 pans · L · T · U · cintré'],
+      ['Matière', 'Zinc naturel', 'Zinc naturel · Zinc quartz · Zinc ardoise · Alu Prefa · Alu laqué · Acier laqué · Cuivre'],
+      ['Coloris', 'P.10 Anthracite', 'Prefa : Anthracite, Noir, Brun noyer, Rouge tuile, Gris clair… ou code #RRGGBB'],
+      ['Pente (°)', 25, 'Ignorée si cintré'],
+      ['Longueur (mm)', 10000, 'Corps principal (axe du faîtage ou des cintres)'],
+      ['Largeur / corde (mm)', 7000, 'Cintré : corde (portée)'],
+      ['Rayon (mm)', '', 'Cintré uniquement'],
+      ['Profondeur aile (mm)', 5000, 'L / T / U'],
+      ['Largeur aile (mm)', 5000, 'L / T / U'],
+      ['Largeur de bac (mm)', 500, 'Largeur utile'],
+      ['Sens de pose', 'gauche', 'gauche · droite · centre']];
+    const elem = [['Type', 'Modèle', 'Largeur (mm)', 'Hauteur / Profondeur (mm)', 'Hauteur hors toit (mm)', 'Pan n°', 'Décalage horiz. (mm)', 'Distance à l\'égout (mm)'],
+      ['Velux', 'MK04', '', '', '', 1, 3000, 1500], ['Cheminée', '', 600, 600, 900, 2, 2500, 1300], ['Sortie de toit', '', 125, '', '', 1, 5200, 2100]];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(toit), 'Toiture'); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(elem), 'Éléments');
+    XLSX.writeFile(wb, 'modele_calepinage_toiture.xlsx'); showToast('Modèle Excel téléchargé.');
+  }
+  function mpSetMat(txt, color){
+    const t = mpNorm(txt); if (!t) return;
+    const k = t.includes('prefa') ? 'pf' : t.includes('quartz') ? 'zq' : t.includes('ardoise') ? 'za' : t.includes('cuivre') ? 'cu' : t.includes('acier') ? 'ac' : t.includes('alu') ? (mpNorm(color).startsWith('#') ? 'al' : 'pf') : 'zn';
+    mpMat.k = k; const col = String(color || '').trim();
+    if (/^#[0-9a-f]{6}$/i.test(col)) mpMat.custom = col;
+    else if (k === 'pf' && col) { const i = MP_PREFA.findIndex(x => mpNorm(x[0]).includes(mpNorm(col).replace(/^p\.?10/, '')) || mpNorm(col).includes(mpNorm(x[0]).replace(/^p\.?10/, ''))); if (i >= 0) mpMat.pf = i; }
+  }
+  function mpApplyParams(P){
+    const set = (id, v) => { if (v !== undefined && v !== null && v !== '' && isFinite(+v)) $(id).value = +v; };
+    if (P.type) { $('mpType').value = P.type; $('mpMainHip').checked = P.type === '4pans'; $('mpType').dispatchEvent(new Event('change')); }
+    set('mpPente', P.pente); set('mpMainL', P.L); set('mpMainW', P.W); set('mpRayon', P.R); set('mpWingL', P.wL); set('mpWingW', P.wW); set('largeurBac', P.bac);
+    if (P.mat) mpSetMat(P.mat, P.color);
+    mpItems = P.items || mpItems; mpItemSeq = mpItems.reduce((m, i) => Math.max(m, i.id + 1), 1); mpSel = null;
+    $('mpCalcBtn').click();
+    if (P.sens) { const s = /dr/.test(mpNorm(P.sens)) ? 'right' : /cen/.test(mpNorm(P.sens)) ? 'center' : 'left'; mpBacStartByPan = mpLastData.pans.map(() => s); mpRenderBacStartControls(mpLastData); mpRefresh(); }
+    else mpRefresh();
+  }
+  function mpImportXlsx(file){
+    const rd = new FileReader();
+    rd.onload = e => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array' }), P = {}, find = n => wb.SheetNames.find(s => mpNorm(s).startsWith(n));
+        const sh = wb.Sheets[find('toiture')] || wb.Sheets[wb.SheetNames[0]], kv = {};
+        XLSX.utils.sheet_to_json(sh, { header: 1, defval: '' }).forEach(r => { if (r[0]) kv[mpNorm(r[0])] = r[1]; });
+        const g = (...ks) => { for (const k of ks) { const f = Object.keys(kv).find(x => x.startsWith(k)); if (f !== undefined && kv[f] !== '') return kv[f]; } };
+        const ty = mpNorm(g('typedetoit', 'type') || '');
+        P.type = !ty ? undefined : /cintr|voute|arrondi/.test(ty) ? 'voute' : /mono/.test(ty) ? 'monopente' : /4|croup/.test(ty) ? '4pans' : /2|pignon/.test(ty) ? '2pans' : /^l$/.test(ty) ? 'L' : /^t$/.test(ty) ? 'T' : /^u$/.test(ty) ? 'U' : undefined;
+        P.pente = g('pente'); P.L = g('longueur'); P.W = g('largeur/corde', 'largeurcorde', 'largeur'); P.R = g('rayon'); P.wL = g('profondeuraile'); P.wW = g('largeuraile');
+        P.bac = g('largeurdebac', 'largeurbac'); P.mat = g('matiere'); P.color = g('coloris', 'couleur'); P.sens = g('sensdepose');
+        const es = wb.Sheets[find('element')];
+        if (es) {
+          let id = 1; P.items = [];
+          XLSX.utils.sheet_to_json(es, { defval: '' }).forEach(r => {
+            const o = {}; Object.keys(r).forEach(k => { o[mpNorm(k)] = r[k]; });
+            const t = mpNorm(o.type), num = k => { const f = Object.keys(o).find(x => x.startsWith(k)); return f && o[f] !== '' ? parseFloat(o[f]) : NaN; };
+            const base = { id: id++, pan: Math.max(0, (num('pan') || 1) - 1), u: num('decalage') || 1500, v: num('distance') || 1000 };
+            if (/velux|fenetre/.test(t)) { const sz = String(o.modele || 'MK04').toUpperCase().trim(), d = MP_VELUX[sz] || MP_VELUX.MK04; P.items.push(Object.assign(base, { type: 'velux', sz: MP_VELUX[sz] ? sz : 'MK04', w: num('largeur') || d[0], h: num('hauteur') || d[1] })); }
+            else if (/chemin/.test(t)) P.items.push(Object.assign(base, { type: 'cheminee', w: num('largeur') || 600, d: num('hauteur') || 600, hh: num('hauteurhors') || 900 }));
+            else if (/sortie|vmc|vent/.test(t)) P.items.push(Object.assign(base, { type: 'sortie', w: num('largeur') || 125 }));
+          });
+        }
+        mpApplyParams(P); showToast('Import Excel terminé : calepinage recalculé.');
+      } catch (err) { console.error(err); showToast('Fichier Excel illisible (utilise le modèle).'); }
+    };
+    rd.readAsArrayBuffer(file);
+  }
+
+  /* ---------- Import DXF (charpente) ---------- */
+  function mpParseDxf(txt){
+    const ln = txt.split(/\r?\n/), polys = [], segs = []; let cur = null, pl = null, unit = 0;
+    const done = () => { if (cur && (cur.t === 'LWPOLYLINE') && cur.pts.length > 1) polys.push(cur); if (cur && cur.t === 'LINE' && cur.a && cur.b) segs.push([cur.a, cur.b]); cur = null; };
+    for (let i = 0; i + 1 < ln.length; i += 2) {
+      const code = parseInt(ln[i], 10), val = ln[i + 1].trim();
+      if (code === 9 && val === '$INSUNITS') { const nx = ln[i + 3]; unit = parseInt(nx, 10) || 0; }
+      if (code === 0) {
+        if (val === 'VERTEX' && pl) { cur = { t: 'VERTEX' }; continue; }
+        done();
+        if (val === 'POLYLINE') { pl = { t: 'LWPOLYLINE', pts: [], closed: false }; polys.push(pl); cur = pl; }
+        else if (val === 'SEQEND') pl = null;
+        else if (val === 'LWPOLYLINE') { pl = null; cur = { t: 'LWPOLYLINE', pts: [], closed: false }; }
+        else if (val === 'LINE') { pl = null; cur = { t: 'LINE' }; }
+        else cur = null;
+        continue;
+      }
+      if (!cur) continue;
+      if (cur.t === 'LWPOLYLINE') { if (code === 10) cur.pts.push([parseFloat(val), 0]); else if (code === 20 && cur.pts.length) cur.pts[cur.pts.length - 1][1] = parseFloat(val); else if (code === 70) cur.closed = (parseInt(val, 10) & 1) === 1; }
+      else if (cur.t === 'VERTEX' && pl) { if (code === 10) pl.pts.push([parseFloat(val), 0]); else if (code === 20 && pl.pts.length) pl.pts[pl.pts.length - 1][1] = parseFloat(val); }
+      else if (cur.t === 'LINE') { cur.a = cur.a || [0, 0]; cur.b = cur.b || [0, 0]; if (code === 10) cur.a[0] = parseFloat(val); else if (code === 20) cur.a[1] = parseFloat(val); else if (code === 11) cur.b[0] = parseFloat(val); else if (code === 21) cur.b[1] = parseFloat(val); }
+    }
+    done();
+    return { polys, segs, unit };
+  }
+  function mpSimplify(P){
+    let Q = P.filter((p, i) => { const q = P[(i + 1) % P.length]; return Math.hypot(p[0] - q[0], p[1] - q[1]) > 1; });
+    if (Q.length > 1 && Math.hypot(Q[0][0] - Q[Q.length - 1][0], Q[0][1] - Q[Q.length - 1][1]) < 1) Q.pop();
+    let ch = true; while (ch && Q.length > 3) { ch = false; for (let i = 0; i < Q.length; i++) { const a = Q[(i + Q.length - 1) % Q.length], p = Q[i], b = Q[(i + 1) % Q.length]; if (Math.abs((p[0] - a[0]) * (b[1] - p[1]) - (p[1] - a[1]) * (b[0] - p[0])) < 1e-3 * Math.max(1, Math.hypot(b[0] - a[0], b[1] - a[1])) * 10) { Q.splice(i, 1); ch = true; break; } } }
+    return Q;
+  }
+  function mpClassify(P, swapped){
+    const xs = P.map(p => p[0]), ys = P.map(p => p[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), BW = x1 - x0, BH = y1 - y0, n = P.length, tol = Math.max(5, Math.max(BW, BH) * 0.002);
+    if (!P.every((p, i) => { const q = P[(i + 1) % n]; return Math.abs(p[0] - q[0]) < tol || Math.abs(p[1] - q[1]) < tol; })) return null;
+    if (n === 4) return { type: '2pans', L: BW, W: BH };
+    const a2 = P.reduce((s, p, i) => { const q = P[(i + 1) % n]; return s + p[0] * q[1] - q[0] * p[1]; }, 0), sg = Math.sign(a2);
+    const refl = P.filter((p, i) => { const a = P[(i + n - 1) % n], b = P[(i + 1) % n]; return ((p[0] - a[0]) * (b[1] - p[1]) - (p[1] - a[1]) * (b[0] - p[0])) * sg < 0; });
+    const has = (x, y) => P.some(p => Math.abs(p[0] - x) < tol && Math.abs(p[1] - y) < tol);
+    if (n === 6 && refl.length === 1) {
+      const r = refl[0], c = [[x0, y0], [x1, y0], [x0, y1], [x1, y1]].find(q => !has(q[0], q[1])); if (!c) return null;
+      const nw = Math.abs(c[0] - r[0]), nh = Math.abs(c[1] - r[1]), A = { L: BW, W: BH - nh, wL: nh, wW: BW - nw }, B = { L: BH, W: BW - nw, wL: nw, wW: BH - nh };
+      return Object.assign({ type: 'L' }, A.L * A.W >= B.L * B.W ? A : B);
+    }
+    if (n === 8 && refl.length === 2) {
+      const [r1, r2] = refl;
+      if (Math.abs(r1[1] - r2[1]) < tol) {
+        const cp = [[x0, y0], [x1, y0], [x0, y1], [x1, y1]].filter(q => has(q[0], q[1])).length, ry = r1[1], gap = Math.abs(r1[0] - r2[0]);
+        if (cp === 2) { const wideLow = has(x0, y0) && has(x1, y0); return { type: 'T', L: BW, W: wideLow ? ry - y0 : y1 - ry, wL: wideLow ? y1 - ry : ry - y0, wW: gap }; }
+        if (cp === 4) { const top = P.filter(p => Math.abs(p[1] - y1) < tol).length > P.filter(p => Math.abs(p[1] - y0) < tol).length, nd = top ? y1 - ry : ry - y0, xa = Math.min(r1[0], r2[0]), xb = Math.max(r1[0], r2[0]); return { type: 'U', L: BW, W: BH - nd, wL: nd, wW: Math.min(xa - x0, x1 - xb) }; }
+      } else if (!swapped && Math.abs(r1[0] - r2[0]) < tol) return mpClassify(P.map(p => [p[1], p[0]]), true);
+    }
+    return null;
+  }
+  function mpImportDxf(file){
+    const rd = new FileReader();
+    rd.onload = e => {
+      const buf = e.target.result, head = new TextDecoder('latin1').decode(buf.slice(0, 6));
+      if (/^AC10/.test(head)) { showToast('Le DWG est un format binaire fermé : enregistre-le en DXF (Fichier > Enregistrer sous > DXF) puis réimporte-le.'); return; }
+      const d = mpParseDxf(new TextDecoder('latin1').decode(buf)), area = P => Math.abs(P.reduce((s, p, i) => { const q = P[(i + 1) % P.length]; return s + p[0] * q[1] - q[0] * p[1]; }, 0)) / 2;
+      const closed = d.polys.filter(p => p.pts.length >= 4 && (p.closed || Math.hypot(p.pts[0][0] - p.pts[p.pts.length - 1][0], p.pts[0][1] - p.pts[p.pts.length - 1][1]) < 1)).sort((a, b) => area(b.pts) - area(a.pts));
+      let pts = closed.length ? closed[0].pts : null, res = null;
+      const all = (pts ? [] : d.polys.flatMap(p => p.pts)).concat(d.segs.flat());
+      if (pts) res = mpClassify(mpSimplify(pts));
+      let ext = '';
+      if (!res) {
+        const A = pts || all; if (A.length < 2) { showToast('Aucune géométrie exploitable dans ce DXF.'); return; }
+        const xs = A.map(p => p[0]), ys = A.map(p => p[1]); res = { type: '2pans', L: Math.max(...xs) - Math.min(...xs), W: Math.max(...ys) - Math.min(...ys) };
+        res.L >= res.W || ([res.L, res.W] = [res.W, res.L]); ext = ' (emprise du dessin)';
+      }
+      const k = d.unit === 6 ? 1000 : d.unit === 5 ? 10 : d.unit === 4 ? 1 : (Math.max(res.L, res.W) < 100 ? 1000 : Math.max(res.L, res.W) < 1000 ? 10 : 1);
+      ['L', 'W', 'wL', 'wW'].forEach(q => { if (res[q]) res[q] = Math.round(res[q] * k); });
+      mpApplyParams(res); showToast(`DXF importé${ext} : ${res.type} ${res.L} × ${res.W} mm. Ajuste les cotes sur le plan si besoin.`);
+    };
+    rd.readAsArrayBuffer(file);
+  }
+  function mpWireImport(root){
+    root.querySelectorAll('[data-xl]').forEach(b => b.addEventListener('click', mpXlsxTemplate));
+    root.querySelectorAll('[data-xlfile]').forEach(i => i.addEventListener('change', () => { if (i.files[0]) mpImportXlsx(i.files[0]); i.value = ''; }));
+    root.querySelectorAll('[data-dxffile]').forEach(i => i.addEventListener('change', () => { if (i.files[0]) mpImportDxf(i.files[0]); i.value = ''; }));
+    root.querySelectorAll('[data-send-debit]').forEach(b => b.addEventListener('click', mpSendDebit));
+  }
+  function mpWireMat(root, own){
+    const m = root.querySelector('[data-mat]'); if (!m) return;
+    const again = () => { if (own) { root.innerHTML = mpMatHtml(); mpWireMat(root, true); } mpRefresh(); };
+    m.addEventListener('change', () => { mpMat.k = m.value; again(); });
+    const pf = root.querySelector('[data-prefa]'); if (pf) pf.addEventListener('change', () => { mpMat.pf = +pf.value; again(); });
+    const cu = root.querySelector('[data-custom]'); if (cu) cu.addEventListener('change', () => { mpMat.custom = cu.value; mpRefresh(); });
+  }
+  function mpSetupV4(){
+    const type = $('mpType'); if (!type) return;
+    type.insertAdjacentHTML('beforeend', '<option value="voute">Cintré — voûte (rayon)</option><option value="modele">Dessin libre — modeleur de volumes</option>');
+    const fw = $('mpMainW').closest('.field');
+    fw.insertAdjacentHTML('afterend', `<div class="field" data-vault style="margin-top:8px;display:none;"><label>Cintré — rayon (mm) · la largeur ci-dessus est la corde</label><input type="number" id="${id('mpRayon')}" value="5000" min="500" step="100"></div>`);
+    fw.insertAdjacentHTML('afterend', `<div class="field" data-hipopt style="margin-top:8px;display:none;"><label>4 pans — longueur de faîtage (mm, 0 = automatique)</label><input type="number" id="${id('mpRidge')}" value="0" min="0" step="100"><label style="margin-top:6px;display:block;">Croupes</label><select id="${id('mpHips')}"><option value="both">2 croupes (aux deux bouts)</option><option value="first">1 croupe (début)</option><option value="last">1 croupe (fin)</option></select></div>`);
+    const toggle = () => { const v = fw.parentNode.querySelector('[data-vault]'); if (v) v.style.display = type.value === 'voute' ? '' : 'none'; const h = fw.parentNode.querySelector('[data-hipopt]'); if (h) h.style.display = type.value === '4pans' ? '' : 'none'; };
+    type.addEventListener('change', toggle); toggle();
+    const tf = type.closest('.field'); if (tf) { const z = document.createElement('div'); z.style.marginTop = '10px'; z.innerHTML = mpImportHtml() + '<div data-matbox>' + mpMatHtml() + '</div>'; tf.parentNode.insertBefore(z, tf.nextSibling); mpWireImport(z); const mb = z.querySelector('[data-matbox]'); mpWireMat(mb, true); }
+  }
+  /* ===== v5 : modeleur de volumes (on part d'un cube, on ajoute / déplace / redimensionne des volumes) ===== */
+  let mpModel = { vols: [], sel: null, seq: 1 }, mpEdgeMap = null;
+  const MP_ROOF_NAME = { '2pans': '2 pans (pignon)', '4pans': '4 pans (croupe)', mono: 'Monopente / contre mur', pavillon: 'Pavillon (4 arêtiers en pointe)', arc: 'Cercle / demi-cercle / segment / anneau' };
+  const MP_ROOF_OLD = Object.assign({ round: 'Rond (ancien)', demi: 'Demi-rond (ancien)' }, MP_ROOF_NAME);
+  const MP_SM = { ext: 'Vers le centre (égout à l\'extérieur)', int: 'Vers l\'extérieur (égout à l\'intérieur)', faitage: 'Faîtage circulaire (2 pans)' };
+  const MP_BACS = { billard: 'Queue de billard (1 bac effilé par pan)', droit: 'Bacs droits en facettes' };
+  let mpWallH = 0;
+  function mpClampField(k, n){
+    if (k === 'L' || k === 'W') return Math.max(1000, n); if (k === 'R' || k === 'Ro') return Math.max(500, n); if (k === 'hm') return Math.max(1500, n);
+    if (k === 'ang') return Math.min(360, Math.max(10, n)); if (k === 'z' || k === 'rp' || k === 'r' || k === 'rl' || k === 'Ri') return Math.max(0, n); return n;
+  }
+  const MP_HIPS = { both: '2 croupes (aux deux bouts)', first: '1 croupe (début)', last: '1 croupe (fin)' };
+  const MP_ARC = { d: 'le bas ↓', u: 'le haut ↑', r: 'la droite →', l: 'la gauche ←' };
+  const MP_CHORD = { mur: 'Contre mur (sans égout)', egout: 'Avec égout' };
+  function mpVolNormalize(v){
+    if (v.roof === 'demi') { v.R = Math.max(500, +v.R || Math.round(Math.min(v.L, v.W) / 2) || 3000); const h = v.dir === 'r' || v.dir === 'l'; v.L = h ? v.R : 2 * v.R; v.W = h ? 2 * v.R : v.R; }
+    if (v.roof === 'round') v.W = v.L;
+    if (v.roof === 'arc') { const b = mpArcBBox(v); if (v.cx == null) { v.cx = v.x - b.mx; v.cy = v.y - b.my; } v.x = v.cx + b.mx; v.y = v.cy + b.my; v.L = b.w; v.W = b.h; }
+    return v;
+  }
+  const MP_DIR_NAME = { d: 'monte vers le bas ↓', u: 'monte vers le haut ↑', r: 'monte vers la droite →', l: 'monte vers la gauche ←' };
+  const MP_RMODE = { pente: 'Même pente (côté court plus raide)', hauteur: 'Même hauteur de faîtage' };
+  const MP_RIVE_DROP = 200;
+  const mpArea2 = P => P.reduce((s, p, i) => { const q = P[(i + 1) % P.length]; return s + p[0] * q[1] - q[0] * p[1]; }, 0) / 2;
+  // Garde A·x + B·y + C ≥ 0.
+  function mpHP(P, A, B, C){
+    const out = [];
+    for (let i = 0; i < P.length; i++) {
+      const p = P[i], q = P[(i + 1) % P.length], fp = A * p[0] + B * p[1] + C, fq = A * q[0] + B * q[1] + C, ip = fp >= 0, iq = fq >= 0;
+      if (ip) out.push(p);
+      if (ip !== iq) { const s = fp / (fp - fq); out.push([p[0] + (q[0] - p[0]) * s, p[1] + (q[1] - p[1]) * s]); }
+    }
+    return out;
+  }
+  // S moins Q (Q convexe) → morceaux convexes extérieurs à Q.
+  function mpSubConvex(S, Q){
+    const sg = Math.sign(mpArea2(Q)) || 1, res = []; let cur = S;
+    for (let i = 0; i < Q.length && cur.length >= 3; i++) {
+      const a = Q[i], b = Q[(i + 1) % Q.length], A = -(b[1] - a[1]) * sg, B = (b[0] - a[0]) * sg, C = -(A * a[0] + B * a[1]);
+      const out = mpHP(cur, -A, -B, -C); if (out.length >= 3 && Math.abs(mpArea2(out)) > 1000) res.push(out);
+      cur = mpHP(cur, A, B, C);
+    }
+    return res;
+  }
+  function mpVolFootprint(v){
+    const x = v.x, y = v.y, x1 = x + v.L, y1 = y + v.W;
+    if (v.roof === 'round') {
+      const n = Math.max(3, Math.min(48, Math.round(v.n || 24))), R = v.L / 2, cx = x + R, cy = y + R;
+      return Array.from({ length: n }, (_, i) => { const an = 2 * Math.PI * (i + 0.5) / n; return [cx + R * Math.cos(an), cy + R * Math.sin(an)]; });
+    }
+    if (v.roof === 'demi') {
+      const R = v.R || 3000, n = Math.max(4, Math.min(48, Math.round(v.n || 12))), d = v.dir || 'd', pts = [];
+      const [cx, cy, a0] = d === 'd' ? [x + R, y, 0] : d === 'u' ? [x + R, y + R, Math.PI] : d === 'r' ? [x, y + R, -Math.PI / 2] : [x + R, y + R, Math.PI / 2];
+      for (let i = 0; i <= n; i++) { const an = a0 + Math.PI * i / n; pts.push([cx + R * Math.cos(an), cy + R * Math.sin(an)]); }
+      return pts;
+    }
+    const r = v.roof === '4pans' ? Math.min(Math.max(0, +v.r || 0), v.L / 2, v.W / 2) : 0;
+    if (r < 50) return [[x, y], [x1, y], [x1, y1], [x, y1]];
+    const k = Math.min(10, Math.max(3, Math.ceil(r * Math.PI / 2 / 600))), P = [];
+    [[x + r, y + r, 1.0], [x1 - r, y + r, 1.5], [x1 - r, y1 - r, 0], [x + r, y1 - r, 0.5]].forEach(([cx, cy, q]) => { for (let i = 0; i <= k; i++) { const an = (q + 0.5 * i / k) * Math.PI; P.push([cx + r * Math.cos(an), cy + r * Math.sin(an)]); } });
+    return P;
+  }
+  // Volume = empreinte convexe + un plan par arête porteuse d'égout. Pan k = empreinte ∩ {plan k ≤ autres plans}.
+  function mpArcGeom(v){
+    const Ro = Math.max(500, +v.Ro || 3000), Ri = Math.min(Math.max(0, +v.Ri || 0), Ro - 300), ang = Math.min(360, Math.max(10, +v.ang || 360)), bacW = parseFloat($('largeurBac').value) || 500;
+    const billard = (v.bacs || 'billard') === 'billard', sm = Ri > 0 ? (v.sm || 'ext') : 'ext', edgeR = sm === 'int' ? Ri : Ro;
+    let n = billard ? Math.ceil(edgeR * ang * Math.PI / 180 / bacW) : Math.round(+v.n || 16);
+    n = Math.max(2, Math.min(billard ? 160 : 48, n));
+    return { Ro, Ri, ang, a0: (+v.a0 || 0) * Math.PI / 180, sm, n, billard, full: ang >= 359.99 };
+  }
+  function mpArcBBox(v){
+    const g = mpArcGeom(v), da = g.ang * Math.PI / 180 / g.n, xs = [], ys = [];
+    for (let i = 0; i <= g.n; i++) { xs.push(g.Ro * Math.cos(g.a0 + da * i)); ys.push(g.Ro * Math.sin(g.a0 + da * i)); }
+    if (!g.full && g.Ri === 0) { xs.push(0); ys.push(0); }
+    const mx = Math.min(...xs), my = Math.min(...ys); return { mx, my, w: Math.max(...xs) - mx, h: Math.max(...ys) - my };
+  }
+  function mpArcPlanes(v, t0){
+    const g = mpArcGeom(v), cx = v.cx, cy = v.cy, z = v.z || 0, da = g.ang * Math.PI / 180 / g.n, ch = Math.cos(da / 2), t = t0 / ch, pt = (r, an) => [cx + r * Math.cos(an), cy + r * Math.sin(an)];
+    const outer = [], inner = [], planes = [];
+    for (let i = 0; i <= g.n; i++) { const an = g.a0 + da * i; outer.push(pt(g.Ro, an)); if (g.Ri > 0) inner.push(pt(g.Ri, an)); }
+    const S = (g.Ro - g.Ri) * ch, p = Math.min(S * 0.92, Math.max(S * 0.08, +v.rp || S / 2)), Hr = v.rmode === 'hauteur' ? t * S / 2 : t * p, single = g.billard, vol = v;
+    for (let i = 0; i < g.n; i++) {
+      const am = g.a0 + da * (i + 0.5), nx = Math.cos(am), ny = Math.sin(am), O0 = outer[i], O1 = outer[i + 1], I0 = g.Ri > 0 ? inner[i] : null, I1 = g.Ri > 0 ? inner[i + 1] : null;
+      if (g.sm === 'ext' || g.Ri === 0) planes.push({ poly: g.Ri > 0 ? [O0, O1, I1, I0] : [O0, O1, [cx, cy]], a: -t * nx, b: -t * ny, c: z + t * (O0[0] * nx + O0[1] * ny), single });
+      else if (g.sm === 'int') planes.push({ poly: [O0, O1, I1, I0], a: t * nx, b: t * ny, c: z - t * (I0[0] * nx + I0[1] * ny), single });
+      else {
+        const rr = g.Ro - p / ch, M0 = pt(rr, g.a0 + da * i), M1 = pt(rr, g.a0 + da * (i + 1)), sA = Hr / p, sB = Hr / (S - p);
+        planes.push({ poly: [O0, O1, M1, M0], a: -sA * nx, b: -sA * ny, c: z + sA * (O0[0] * nx + O0[1] * ny), single });
+        planes.push({ poly: [M0, M1, I1, I0], a: sB * nx, b: sB * ny, c: z - sB * (I0[0] * nx + I0[1] * ny), single });
+      }
+    }
+    const foot = g.full ? outer.slice(0, g.n) : g.Ri > 0 ? outer.concat(inner.slice().reverse()) : outer.concat([[cx, cy]]);
+    return { rect: foot, holes: g.full && g.Ri > 0 ? [inner.slice(0, g.n)] : null, planes: planes.filter(q => Math.abs(mpArea2(q.poly)) > 1000), pl: planes, gable: null, mode: 'pans' };
+  }
+  function mpVolPlanes(v, t){
+    if (v.roof === 'arc') return mpArcPlanes(v, t);
+    const F = mpVolFootprint(v), z = v.z || 0, x = v.x, y = v.y, x1 = x + v.L, y1 = y + v.W, n = F.length, sgn = Math.sign(mpArea2(F)) || 1;
+    const edge = (i, s) => { const P = F[i], Q = F[(i + 1) % n], dx = Q[0] - P[0], dy = Q[1] - P[1], l = Math.hypot(dx, dy) || 1, nx = -dy / l * sgn, ny = dx / l * sgn; return { a: s * nx, b: s * ny, c: z - s * (P[0] * nx + P[1] * ny) }; };
+    const rect4 = F.length === 4 ? { top: 0, right: 1, bottom: 2, left: 3 } : null;   // arêtes : y, x1, y1, x
+    let pl = [], gable = null;
+    if (v.roof === 'mono') pl = [edge(v.dir === 'u' ? 2 : v.dir === 'r' ? 3 : v.dir === 'l' ? 1 : 0, t)];
+    else if (v.roof === '2pans') {
+      const along = v.axis === 'y', S = along ? v.L : v.W, p = Math.min(S * 0.92, Math.max(S * 0.08, +v.rp || S / 2));
+      const Hr = v.rmode === 'hauteur' ? t * S / 2 : t * p, sA = Hr / p, sB = Hr / (S - p);
+      pl = along ? [edge(3, sA), edge(1, sB)] : [edge(0, sA), edge(2, sB)];
+    } else if (v.roof === 'pavillon') {
+      const H = t * Math.min(v.L, v.W) / 2;
+      pl = [edge(0, H / (v.W / 2)), edge(1, H / (v.L / 2)), edge(2, H / (v.W / 2)), edge(3, H / (v.L / 2))];
+    } else if (v.roof === 'demi') {
+      const na = n - 1; pl = F.slice(0, na).map((_, i) => edge(i, t)); if (v.chord === 'egout') pl.push(edge(na, t));
+    } else if (v.roof === '4pans' && n === 4 && (+v.rl > 0 || (v.hips && v.hips !== 'both'))) {
+      const alongX = v.L >= v.W, Lr = alongX ? v.L : v.W, Sr = alongX ? v.W : v.L, H = t * Sr / 2, hips = v.hips || 'both';
+      const rl = +v.rl > 0 ? Math.min(+v.rl, Lr) : (hips === 'both' ? Lr - Sr : Lr - Sr / 2), run = hips === 'both' ? (Lr - rl) / 2 : Lr - rl, sEnd = run > 1 ? H / run : 0;
+      const first = alongX ? 3 : 0, last = alongX ? 1 : 2;
+      pl = alongX ? [edge(0, t), edge(2, t)] : [edge(3, t), edge(1, t)];
+      if (sEnd > 0) { if (hips !== 'last') pl.push(edge(first, sEnd)); if (hips !== 'first') pl.push(edge(last, sEnd)); }
+      if (hips !== 'both') gable = { ax: alongX ? 'x' : 'y', end: hips === 'first' ? 'max' : 'min', S: Sr, base: alongX ? v.y : v.x };
+    } else pl = F.map((_, i) => edge(i, t));
+    const planes = pl.map((q, k) => {
+      let poly = F.map(p => p.slice());
+      pl.forEach((o, m) => {
+        if (m === k || poly.length < 3) return;
+        const A = o.a - q.a, B = o.b - q.b, C = o.c - q.c;
+        if (Math.abs(A) < 1e-9 && Math.abs(B) < 1e-9 && Math.abs(C) < 1e-6) { if (m < k) poly = []; return; }
+        poly = mpHP(poly, A, B, C);
+      });
+      return { poly, a: q.a, b: q.b, c: q.c };
+    }).filter(q => q.poly.length >= 3 && Math.abs(mpArea2(q.poly)) > 1000);
+    return { rect: F, planes, pl, gable };
+  }
+  function mpModelCompute(L0, W0, thRad, over){
+    if (!over && !mpModel.vols.length) mpModelInit(L0, W0);
+    const t = Math.tan(thRad), vs = (over || mpModel.vols).map(v => mpVolNormalize(Object.assign({}, v)));
+    const hmv = v => v.hm != null ? v.hm : 3000 + (v.z || 0), zMin = Math.min(...vs.map(hmv)); vs.forEach(v => { v.z = hmv(v) - zMin; });
+    const minX = Math.min(...vs.map(v => v.x)), minY = Math.min(...vs.map(v => v.y)), maxX = Math.max(...vs.map(v => v.x + v.L)), maxY = Math.max(...vs.map(v => v.y + v.W));
+    vs.forEach(v => { v.x -= minX; v.y -= minY; if (v.cx != null) { v.cx -= minX; v.cy -= minY; } });
+    const VP = vs.map(v => mpVolPlanes(v, t)), pans = [];
+    VP.forEach((vp, i) => vp.planes.forEach(P => {
+      let pieces = [P.poly];
+      VP.forEach((wp, j) => {
+        if (j === i || !pieces.length) return;
+        const tol = j < i ? 0.01 : -0.01;
+        if (wp.mode === 'pans') {
+          wp.planes.forEach(M => { if (!pieces.length) return; const Q = mpHP(M.poly.map(q => q.slice()), -(P.a - M.a), -(P.b - M.b), -(P.c - M.c) + tol); if (Q.length >= 3 && Math.abs(mpArea2(Q)) > 1) pieces = pieces.flatMap(S => mpSubConvex(S, Q)); });
+          return;
+        }
+        let Q = wp.rect;
+        wp.planes.forEach(M => { if (Q.length >= 3) Q = mpHP(Q, -(P.a - M.a), -(P.b - M.b), -(P.c - M.c) + tol); });
+        if (Q.length >= 3 && Math.abs(mpArea2(Q)) > 1) pieces = pieces.flatMap(S => mpSubConvex(S, Q));
+      });
+      pieces.forEach(S0 => {
+        const S = S0.filter((p, k) => { const q = S0[(k + S0.length - 1) % S0.length]; return Math.hypot(p[0] - q[0], p[1] - q[1]) > 1; });
+        if (S.length < 3 || Math.abs(mpArea2(S)) < 20000) return;
+        const pts = S.map(([x, y]) => { const h = P.a * x + P.b * y + P.c; return { x, y, h: Math.abs(h) < 0.01 ? 0 : h }; });
+        const gl = Math.hypot(P.a, P.b), up = { x: P.a / gl, y: P.b / gl }, u = { x: -up.y, y: up.x }, us = pts.map(q => q.x * u.x + q.y * u.y);
+        const lo = pts.reduce((m, q) => q.h < m.h ? q : m, pts[0]), top = pts.reduce((m, q) => q.h > m.h ? q : m, pts[0]), lu = lo.x * u.x + lo.y * u.y;
+        const at = k => ({ x: lo.x + u.x * (k - lu), y: lo.y + u.y * (k - lu), h: lo.h });
+        pans.push({ pts, single: !!P.single, hmin: lo.h, eA: at(Math.min(...us)), eB: at(Math.max(...us)), eT: top, pl: P, vol: i, color: 0xc7cdd3 });
+      });
+    }));
+    // Coupe les arêtes aux points de jonction (T) pour classer chaque tronçon séparément.
+    pans.forEach((p, pi) => {
+      const out = [];
+      p.pts.forEach((A, k) => {
+        const B = p.pts[(k + 1) % p.pts.length], d = { x: B.x - A.x, y: B.y - A.y, h: B.h - A.h }, Ln = Math.hypot(d.x, d.y, d.h); out.push(A); if (Ln < 3) return;
+        const cuts = [];
+        pans.forEach((q, qi) => { if (qi !== pi) q.pts.forEach(C => {
+          const r = { x: C.x - A.x, y: C.y - A.y, h: C.h - A.h }, s = (r.x * d.x + r.y * d.y + r.h * d.h) / Ln;
+          if (s > 1.5 && s < Ln - 1.5 && Math.hypot(r.x - s * d.x / Ln, r.y - s * d.y / Ln, r.h - s * d.h / Ln) < 1.5) cuts.push(s);
+        }); });
+        cuts.sort((m, n) => m - n).filter((v, i, ar) => i === 0 || v - ar[i - 1] > 1.5).forEach(v => out.push({ x: A.x + d.x * v / Ln, y: A.y + d.y * v / Ln, h: A.h + d.h * v / Ln }));
+      });
+      p.pts = out;
+    });
+    // Classement des arêtes : égout, rive, faîtage, arêtier, noue (ou « none » = joint dans un même plan).
+    const E = []; pans.forEach((p, pi) => p.pts.forEach((A, k) => E.push({ pi, A, B: p.pts[(k + 1) % p.pts.length] })));
+    const ov = (e, f) => {
+      const d = { x: e.B.x - e.A.x, y: e.B.y - e.A.y, h: e.B.h - e.A.h }, Ln = Math.hypot(d.x, d.y, d.h); if (Ln < 1) return null;
+      const w = { x: d.x / Ln, y: d.y / Ln, h: d.h / Ln }, tt = [], ds = [f.A, f.B].map(q => {
+        const r = { x: q.x - e.A.x, y: q.y - e.A.y, h: q.h - e.A.h }, s = r.x * w.x + r.y * w.y + r.h * w.h;
+        tt.push(s); return Math.hypot(r.x - s * w.x, r.y - s * w.y, r.h - s * w.h);
+      });
+      if (ds[0] > 1.5 || ds[1] > 1.5) return null;
+      const a = Math.max(0, Math.min(...tt)), b = Math.min(Ln, Math.max(...tt)); return b - a > 1.5 ? [a, b] : null;
+    };
+    const map = new Map(), tot = { egout: 0, rive: 0, faitage: 0, aretier: 0, noue: 0, mur: 0 };
+    E.forEach(e => {
+      const Ln = Math.hypot(e.B.x - e.A.x, e.B.y - e.A.y, e.B.h - e.A.h), partners = [];
+      E.forEach(f => { if (f.pi !== e.pi) { const o = ov(e, f); if (o) partners.push({ pi: f.pi, o }); } });
+      const dh = Math.abs(e.A.h - e.B.h), pan = pans[e.pi]; let kind;
+      if (!partners.length) {
+        kind = dh < 1 ? (e.A.h <= pan.hmin + 1 ? 'egout' : 'faitage') : 'rive';
+        if (kind !== 'egout') {
+          const mx = (e.A.x + e.B.x) / 2, my = (e.A.y + e.B.y) / 2, mh = (e.A.h + e.B.h) / 2;
+          const near = (F, px, py) => F.some((P, k) => { const Q = F[(k + 1) % F.length], dx = Q[0] - P[0], dy = Q[1] - P[1], l2 = dx * dx + dy * dy || 1, s = Math.max(0, Math.min(1, ((px - P[0]) * dx + (py - P[1]) * dy) / l2)); return Math.hypot(px - P[0] - s * dx, py - P[1] - s * dy) < 3; });
+          const nearPoly = (F, px, py) => mpIn2(F, px, py) || near(F, px, py);
+          if (VP.some((wp, j) => j !== pan.vol && (wp.mode === 'pans' ? wp.planes.some(q => nearPoly(q.poly, mx, my) && (q.a * mx + q.b * my + q.c) >= mh - 1) : near(wp.rect, mx, my) && Math.min(...wp.pl.map(q => q.a * mx + q.b * my + q.c)) >= mh - 1))) kind = 'mur';
+        }
+      } else {
+        const p = pans[e.pi], q = pans[partners[0].pi], cx = p.pts.reduce((s, z) => s + z.x, 0) / p.pts.length, cy = p.pts.reduce((s, z) => s + z.y, 0) / p.pts.length;
+        const diff = (q.pl.a * cx + q.pl.b * cy + q.pl.c) - (p.pl.a * cx + p.pl.b * cy + p.pl.c);
+        kind = Math.abs(diff) < 1 ? 'none' : diff > 0 ? (dh < 1 ? 'faitage' : 'aretier') : 'noue';
+        if (dh >= 1 && p.single && q.single && p.vol === q.vol && kind !== 'none') kind = 'seam';
+      }
+      if (kind === 'seam') map.set(mpKey(e.A, e.B), e.pi < partners[0].pi ? 'seam' : 'none');
+      else { map.set(mpKey(e.A, e.B), kind); map.set(mpKey(e.B, e.A), kind); }
+      if (tot[kind] !== undefined) {
+        const low = partners.filter(z => z.pi < e.pi).map(z => z.o).sort((a, b) => a[0] - b[0]); let cov = 0, end = -1;
+        low.forEach(([a, b]) => { const a2 = Math.max(a, end); if (b > a2) { cov += b - a2; end = b; } });
+        tot[kind] += Math.max(0, Ln - cov);
+      }
+    });
+    mpEdgeMap = map;
+    const NAMES = { faitage: 'Faîtage (total)', aretier: 'Arêtiers (total)', noue: 'Noues (total)', mur: 'Solins contre mur (total)' };
+    const segs = ['faitage', 'aretier', 'noue', 'mur'].filter(k => tot[k] > 1).map(k => ({ kind: k, label: NAMES[k], length: tot[k] }));
+    // Murs : une empreinte par volume (pignons / monopente fermés par un triangle ou trapèze).
+    const S0 = 40, rects = vs.map((v, i) => {
+      let fill = null;
+      const hAt = (X, Y) => Math.min(...VP[i].pl.map(q => q.a * X + q.b * Y + q.c)) - v.z;
+      if (v.roof === '2pans' || v.roof === 'mono') {
+        const ax = v.roof === 'mono' ? (v.dir === 'r' || v.dir === 'l' ? 'y' : 'x') : (v.axis === 'y' ? 'y' : 'x'), S = ax === 'y' ? v.L : v.W, base = ax === 'y' ? v.x : v.y, mid = ax === 'y' ? v.y + v.W / 2 : v.x + v.L / 2;
+        const hs = s => ax === 'y' ? hAt(base + s, mid) : hAt(mid, base + s), rp = Math.min(S * 0.92, Math.max(S * 0.08, +v.rp || S / 2));
+        const ss = v.roof === 'mono' ? [S - S0, S0] : [S - S0, rp, S0];
+        fill = { axis: ax, pts: [[S0, 0], [S - S0, 0], ...ss.map(s => [s, Math.max(0, hs(s))])] };
+      }
+      if (VP[i].gable) {
+        const g = VP[i].gable, mid = g.ax === 'y' ? v.y + v.W / 2 : v.x + v.L / 2, hs = s => g.ax === 'y' ? hAt(v.x + s, mid) : hAt(mid, v.y + s);
+        fill = { axis: g.ax, end: g.end, depth: 200, pts: [[S0, 0], [g.S - S0, 0], [g.S - S0, Math.max(0, hs(g.S - S0))], [g.S / 2, Math.max(0, hs(g.S / 2))], [S0, Math.max(0, hs(S0))]] };
+      }
+      return { x0: v.x, y0: v.y, sx: v.L, sy: v.W, z: v.z, fill, poly: VP[i].rect, holes: VP[i].holes };
+    });
+    return { segs, pans, Lm: maxX - minX, Wm: maxY - minY, rects, valleys: new Set(), tan: t, houseH: Math.max(1500, zMin), type: 'modele', VP: null, edgeTotals: tot, model: over ? null : mpModel, off: { x: minX, y: minY } };
+  }
+  function mpModelInit(L, W){ mpModel = { vols: [{ id: 1, x: 0, y: 0, L, W, z: 0, roof: '2pans', axis: L >= W ? 'x' : 'y', dir: 'd', rp: 0, rmode: 'pente', r: 0, n: 24, rl: 0, hips: 'both', R: 3000, chord: 'mur', hm: 3000 }], sel: 1, seq: 2 }; }
+
+  /* ---------- Éditeur : contours + poignées sur le plan, panneau numérique ---------- */
+  function mpVolInner(v, i, off, fs, sel){
+    const x = v.x - off.x, y = v.y - off.y, hs = fs * 1.5, col = sel ? '#ff8a00' : '#0f766e';
+    return `<rect x="${x}" y="${y}" width="${v.L}" height="${v.W}" fill="none" stroke="${col}" stroke-width="${fs * 0.2}" stroke-dasharray="${fs * 0.9} ${fs * 0.5}" pointer-events="none"/>
+      <text x="${x + fs * 0.5}" y="${y + fs * 1.3}" font-size="${fs * 0.9}" fill="${col}" stroke="#fff" stroke-width="${fs * 0.2}" paint-order="stroke" font-weight="700" font-family="Inter, sans-serif" pointer-events="none">V${i + 1} · ${Math.round(v.L)}×${Math.round(v.W)}</text>
+      <circle data-vh="move:${v.id}" cx="${x + fs * 1.6}" cy="${y + fs * 3.3}" r="${fs * 1.0}" fill="${col}" stroke="#fff" stroke-width="${fs * 0.15}" style="cursor:move;touch-action:none;"/>
+      <rect data-vh="size:${v.id}" x="${x + v.L - hs}" y="${y + v.W - hs}" width="${hs}" height="${hs}" fill="${col}" stroke="#fff" stroke-width="${fs * 0.15}" style="cursor:nwse-resize;touch-action:none;"/>`;
+  }
+  const mpModelSvg = (data, fs) => mpModel.vols.map((v, i) => `<g data-vol="${v.id}">${mpVolInner(v, i, data.off, fs, v.id === mpModel.sel)}</g>`).join('');
+  function mpModelHtml(){
+    const sel = mpModel.vols.find(v => v.id === mpModel.sel) || mpModel.vols[0]; if (!sel) return '';
+    if (sel.hm == null) sel.hm = 3000 + (sel.z || 0);
+    const arcOn = sel.roof === 'arc', chip = (v, i) => `<button type="button" data-vsel="${v.id}" style="${MP_BTN}${v.id === sel.id ? 'background:#ffe3b8;border-color:#ff8a00;' : ''}">V${i + 1}</button>`;
+    const inp = (k, l) => `<label style="font-size:11px;display:flex;flex-direction:column;gap:2px;color:#4a5056;">${l}<input data-vf="${k}" type="number" step="100" value="${Math.round(sel[k])}" style="width:88px;padding:5px 6px;border:1px solid #c9ced3;border-radius:6px;font-size:12px;"></label>`;
+    const selB = (k, l, o) => `<label style="font-size:11px;display:flex;flex-direction:column;gap:2px;color:#4a5056;">${l}<select data-vf="${k}" style="padding:5px 6px;border:1px solid #c9ced3;border-radius:6px;font-size:12px;">${Object.keys(o).map(q => `<option value="${q}"${q === sel[k] ? ' selected' : ''}>${o[q]}</option>`).join('')}</select></label>`;
+    return `<div style="border:1px solid #cfe3df;border-radius:8px;padding:8px;margin-bottom:8px;background:#f4fbf9;">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;"><span style="font-size:12px;font-weight:700;color:#0f766e;">Modeleur — volumes :</span>${mpModel.vols.map(chip).join('')}<button type="button" data-vadd style="${MP_BTN}">+ Cube</button></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">${arcOn ? inp('cx', 'Centre X') + inp('cy', 'Centre Y') : inp('x', 'X (mm)') + inp('y', 'Y (mm)')}${arcOn || sel.roof === 'demi' ? '' : inp('L', sel.roof === 'round' ? 'Diamètre' : 'Longueur')}${arcOn || sel.roof === 'demi' || sel.roof === 'round' ? '' : inp('W', 'Largeur')}${selB('roof', 'Toit', (sel.roof === 'round' || sel.roof === 'demi') ? MP_ROOF_OLD : MP_ROOF_NAME)}
+        ${inp('hm', 'Hauteur du bâtiment / égout (mm)')}
+        ${sel.roof === '2pans' ? selB('axis', 'Faîtage', { x: 'horizontal →', y: 'vertical ↓' }) + inp('rp', 'Faîtage à (mm du bord haut/gauche, 0 = milieu)') + selB('rmode', 'Si décalé', MP_RMODE) : ''}${sel.roof === 'mono' ? selB('dir', 'Pente', MP_DIR_NAME) : ''}
+        ${sel.roof === '4pans' ? inp('rl', 'Longueur de faîtage (0 = auto)') + selB('hips', 'Croupes', MP_HIPS) + inp('r', 'Coins arrondis : rayon (0 = droit)') : ''}${sel.roof === 'round' ? inp('n', 'Nombre de facettes (3 à 48)') : ''}
+        ${arcOn ? inp('Ro', 'Rayon extérieur (mm)') + inp('Ri', 'Rayon intérieur (0 = plein)') + inp('ang', 'Angle (°) · 360 = cercle') + inp('a0', 'Départ (°) · 0 = droite, 90 = bas') + selB('sm', 'Pente', MP_SM) + (sel.sm === 'faitage' && sel.Ri > 0 ? inp('rp', 'Faîtage à (mm de l\'extérieur, 0 = milieu)') + selB('rmode', 'Si décalé', MP_RMODE) : '') + selB('bacs', 'Bacs sur l\'arrondi', MP_BACS) + (sel.bacs === 'droit' ? inp('n', 'Facettes (4 à 48)') : '') + `<div style="flex-basis:100%;display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><span style="font-size:11px;color:#4a5056;">Formes :</span>` + [['360,0', 'Cercle'], ['180,0', 'Demi-cercle'], ['90,0', 'Quart'], ['360,1', 'Anneau'], ['180,1', 'Demi-anneau']].map(q => `<button type="button" data-arcp="${q[0]}" style="${MP_BTN}">${q[1]}</button>`).join('') + '</div>' : ''}
+        ${sel.roof === 'demi' ? inp('R', 'Rayon (mm)') + selB('dir', 'Arc vers', MP_ARC) + selB('chord', 'Côté droit', MP_CHORD) + inp('n', 'Facettes de l\'arc (4 à 48)') : ''}
+        <button type="button" data-vrecalc style="${MP_BTN}background:#e6f2ff;border-color:#7fb0e6;">↻ Recalculer</button><button type="button" data-vdup style="${MP_BTN}">Dupliquer</button>${mpModel.vols.length > 1 ? `<button type="button" data-vdel style="${MP_BTN}color:#b3261e;border-color:#e6b8b4;">Supprimer</button>` : ''}</div>
+      <div style="font-size:11px;color:#6b7178;margin-top:6px;">Glisse le rond pour déplacer un volume, le carré pour l'agrandir. Les volumes qui se chevauchent forment les noues automatiquement. Même pente partout.</div></div>`;
+  }
+  function mpModelChanged(){
+    mpModel.vols.forEach(mpVolNormalize);
+    const n0 = mpLastData ? mpLastData.pans.length : -1, d = computeMultiPanRoof();
+    if (d.pans.length !== n0) mpItems = [];
+    mpRecalc();
+  }
+  function mpWireModel(wrap, data, fs){
+    const svg = wrap.querySelector('svg'); if (!svg) return;
+    wrap.querySelectorAll('[data-vsel]').forEach(b => b.addEventListener('click', () => { mpModel.sel = +b.dataset.vsel; mpDrawPlan(data); }));
+    const sel = () => mpModel.vols.find(v => v.id === mpModel.sel);
+    const add = wrap.querySelector('[data-vadd]');
+    if (add) add.addEventListener('click', () => { const s = sel(); mpModel.vols.push(Object.assign({}, s, { id: mpModel.seq, x: s.x + s.L, y: s.y, L: Math.round(s.L / 2 / 100) * 100 || 3000 })); mpModel.sel = mpModel.seq++; mpModelChanged(); });
+    wrap.querySelectorAll('[data-arcp]').forEach(b => b.addEventListener('click', () => { const s = sel(), [a, r] = b.dataset.arcp.split(','); s.ang = +a; s.Ri = r === '1' ? Math.round((s.Ro || 3000) * 0.6 / 100) * 100 : 0; mpModelChanged(); }));
+    wrap.querySelectorAll('[data-vrecalc]').forEach(b => b.addEventListener('click', mpModelChanged));
+    const dup = wrap.querySelector('[data-vdup]');
+    if (dup) dup.addEventListener('click', () => { const s = sel(); mpModel.vols.push(Object.assign({}, s, { id: mpModel.seq, x: s.x + 1000, y: s.y + 1000 })); mpModel.sel = mpModel.seq++; mpModelChanged(); });
+    const del = wrap.querySelector('[data-vdel]');
+    if (del) del.addEventListener('click', () => { mpModel.vols = mpModel.vols.filter(v => v.id !== mpModel.sel); mpModel.sel = mpModel.vols[0].id; mpModelChanged(); });
+    wrap.querySelectorAll('[data-vf]').forEach(el => el.addEventListener('change', () => {
+      const s = sel(), k = el.dataset.vf; if (k === 'roof' && el.value === 'round') { s.W = s.L; s.n = s.n && s.n >= 6 ? s.n : 24; }
+      if (k === 'roof' && el.value === 'arc') { s.Ro = s.Ro || Math.max(500, Math.round(Math.min(s.L, s.W) / 2 / 100) * 100); s.Ri = s.Ri || 0; s.ang = s.ang || 360; s.a0 = s.a0 || 0; s.sm = s.sm || 'ext'; s.bacs = s.bacs || 'billard'; s.cx = s.x + s.Ro; s.cy = s.y + s.Ro; }
+      if (k === 'roof' && el.value === 'demi') { s.R = s.R || Math.round(Math.min(s.L, s.W) / 2); s.chord = s.chord || 'mur'; s.n = s.n && s.n <= 24 ? s.n : 12; }
+      if (k === 'roof' || k === 'axis' || k === 'dir' || k === 'rmode' || k === 'hips' || k === 'chord' || k === 'sm' || k === 'bacs') s[k] = el.value;
+      else if (k === 'n') s.n = Math.max(3, Math.min(48, Math.round(parseFloat(el.value) || 24)));
+      else { const n = parseFloat(el.value); if (isFinite(n)) s[k] = mpClampField(k, n); }
+      mpModelChanged();
+    }));
+    const toPlan = e => { const m = svg.getScreenCTM(); if (!m) return null; const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; return pt.matrixTransform(m.inverse()); };
+    let dr = null;
+    svg.addEventListener('pointerdown', e => {
+      const h = e.target.closest('[data-vh]'); if (!h) return;
+      const [mode, id] = h.dataset.vh.split(':'), v = mpModel.vols.find(q => q.id === +id), P = toPlan(e); if (!v || !P) return;
+      dr = { mode, v, P, o: { x: v.x, y: v.y, L: v.L, W: v.W, R: v.R, Ro: v.Ro } }; mpModel.sel = v.id;
+      if (svg.setPointerCapture) svg.setPointerCapture(e.pointerId); e.preventDefault(); e.stopImmediatePropagation();
+    }, true);
+    svg.addEventListener('pointermove', e => {
+      if (!dr) return; const P = toPlan(e); if (!P) return;
+      const sn = q => Math.round(q / 100) * 100, dx = P.x - dr.P.x, dy = P.y - dr.P.y;
+      if (dr.mode === 'move') { dr.v.x = sn(dr.o.x + dx); dr.v.y = sn(dr.o.y + dy); if (dr.v.roof === 'arc') { const b = mpArcBBox(dr.v); dr.v.cx = dr.v.x - b.mx; dr.v.cy = dr.v.y - b.my; } }
+      else if (dr.v.roof === 'arc') { dr.v.Ro = Math.max(500, sn((dr.o.Ro || 3000) + Math.max(dx, dy) / 2)); mpVolNormalize(dr.v); } else if (dr.v.roof === 'demi') { dr.v.R = Math.max(500, sn((dr.o.R || 3000) + Math.max(dx, dy))); mpVolNormalize(dr.v); }
+      else { dr.v.L = Math.max(1000, sn(dr.o.L + dx)); dr.v.W = dr.v.roof === 'round' ? dr.v.L : Math.max(1000, sn(dr.o.W + dy)); }
+      const g = svg.querySelector(`[data-vol="${dr.v.id}"]`); if (g) g.innerHTML = mpVolInner(dr.v, mpModel.vols.indexOf(dr.v), data.off, fs, true);
+    });
+    const end = () => { if (!dr) return; dr = null; mpModelChanged(); };
+    svg.addEventListener('pointerup', end); svg.addEventListener('pointercancel', end);
+  }
+
+  $('mpReplayBtn').addEventListener('click', mpPlayInstallation);
+  mpBuildControls();
+  mpSetupV4();
+
   $('mpExplodeRange').addEventListener('input', e => {
     mpExplodeAmount = parseFloat(e.target.value) || 0;
     $('mpExplodeVal').textContent = mpExplodeAmount + ' mm';
@@ -9690,9 +11098,15 @@ function createZincController(suffix, kind){
 
   $('mpCalcBtn').addEventListener('click', () => {
     const data = computeMultiPanRoof();
+    mpLastData = data;
+    mpFitItems(data);
+    mpBacStartByPan = [];
+    mpUpdateSummaryLine();
     mpRenderResults(data);
+    mpRenderBacStartControls(data);
     mpDrawPlan(data);
-    setTimeout(() => mpDraw3D(data), 30);
+    setTimeout(() => { mpDraw3D(data); setTimeout(mpPlayInstallation, 150); }, 30);
+    mpCloseWizard();
   });
 
   function renderAccessoires(data){
@@ -10780,6 +12194,7 @@ function createZincController(suffix, kind){
 
   return {
     redraw, init3D, update3D: () => { update3D(); drawSchema(); }, fitCamera,
+    openMpWizard: () => { if (!mpLastData) mpOpenWizard(); }, exportMp: mpExport, importMp: mpImport,
     exportState: () => ({
       versants: roofVersants,
       current: roofEdges.length ? captureCurrentVersantConfig($('versantName').value || 'En cours') : null
@@ -10795,6 +12210,27 @@ function createZincController(suffix, kind){
 
 window.zincCtrl_tas = createZincController('tas', 'tasseaux');
 window.zincCtrl_jd = createZincController('jd', 'jointdebout');
+/* Un seul onglet « Toiture zinc » : l'utilisateur choisit joint debout ou bac à tasseaux. */
+(function(){
+  const tabOf = { jd: 'tab-jointdebout', tas: 'tab-tasseaux' };
+  ['jd', 'tas'].forEach(sys => {
+    const panel = document.getElementById(tabOf[sys]);
+    const bar = document.createElement('div');
+    bar.className = 'dir-toggle'; bar.style.cssText = 'margin:0 0 12px;max-width:440px;';
+    bar.innerHTML = '<button type="button" data-sys="jd">Joint debout</button><button type="button" data-sys="tas">Bac à tasseaux</button>';
+    bar.querySelector('[data-sys="' + sys + '"]').classList.add('active');
+    bar.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+      const to = b.dataset.sys; if (to === sys) return;
+      let st = null; try { st = window['zincCtrl_' + sys].exportMp(); } catch (e) {}
+      document.querySelector('.tab-btn[data-tab="' + tabOf[to] + '"]').click();
+      setTimeout(() => { try { window['zincCtrl_' + to].importMp(st); } catch (e) { console.error(e); } }, 300);
+    }));
+    panel.insertBefore(bar, panel.firstChild);
+  });
+  const sync = () => { const b = document.getElementById('zincTabBtn'); if (b) b.classList.toggle('active', ['tab-jointdebout', 'tab-tasseaux'].some(t => document.getElementById(t).classList.contains('active'))); };
+  document.querySelectorAll('.tab-btn').forEach(x => x.addEventListener('click', () => setTimeout(sync, 0)));
+})();
+
 
 
 /* ===================== BIBLIOTHÈQUE DE PROFILS TYPES ===================== */
