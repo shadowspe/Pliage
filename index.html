@@ -9666,7 +9666,7 @@ function createZincController(suffix, kind){
     const rx = top.x - p0.x, ry = top.y - p0.y, dt = rx * u.x + ry * u.y;
     const v = { x: rx - dt * u.x, y: ry - dt * u.y, h: top.h - p0.h };
     const vl = Math.hypot(v.x, v.y, v.h) || 1; v.x /= vl; v.y /= vl; v.h /= vl;
-    const us = p.pts.map(q => (q.x - p0.x) * u.x + (q.y - p0.y) * u.y), umin = Math.min(...us), umax = Math.max(...us);
+    const us = p.pts.map(q => (q.x - p0.x) * u.x + (q.y - p0.y) * u.y), umin = p.fixedBasis ? 0 : Math.min(...us), umax = p.fixedBasis ? len : Math.max(...us);
     const n = { x: u.y * v.h - u.h * v.y, y: u.h * v.x - u.x * v.h, h: u.x * v.y - u.y * v.x };
     const nl = Math.hypot(n.x, n.y, n.h) || 1; n.x /= nl; n.y /= nl; n.h /= nl;
     if (n.h < 0) { n.x *= -1; n.y *= -1; n.h *= -1; }
@@ -9695,7 +9695,7 @@ function createZincController(suffix, kind){
   function mpBuildBacsForPan(p, panIdx){
     const W = parseFloat($('largeurBac').value) || 500, bs = mpPanBasis(p);
     const pieces2 = (p.pieces || [p.pts]).map(pc => pc.map(q => { const t = mpLocalUV(bs, q); return [t.u, t.v]; }));
-    const its = mpItems.filter(it => it.pan === panIdx), rects = its.map(it => mpItemRect(it, bs, it.type === 'velux' ? 15 : it.type === 'cheminee' ? 10 : 0));
+    const its = mpItems.filter(it => it.pan === panIdx), rects = its.map(it => mpItemRect(it, bs, it.type === 'velux' ? 15 : it.type === 'cheminee' ? 10 : 0, p));
     if (p.single) {   // « queue de billard » : un seul bac effilé par pan (pointe ou largeur réduite vers le haut)
       const polys = [];
       pieces2.forEach(P2 => { let parts = [P2]; rects.forEach(r => { parts = parts.flatMap(P => mpSubRect(P, r)); }); parts.forEach(q => polys.push({ p2: q, p3: q.map(([u, v]) => mpToWorld(bs, u, v)) })); });
@@ -9718,6 +9718,7 @@ function createZincController(suffix, kind){
       const cuts = [...new Set(its.filter((it, k) => rects[k].u2 > u1 && rects[k].u1 < u2).map(mpItemName))];
       return { polys, cuts, u1, u2, w, cut: w < W - 2, half: Math.abs(w / W - 0.5) < 0.07 && w < W - 2, lenMin: Math.min(...ends), lenMax: Math.max(...ends) };
     }).filter(b => b.polys.length);
+    if (p.curved && p.devLen) bacs.forEach(b => { b.lenMin = b.lenMax = p.devLen; });
     bacs.W = W;
     return bacs;
   }
@@ -9744,7 +9745,7 @@ function createZincController(suffix, kind){
       const avg = bacs.reduce((s, b) => s + (b.lenMin + b.lenMax) / 2, 0) / bacs.length;
       const perBac = Math.max(2, Math.ceil(avg / CLIP_SPACING) + 1);
       nClips += bacs.length * perBac;
-      bacs.forEach(b => { surf += b.polys.reduce((t, pl) => t + mpPoly2Area(pl.p2), 0); lin += (b.lenMin + b.lenMax) / 2; });
+      bacs.forEach(b => { surf += b.polys.reduce((t, pl) => t + mpPoly2Area(pl.p2), 0) * (p.areaK || 1); lin += (b.lenMin + b.lenMax) / 2; });
       clipRows += `<tr><td>Pan ${pi + 1}</td><td>${Math.round(avg)} mm</td><td>${perBac} / bac (1 fixe + ${perBac - 1} coulissante${perBac - 1 > 1 ? 's' : ''})</td><td>${bacs.length * perBac}</td></tr>`;
       const order = bacs.map((_, bi) => bi).sort((a, b) => mpBacDistFrac(a, bacs.length, pi) - mpBacDistFrac(b, bacs.length, pi));
       order.forEach((bi, rank) => {
@@ -9778,7 +9779,7 @@ function createZincController(suffix, kind){
         ${data.type === 'voute' ? '' : tr(data.type === 'monopente' ? 'Tête de mur (haut de pan)' : 'Faîtage', mm(ed.faitage))}
         ${ed.aretier ? tr('Arêtiers', mm(ed.aretier)) : ''}
         ${ed.noue ? tr('Noues', mm(ed.noue)) : ''}
-        ${tr('Pattes de fixation', nClips)}
+        ${tr(mpMatNow().steel ? 'Vis auto-perceuses (estimation)' : 'Pattes de fixation', mpMatNow().steel ? Math.ceil(surf / 1e6 * (mpMatNow().steel.pr.screws || 7)) : nClips)}
         ${mpItems.length ? tr('Éléments en toiture (bacs découpés)', mpItemsSummary()) : ''}
       </tbody></table>`;
     $('mpResults').innerHTML = totals + `
@@ -9798,7 +9799,7 @@ function createZincController(suffix, kind){
       <table class="biais-seg-table" style="margin-top:6px;">
         <thead><tr><th>Pan</th><th>Longueur moy.</th><th>Pattes/bac</th><th>Total pattes</th></tr></thead>
         <tbody>${clipRows}</tbody>
-      </table>` + (data.type === 'voute' ? mpVaultHtml(data.vault) : '');
+      </table>` + (data.type === 'voute' ? mpVaultHtml(data.vault) : '') + mpCurveHtml();
     mpWireImport($('mpResults'));
   }
 
@@ -10024,7 +10025,7 @@ function createZincController(suffix, kind){
     const M = {
       velFrame: std({ color: 0x3d444b, metalness: 0.6, roughness: 0.45 }), glass: std({ color: 0x15222e, metalness: 0.25, roughness: 0.06 }),
       brick: std({ color: 0xa4543b, roughness: 0.95, metalness: 0 }), cap: std({ color: 0xbdbdb8, roughness: 0.9, metalness: 0 }),
-      dark: std({ color: 0x141414, roughness: 1, metalness: 0 }), pipe: std({ color: 0x6e7378, metalness: 0.5, roughness: 0.5 }),
+      dwall: std({ color: 0xefe8da, roughness: 0.95, metalness: 0 }), dark: std({ color: 0x141414, roughness: 1, metalness: 0 }), pipe: std({ color: 0x6e7378, metalness: 0.5, roughness: 0.5 }),
       volige: std({ map: voligeTex, roughness: 0.85, metalness: 0 }),
       ecran: std({ map: ecranTex, color: 0x9aa7b4, roughness: 0.5, metalness: 0.15 }),
       panne: std({ color: 0xb98a55, roughness: 0.9, metalness: 0 }),
@@ -10037,7 +10038,7 @@ function createZincController(suffix, kind){
     const addPin = (txt, p) => { if (!pinSeen[txt]) { pinSeen[txt] = 1; pinList.push([txt, p]); } };
 
     data.pans.forEach((p, pi) => {
-      if (p.curved) { mpVault3D(data, { M, add, addPin, eco }); return; }
+      if (p.curved) { mpVault3D(data, { M, add, addPin, eco }, p, pi); return; }
       const bs = mpPanBasis(p), n3 = mpDir(bs.n), v3d = mpDir(bs.v), L = bs.len;
       const pieces2 = (p.pieces || [p.pts]).map(pc => pc.map(q => { const t = mpLocalUV(bs, q); return [t.u, t.v]; }));
       const mode = mpBacStartByPan[pi] || 'left';
@@ -10078,7 +10079,19 @@ function createZincController(suffix, kind){
         if (!shown[bi]) return;
         bc.polys.forEach(pl => add('bacs', mpPolyMesh(pl.p3.map(V), M.bac[bi % 2]), n3, 0.4 + 0.45 * dists[bi], dists[bi]));
       });
-      for (let b = 1; b < bacs.length; b++) {
+      if (MT.steel && !MT.steel.pr.seam) bacs.forEach((bc, bi) => {   // nervures du profil acier (au lieu des joints debout)
+        if (!shown[bi] || bc.billard) return;
+        const pr = MT.steel.pr, nr = Math.max(1, Math.round(bc.w / pr.pitch)), rv = 0.4 + 0.45 * dists[bi];
+        bc.polys.forEach(pl => {
+          for (let k = 0; k < nr; k++) {
+            const u = bc.u1 + (k + 0.5) * (bc.w / nr), sp = mpSpan([pl.p2], 0, u); if (!sp || sp[1] - sp[0] < 80) continue;
+            const A = V(mpToWorld(bs, u, sp[0])), B = V(mpToWorld(bs, u, sp[1])), len = A.distanceTo(B), mid = A.clone().add(B).multiplyScalar(0.5);
+            add('bacs', mpBox(mid.clone().addScaledVector(n3, pr.h * 0.18), v3d, n3, len, pr.h * 0.36, pr.pitch * 0.3, M.bac[bi % 2]), n3, rv, dists[bi]);
+            add('bacs', mpBox(mid.clone().addScaledVector(n3, pr.h * 0.5), v3d, n3, len, pr.h, pr.pitch * 0.13, M.bac[bi % 2]), n3, rv, dists[bi]);
+          }
+        });
+      });
+      else for (let b = 1; b < bacs.length; b++) {
         if (!shown[b] && !shown[b - 1]) continue;
         const d = Math.min(dists[b], dists[b - 1]);
         bacs[b].polys.forEach(pl => {
@@ -10163,18 +10176,25 @@ function createZincController(suffix, kind){
         wall.position.set(r.x0 + r.sx / 2 - C.x, z0 - hh / 2, r.y0 + r.sy / 2 - C.y);
       }
       wall.castShadow = true; wall.receiveShadow = true; mp3dGroup.add(wall); mpHouse.push(wall);
-      if (r.fill) {
-        const sh = new THREE.Shape(); r.fill.pts.forEach((q, i) => i ? sh.lineTo(q[0], q[1]) : sh.moveTo(q[0], q[1]));
-        const depth = r.fill.depth || ((r.fill.axis === 'x' ? r.sx : r.sy) - 80);
+      (Array.isArray(r.fill) ? r.fill : r.fill ? [r.fill] : []).forEach(fl => {
+        const sh = new THREE.Shape(); fl.pts.forEach((q, i) => i ? sh.lineTo(q[0], q[1]) : sh.moveTo(q[0], q[1]));
+        const depth = fl.depth || ((fl.axis === 'x' ? r.sx : r.sy) - 80);
         const g = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: false });
         const mx = new THREE.Matrix4();
-        if (r.fill.axis === 'x') mx.makeBasis(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 1, 0), new THREE.Vector3(-1, 0, 0)).setPosition((r.fill.end === 'min' ? r.x0 + 40 + depth : r.x0 + r.sx - 40) - C.x, z0, r.y0 - C.y);
-        else mx.makeBasis(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)).setPosition(r.x0 - C.x, z0, (r.fill.end === 'max' ? r.y0 + r.sy - 40 - depth : r.y0 + 40) - C.y);
+        if (fl.axis === 'x') mx.makeBasis(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 1, 0), new THREE.Vector3(-1, 0, 0)).setPosition((fl.end === 'min' ? r.x0 + 40 + depth : r.x0 + r.sx - 40) - C.x, z0, r.y0 - C.y);
+        else mx.makeBasis(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)).setPosition(r.x0 - C.x, z0, (fl.end === 'max' ? r.y0 + r.sy - 40 - depth : r.y0 + 40) - C.y);
         g.applyMatrix4(mx);
         const gm = new THREE.Mesh(g, wallMat); gm.castShadow = true; gm.receiveShadow = true; mp3dGroup.add(gm); mpHouse.push(gm);
-      }
+      });
     });
     mpApplyGhost();
+    (data.extras || []).forEach(e => {   // lanterneau circulaire au centre d'un anneau
+      if (e.type !== 'lant') return;
+      const up = new THREE.Vector3(0, 1, 0), ctr = new THREE.Vector3(e.cx - C.x, 0, e.cy - C.y);
+      const curb = new THREE.Mesh(new THREE.CylinderGeometry(e.r * 0.99, e.r * 0.99, 320, 48), M.velFrame); curb.position.set(ctr.x, e.h + 160, ctr.z); curb.castShadow = curb.receiveShadow = true; add('acc', curb, up, 0.975);
+      const gl = new THREE.Mesh(new THREE.CylinderGeometry(e.r * 0.2, e.r * 0.95, 560, 48), M.glass); gl.position.set(ctr.x, e.h + 320 + 280, ctr.z); gl.castShadow = true; add('acc', gl, up, 0.975);
+      addPin('Lanterneau', new THREE.Vector3(ctr.x, e.h + 900, ctr.z));
+    });
     addPin('Maçonnerie', new THREE.Vector3(0, -houseH * 0.45, data.Wm / 2 - 40));
 
     // Repères HTML.
@@ -10253,10 +10273,15 @@ function createZincController(suffix, kind){
   const MP_DIM_LABEL = { mpMainL: 'Longueur du corps principal', mpMainW: 'Largeur du corps principal', mpWingL: 'Profondeur de l\'aile', mpWingW: 'Largeur de l\'aile', mpPente: 'Pente', mpRayon: 'Rayon du cintre', mpWallH: 'Hauteur des murs' };
   let mpItems = [], mpSel = null, mpArm = null, mpItemSeq = 1;
 
-  const mpItemName = it => it.type === 'velux' ? 'Velux ' + it.sz : it.type === 'cheminee' ? 'Cheminée' : 'Sortie de toit';
+  const mpItemName = it => it.type === 'velux' ? 'Velux ' + it.sz : it.type === 'cheminee' ? 'Cheminée' : it.type === 'chien' ? 'Chien assis' : 'Sortie de toit';
+  // Chien assis : toit à une pente plus faible que le versant, dans le même sens ; la profondeur découle de la hauteur de façade.
+  function mpChienGeom(it, bs){
+    const cs = Math.hypot(bs.v.x, bs.v.y) || 1, tanT = bs.v.h / cs, thDeg = Math.atan(tanT) * 180 / Math.PI, pc = Math.min(Math.max(3, +it.pc || 12), Math.max(3, thDeg - 5)), Lh = (+it.hf || 1100) / Math.max(0.05, tanT - Math.tan(pc * Math.PI / 180));
+    return { cs, tanT, pc, Lh, hs: Lh / cs, w: (+it.w || 1200) + 200 };
+  }
   function mpItemsSummary(){
     const c = t => mpItems.filter(i => i.type === t).length, o = [];
-    if (c('velux')) o.push(c('velux') + ' Velux'); if (c('cheminee')) o.push(c('cheminee') + ' cheminée' + (c('cheminee') > 1 ? 's' : '')); if (c('sortie')) o.push(c('sortie') + ' sortie' + (c('sortie') > 1 ? 's' : '') + ' de toit');
+    if (c('chien')) o.push(c('chien') + ' chien' + (c('chien') > 1 ? 's' : '') + ' assis'); if (c('velux')) o.push(c('velux') + ' Velux'); if (c('cheminee')) o.push(c('cheminee') + ' cheminée' + (c('cheminee') > 1 ? 's' : '')); if (c('sortie')) o.push(c('sortie') + ' sortie' + (c('sortie') > 1 ? 's' : '') + ' de toit');
     return o.join(' · ');
   }
   function mpPanPieces2(p, bs){ return (p.pieces || [p.pts]).map(pc => pc.map(q => { const t = mpLocalUV(bs, q); return [t.u, t.v]; })); }
@@ -10273,20 +10298,22 @@ function createZincController(suffix, kind){
     const dx = x - bs.p0.x, dy = y - bs.p0.y, a = bs.u.x, b = bs.v.x, c = bs.u.y, d = bs.v.y, det = a * d - b * c || 1e-9;
     return { u: (dx * d - b * dy) / det, v: (a * dy - c * dx) / det };
   }
-  function mpItemRect(it, bs, m){
+  function mpWFromA(p, a){ const S = p.vault.S, pf = p.vault.prof || mpVaultProf(p.vault, p.vo.C); let best = 0, bd = 1e18; for (let k = 0; k <= 160; k++) { const w = S * k / 160, d = Math.abs(pf(w).a - a); if (d < bd) { bd = d; best = w; } } return best; }
+  function mpItemRect(it, bs, m, p){
     const cs = Math.hypot(bs.v.x, bs.v.y) || 1, g = m || 0;
     let w, h;
-    if (it.type === 'velux') { w = it.w; h = it.h; } else if (it.type === 'cheminee') { w = it.w; h = it.d / cs; } else { w = h = it.w + 60; }
+    if (it.type === 'chien') { const g2 = mpChienGeom(it, bs); w = g2.w; h = g2.hs; } else if (it.type === 'velux') { w = it.w; h = it.h; } else if (it.type === 'cheminee') { w = it.w; h = it.d / cs; } else { w = h = it.w + 60; }
+    if (p && p.curved && p.vo && p.vault) { const pf = p.vault.prof || mpVaultProf(p.vault, p.vo.C), a1 = pf(it.v - h / 2).a, a2 = pf(it.v + h / 2).a; return { u1: it.u - w / 2 - g, u2: it.u + w / 2 + g, v1: Math.min(a1, a2) - g, v2: Math.max(a1, a2) + g }; }
     return { u1: it.u - w / 2 - g, u2: it.u + w / 2 + g, v1: it.v - h / 2 - g, v2: it.v + h / 2 + g };
   }
   function mpItemFits(it, p, bs){
-    const r = mpItemRect(it, bs), P = mpPanPieces2(p, bs);
+    const r = mpItemRect(it, bs, 0, p), P = mpPanPieces2(p, bs);
     return [[r.u1, r.v1], [r.u2, r.v1], [r.u2, r.v2], [r.u1, r.v2], [it.u, it.v]].every(([u, v]) => P.some(pc => mpIn2(pc, u, v)));
   }
   function mpFitItems(data){
-    if (data.type === 'voute') { mpItems = []; mpSel = null; return; }
     mpItems = mpItems.filter(it => {
-      const p = data.pans[it.pan]; if (!p) return false;
+      const p = data.pans[it.pan]; if (!p || (p.curved && it.type === 'chien')) return false;
+      if (p.curved) return mpItemFits(it, p, mpPanBasis(p));
       const bs = mpPanBasis(p), P = mpPanPieces2(p, bs); let cu = 0, cv = 0, n = 0;
       P.forEach(pc => pc.forEach(q => { cu += q[0]; cv += q[1]; n++; })); cu /= n; cv /= n;
       for (let k = 0; k < 25; k++) { if (mpItemFits(it, p, bs)) return true; it.u += (cu - it.u) * 0.15; it.v += (cv - it.v) * 0.15; }
@@ -10316,10 +10343,10 @@ function createZincController(suffix, kind){
   /* ---------- Plan : rendu SVG des éléments et des cotes ---------- */
   function mpItemInner(it, data, fs, sel){
     const p = data.pans[it.pan]; if (!p) return '';
-    const bs = mpPanBasis(p), r = mpItemRect(it, bs);
+    const bs = mpPanBasis(p), r = mpItemRect(it, bs, 0, p);
     const c = [[r.u1, r.v1], [r.u2, r.v1], [r.u2, r.v2], [r.u1, r.v2]].map(([u, v]) => mpToWorld(bs, u, v));
     const cx = (c[0].x + c[2].x) / 2, cy = (c[0].y + c[2].y) / 2, ymin = Math.min(...c.map(q => q.y));
-    const col = it.type === 'velux' ? ['#7fb6e8', '#1f5fa6'] : it.type === 'cheminee' ? ['#b5654a', '#6d3a29'] : ['#9aa0a6', '#3a3f44'];
+    const col = it.type === 'chien' ? ['#d9b98f', '#6d4c2f'] : it.type === 'velux' ? ['#7fb6e8', '#1f5fa6'] : it.type === 'cheminee' ? ['#b5654a', '#6d3a29'] : ['#9aa0a6', '#3a3f44'];
     let s = `<polygon points="${c.map(q => q.x + ',' + q.y).join(' ')}" fill="${col[0]}" fill-opacity=".9" stroke="${sel ? '#ff8a00' : col[1]}" stroke-width="${fs * (sel ? 0.26 : 0.12)}"${sel ? ` stroke-dasharray="${fs * 0.5} ${fs * 0.3}"` : ''}/>`;
     if (it.type === 'sortie') s += `<circle cx="${cx}" cy="${cy}" r="${it.w / 2}" fill="#4b5056" stroke="#1d2024" stroke-width="${fs * 0.08}"/>`;
     else s += `<line x1="${c[0].x}" y1="${c[0].y}" x2="${c[2].x}" y2="${c[2].y}" stroke="${col[1]}" stroke-width="${fs * 0.06}"/><line x1="${c[1].x}" y1="${c[1].y}" x2="${c[3].x}" y2="${c[3].y}" stroke="${col[1]}" stroke-width="${fs * 0.06}"/>`;
@@ -10356,8 +10383,8 @@ function createZincController(suffix, kind){
   }
   function mpToolbarHtml(){
     const b = (t, l) => `<button type="button" data-add="${t}" style="${MP_BTN}${mpArm === t ? 'background:#ffe3b8;border-color:#ff8a00;' : ''}">${l}</button>`;
-    const vt = mpLastData && mpLastData.type === 'voute';
-    return mpMatHtml() + mpImportHtml() + (mpLastData && mpLastData.type === 'modele' ? mpModelHtml() : '') + (vt ? '<div style="font-size:11.5px;color:#6b7178;margin-bottom:6px;">Cintré : les Velux, cheminées et sorties ne sont pas disponibles sur ce type de toit. <button type="button" data-recalc style="${MP_BTN}background:#e6f2ff;border-color:#7fb0e6;">↻ Recalculer</button></div><div data-panel></div>' : `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;"><span style="font-size:11.5px;color:#4a5056;font-weight:600;">Ajouter :</span>${b('velux', '+ Velux')}${b('cheminee', '+ Cheminée')}${b('sortie', '+ Sortie de toit')}<button type="button" data-recalc style="${MP_BTN}background:#e6f2ff;border-color:#7fb0e6;">↻ Recalculer</button>
+    const vt = false;
+    return mpMatHtml() + mpImportHtml() + mpDossierHtml() + (mpLastData && mpLastData.type === 'modele' ? mpModelHtml() : '') + (vt ? '<div style="font-size:11.5px;color:#6b7178;margin-bottom:6px;">Cintré : les Velux, cheminées et sorties ne sont pas disponibles sur ce type de toit. <button type="button" data-recalc style="${MP_BTN}background:#e6f2ff;border-color:#7fb0e6;">↻ Recalculer</button></div><div data-panel></div>' : `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;"><span style="font-size:11.5px;color:#4a5056;font-weight:600;">Ajouter :</span>${b('velux', '+ Velux')}${b('cheminee', '+ Cheminée')}${b('sortie', '+ Sortie de toit')}${b('chien', '+ Chien assis')}<button type="button" data-recalc style="${MP_BTN}background:#e6f2ff;border-color:#7fb0e6;">↻ Recalculer</button>
       ${mpArm ? '<span style="font-size:11.5px;color:#b45f00;">Touche un pan du plan pour le placer</span>' : ''}</div><div data-panel>${mpPanelHtml()}</div>`);
   }
   function mpPanelHtml(){
@@ -10367,6 +10394,7 @@ function createZincController(suffix, kind){
     let f = '';
     if (it.type === 'velux') f = `<label style="font-size:11px;display:flex;flex-direction:column;gap:2px;color:#4a5056;">Modèle<select data-f="sz" style="padding:5px 6px;border:1px solid #c9ced3;border-radius:6px;font-size:12px;">${Object.keys(MP_VELUX).map(k => `<option value="${k}"${k === it.sz ? ' selected' : ''}>${k} (${MP_VELUX[k][0] / 10}×${MP_VELUX[k][1] / 10})</option>`).join('')}</select></label>` + inp('w', 'Largeur (mm)', it.w) + inp('h', 'Hauteur (mm)', it.h);
     else if (it.type === 'cheminee') f = inp('w', 'Largeur (mm)', it.w) + inp('d', 'Profondeur (mm)', it.d) + inp('hh', 'Hauteur hors toit (mm)', it.hh);
+    else if (it.type === 'chien') f = inp('w', 'Largeur de façade (mm)', it.w) + inp('hf', 'Hauteur de façade (mm)', it.hf) + inp('pc', 'Pente du toit du chien assis (°)', it.pc);
     else f = inp('w', 'Diamètre (mm)', it.w);
     return `<div style="border:1px solid #e3e6e9;border-radius:8px;padding:8px;margin-bottom:8px;background:#fafbfc;">
       <div style="font-size:12px;font-weight:700;color:#2a2f35;margin-bottom:6px;">${mpItemName(it)} — pan ${it.pan + 1}</div>
@@ -10382,7 +10410,7 @@ function createZincController(suffix, kind){
       panel.querySelectorAll('[data-f]').forEach(el => el.addEventListener('change', () => {
         const k = el.dataset.f, old = Object.assign({}, it), p = data.pans[it.pan], bs = mpPanBasis(p);
         if (k === 'sz') { it.sz = el.value; it.w = MP_VELUX[it.sz][0]; it.h = MP_VELUX[it.sz][1]; }
-        else { const n = parseFloat(el.value); it[k] = (k === 'u' || k === 'v') ? (isFinite(n) ? n : old[k]) : Math.max(50, n || old[k]); }
+        else { const n = parseFloat(el.value); it[k] = (k === 'u' || k === 'v') ? (isFinite(n) ? n : old[k]) : k === 'pc' ? Math.min(35, Math.max(3, n || old[k])) : Math.max(50, n || old[k]); }
         if (!mpItemFits(it, p, bs)) { Object.assign(it, old); showToast('L\'élément doit rester dans le pan.'); }
         mpRefresh();
       }));
@@ -10393,7 +10421,7 @@ function createZincController(suffix, kind){
       const old = mpSel; mpSel = id; if (old) redrawG(old); if (id) redrawG(id);
       panel.innerHTML = mpPanelHtml(); wirePanel();
     };
-    wirePanel(); mpWireImport(wrap); mpWireMat(wrap);
+    wirePanel(); mpWireImport(wrap); mpWireMat(wrap); mpWireDossier(wrap);
     if (data.type === 'modele') mpWireModel(wrap, data, fs);
     wrap.querySelectorAll('[data-recalc]').forEach(b => b.addEventListener('click', () => { if (data.type === 'modele') mpModelChanged(); else mpRecalc(); showToast('Calepinage recalculé.'); }));
     wrap.querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', () => { mpArm = mpArm === b.dataset.add ? null : b.dataset.add; mpDrawPlan(data); }));
@@ -10416,7 +10444,9 @@ function createZincController(suffix, kind){
         for (let i = 0; i < data.pans.length; i++) {
           const bs = mpPanBasis(data.pans[i]), uv = mpPlanToUV(bs, P.x, P.y);
           if (!mpPanPieces2(data.pans[i], bs).some(pc => mpIn2(pc, uv.u, uv.v))) continue;
-          const d = mpArm === 'velux' ? { sz: 'MK04', w: 780, h: 980 } : mpArm === 'cheminee' ? { w: 600, d: 600, hh: 900 } : { w: 125 };
+          if (data.pans[i].curved && mpArm === 'chien') { showToast('Le chien assis se pose sur un pan plan.'); return; }
+          if (data.pans[i].curved && data.pans[i].vo) uv.v = mpWFromA(data.pans[i], uv.v);
+          const d = mpArm === 'velux' ? { sz: 'MK04', w: 780, h: 980 } : mpArm === 'cheminee' ? { w: 600, d: 600, hh: 900 } : mpArm === 'chien' ? { w: 1200, hf: 1100, pc: 12 } : { w: 125 };
           const it = Object.assign({ id: mpItemSeq++, type: mpArm, pan: i, u: uv.u, v: uv.v }, d);
           if (!mpItemFits(it, data.pans[i], bs)) { showToast('Trop près du bord du pan : place-le plus à l\'intérieur.'); return; }
           mpItems.push(it); mpSel = it.id; mpArm = null; mpRefresh(); return;
@@ -10425,7 +10455,7 @@ function createZincController(suffix, kind){
       }
       if (g) {
         const id = +g.dataset.item, it = mpItems.find(i => i.id === id); if (!it) return;
-        const bs = mpPanBasis(data.pans[it.pan]), uv = mpPlanToUV(bs, P.x, P.y);
+        const bs = mpPanBasis(data.pans[it.pan]), uv = mpPlanToUV(bs, P.x, P.y); if (data.pans[it.pan].curved && data.pans[it.pan].vo) uv.v = mpWFromA(data.pans[it.pan], uv.v);
         drag = { id, du: it.u - uv.u, dv: it.v - uv.v, moved: false };
         if (svg.setPointerCapture) svg.setPointerCapture(e.pointerId);
         select(id); e.preventDefault();
@@ -10436,7 +10466,8 @@ function createZincController(suffix, kind){
       const it = mpItems.find(i => i.id === drag.id), P = toPlan(e); if (!it || !P) return;
       const tries = [[it.pan, true]].concat(data.pans.map((_, i) => [i, false]).filter(t => t[0] !== it.pan));
       for (const [pi, useOff] of tries) {
-        const p = data.pans[pi], bs = mpPanBasis(p), uv = mpPlanToUV(bs, P.x, P.y);
+        const p = data.pans[pi], bs = mpPanBasis(p), uv = mpPlanToUV(bs, P.x, P.y); if (p.curved && p.vo) uv.v = mpWFromA(p, uv.v);
+        if (p.curved && it.type === 'chien') continue;
         const t = Object.assign({}, it, { pan: pi, u: uv.u + (useOff ? drag.du : 0), v: uv.v + (useOff ? drag.dv : 0) });
         if (mpItemFits(t, p, bs)) { Object.assign(it, { pan: pi, u: t.u, v: t.v }); drag.moved = true; redrawG(it.id); break; }
       }
@@ -10447,7 +10478,12 @@ function createZincController(suffix, kind){
 
   /* ---------- 3D : éléments en toiture ---------- */
   function mpItem3D(it, c){
-    const { bs, V, n3, v3d, M, add, addPin } = c, uD = mpDir(bs.u), r = mpItemRect(it, bs), AT = (u, v, l) => V(mpToWorld(bs, u, v)).addScaledVector(n3, l);
+    const { bs, V, M, add, addPin, cv } = c; let n3 = c.n3, v3d = c.v3d, r, S, AT;
+    const uD = cv ? cv.lenDir : mpDir(bs.u);
+    if (cv) {   // surface courbe : position exacte sur l'arc (u = longueur, v = abscisse développée)
+      const dwid = it.type === 'velux' || it.type === 'cheminee' ? it.w : it.w + 60, dlen = it.type === 'velux' ? it.h : it.type === 'cheminee' ? it.d : it.w + 60;
+      r = { u1: it.u - dwid / 2, u2: it.u + dwid / 2, v1: it.v - dlen / 2, v2: it.v + dlen / 2 }; S = (u, v) => cv.P(u, v, 0); AT = (u, v, l) => cv.P(u, v, l);
+    } else { r = mpItemRect(it, bs); S = (u, v) => V(mpToWorld(bs, u, v)); AT = (u, v, l) => S(u, v).addScaledVector(n3, l); }
     const uc = (r.u1 + r.u2) / 2, vc = (r.v1 + r.v2) / 2, ul = r.u2 - r.u1, vl = r.v2 - r.v1, A = (mesh) => add('acc', mesh, n3, 0.975);
     const ring = (R, wd, lift, th, mat, inward) => {
       const a = R.u2 - R.u1, b = R.v2 - R.v1, ux = (R.u1 + R.u2) / 2, vx = (R.v1 + R.v2) / 2, o = inward ? -wd / 2 : wd / 2, lo = inward ? a : a + 2 * wd, lv = inward ? b - 2 * wd : b;
@@ -10459,13 +10495,26 @@ function createZincController(suffix, kind){
       A(mpBox(AT(uc, vc, 52), uD, n3, ul - 120, 12, vl - 120, M.glass));
       addPin('Fenêtre de toit Velux', AT(uc, vc, 70));
     } else if (it.type === 'cheminee') {
-      const ys = [[r.u1, r.v1], [r.u2, r.v1], [r.u2, r.v2], [r.u1, r.v2]].map(([u, v]) => V(mpToWorld(bs, u, v)).y);
-      const y0 = Math.min(...ys) - 300, top = Math.max(...ys) + it.hh, ctr = V(mpToWorld(bs, uc, vc)), ex = new THREE.Vector3(uD.x, 0, uD.z).normalize(), ey = new THREE.Vector3(0, 1, 0);
+      const ys = [[r.u1, r.v1], [r.u2, r.v1], [r.u2, r.v2], [r.u1, r.v2]].map(([u, v]) => S(u, v).y);
+      const y0 = Math.min(...ys) - 300, top = Math.max(...ys) + it.hh, ctr = S(uc, vc), ex = new THREE.Vector3(uD.x, 0, uD.z).normalize(), ey = new THREE.Vector3(0, 1, 0);
       A(mpBox(new THREE.Vector3(ctr.x, (y0 + top) / 2, ctr.z), ex, ey, it.w, top - y0, it.d, M.brick));
       A(mpBox(new THREE.Vector3(ctr.x, top + 30, ctr.z), ex, ey, it.w + 120, 60, it.d + 120, M.cap));
       A(mpBox(new THREE.Vector3(ctr.x, top + 62, ctr.z), ex, ey, it.w * 0.5, 4, it.d * 0.5, M.dark));
       ring(r, 120, 28, 5, M.acc.rive, false);
       addPin('Cheminée', new THREE.Vector3(ctr.x, top + 70, ctr.z));
+    } else if (it.type === 'chien') {
+      const g = mpChienGeom(it, bs), up = new THREE.Vector3(0, 1, 0), v1 = it.v - g.hs / 2, v2 = it.v + g.hs / 2, Fw = V(mpToWorld(bs, it.u, v1)), Bw = V(mpToWorld(bs, it.u, v2));
+      const s = new THREE.Vector3(Bw.x - Fw.x, 0, Bw.z - Fw.z); if (s.length() < 1) s.set(uD.z, 0, -uD.x); s.normalize();
+      const pcr = g.pc * Math.PI / 180, r = s.clone().multiplyScalar(Math.cos(pcr)).addScaledVector(up, Math.sin(pcr)), nr = up.clone().multiplyScalar(Math.cos(pcr)).addScaledVector(s, -Math.sin(pcr)), Lr = g.Lh / Math.cos(pcr), hf = +it.hf || 1100, w = +it.w || 1200;
+      const Ft = Fw.clone().addScaledVector(up, hf);
+      A(mpBox(Ft.clone().addScaledVector(r, Lr / 2 - 75).addScaledVector(nr, 7), uD, nr, w + 300, 14, Lr + 150, M.bac[0]));
+      A(mpBox(Fw.clone().addScaledVector(up, hf / 2).addScaledVector(s, 60), uD, up, w, hf, 120, M.dwall));
+      A(mpBox(Fw.clone().addScaledVector(up, hf * 0.5).addScaledVector(s, -4), uD, up, Math.max(300, w - 400), Math.max(250, hf - 450), 30, M.velFrame));
+      A(mpBox(Fw.clone().addScaledVector(up, hf * 0.5).addScaledVector(s, -22), uD, up, Math.max(240, w - 520), Math.max(190, hf - 560), 8, M.glass));
+      const ez = new THREE.Vector3().crossVectors(s, up).normalize(), sh = new THREE.Shape(); sh.moveTo(0, 0); sh.lineTo(0, hf); sh.lineTo(g.Lh, g.Lh * g.tanT); sh.lineTo(0, 0);
+      [-(w / 2 + 100), w / 2].forEach(off0 => { const geo = new THREE.ExtrudeGeometry(sh, { depth: 100, bevelEnabled: false }); geo.applyMatrix4(new THREE.Matrix4().makeBasis(s, up, ez).setPosition(Fw.x + ez.x * off0, Fw.y + ez.y * off0, Fw.z + ez.z * off0)); const m = new THREE.Mesh(geo, M.acc.faitage); m.castShadow = m.receiveShadow = true; A(m); });
+      ring(mpItemRect(it, bs), 110, 28, 5, M.acc.rive, false);
+      addPin('Chien assis', Ft.clone().addScaledVector(r, Lr / 2).addScaledVector(nr, 40));
     } else {
       const ctr = AT(uc, vc, 0), rad = it.w / 2;
       A(mpBox(AT(uc, vc, 32), uD, n3, ul + 120, 5, vl + 120, M.acc.rive));
@@ -10479,14 +10528,47 @@ function createZincController(suffix, kind){
   const MP_IN = ['mpType', 'mpPente', 'mpMainL', 'mpMainW', 'mpWingL', 'mpWingW', 'largeurBac', 'mpRayon', 'mpRidge', 'mpHips'];
   function mpExport(){
     const v = {}; MP_IN.forEach(k => { v[k] = $(k).value; });
-    return { v, wallH: mpWallH, mat: Object.assign({}, mpMat), model: JSON.parse(JSON.stringify(mpModel)), hip: $('mpMainHip').checked, starts: mpBacStartByPan.slice(), items: JSON.parse(JSON.stringify(mpItems)), calc: !!mpLastData };
+    return { v, doss: Object.assign({}, mpDoss), wallH: mpWallH, mat: Object.assign({}, mpMat), model: JSON.parse(JSON.stringify(mpModel)), hip: $('mpMainHip').checked, starts: mpBacStartByPan.slice(), items: JSON.parse(JSON.stringify(mpItems)), calc: !!mpLastData };
   }
   function mpImport(st){
     if (!st) return;
     MP_IN.forEach(k => { if (st.v[k] !== undefined) $(k).value = st.v[k]; });
-    $('mpType').dispatchEvent(new Event('change')); $('mpMainHip').checked = !!st.hip; mpWallH = st.wallH || 0; if (st.mat) mpMat = Object.assign({}, st.mat); if (st.model) mpModel = JSON.parse(JSON.stringify(st.model));
+    $('mpType').dispatchEvent(new Event('change')); $('mpMainHip').checked = !!st.hip; mpWallH = st.wallH || 0; if (st.doss) Object.assign(mpDoss, st.doss); if (st.mat) mpMat = Object.assign({}, st.mat); if (st.model) mpModel = JSON.parse(JSON.stringify(st.model));
     mpItems = st.items || []; mpItemSeq = mpItems.reduce((m, i) => Math.max(m, i.id + 1), 1); mpSel = null; mpArm = null;
     if (st.calc) { $('mpCalcBtn').click(); mpBacStartByPan = (st.starts || []).slice(); mpRenderBacStartControls(mpLastData); mpDrawPlan(mpLastData); mpRenderResults(mpLastData); }
+  }
+  /* ===== v7 : bac acier Joris Ide (non isolé / isolé), profils 45-333-1000, 40-250-1000 et autres ===== */
+  // Poids marqués « fiche » : valeurs des fiches Joris Ide ; les autres sont estimés (masse de l'acier x coefficient de développé) et à confirmer.
+  const MP_JI = {
+    '45-333-1000': { name: 'JI 45-333-1000 Toiture', h: 45, pitch: 333, w: 1000, ribs: 3, maxL: 13600, maxRamp: 40, eps: [0.63, 0.75, 1], kg: { 0.63: 6.15, 0.75: 7.32, 1: 9.76 }, f: 1.2435, src: 'fiche Joris Ide' },
+    '40-250-1000': { name: 'JI 40-250-1000', h: 40, pitch: 250, w: 1000, ribs: 4, maxL: 13600, maxRamp: 30, eps: [0.63, 0.75, 1], f: 1.25, src: 'estimé' },
+    '33-250-1000': { name: 'JI 33-250-1000 Toiture', h: 33, pitch: 250, w: 1000, ribs: 4, maxL: 13600, maxRamp: 30, eps: [0.63, 0.75, 1], f: 1.22, src: 'estimé' },
+    '37-250-1000': { name: 'JI 37-250-1000', h: 37, pitch: 250, w: 1000, ribs: 4, maxL: 13600, maxRamp: 30, eps: [0.63, 0.75, 1], f: 1.24, src: 'estimé' },
+    '25-125-1000': { name: 'JI 25-125-1000', h: 25, pitch: 125, w: 1000, ribs: 8, maxL: 13600, maxRamp: 30, eps: [0.63, 0.75], f: 1.2, src: 'estimé' },
+    'vieo-500': { name: 'JI Vieo Edge 500 (joint debout acier)', h: 25, pitch: 500, w: 500, ribs: 1, maxL: 12000, maxRamp: 12, eps: [0.6, 0.7], kg: { 0.6: 5.75 }, f: 1.22, seam: true, screws: 12, src: 'fiche Joris Ide' }
+  };
+  const MP_RAL = [['7016', 'Gris anthracite', 0x383e42], ['9006', 'Aluminium blanc', 0xa5a8a6], ['9007', 'Aluminium gris', 0x8f8f8c], ['7042', 'Gris signalisation', 0x8e9291], ['7022', 'Gris terre d\'ombre', 0x4c4a44], ['8004', 'Brun cuivré', 0x8e402a], ['8012', 'Brun rouge', 0x6b3a2e], ['3009', 'Rouge oxyde', 0x6d342d], ['6005', 'Vert mousse', 0x2f4538], ['5010', 'Bleu gentiane', 0x0e4c92], ['9010', 'Blanc pur', 0xf0efe6]];
+  const MP_ISO = [0, 30, 40, 60, 80, 100];
+  const MP_ACC_STEEL = { egout: [250, 'Bavette / bande d\'égout'], rive: [333, 'Rives (bande de rive)'], faitage: [333, 'Faîtière'], aretier: [333, 'Arêtiers (faîtière d\'arêtier)'], noue: [500, 'Noues (tôle de noue)'], mur: [250, 'Solins contre mur'] };
+  const mpJiKg = (pr, ep) => pr.kg && pr.kg[ep] ? pr.kg[ep] : ep * 7.85 * pr.f;
+  function mpSteelInfo(){
+    const pr = MP_JI[mpMat.ji] || MP_JI['45-333-1000'], ep = pr.eps.includes(+mpMat.ep) ? +mpMat.ep : pr.eps[0], iso = +mpMat.iso || 0, ral = MP_RAL.find(r => r[0] === mpMat.ral) || MP_RAL[0];
+    const kgSheet = mpJiKg(pr, ep), kgm2 = iso > 0 ? kgSheet + 0.4 * 7.85 + 0.04 * iso : kgSheet;   // sandwich : peau intérieure 0,4 mm + PIR ~40 kg/m3
+    return { pr, ep, iso, ral: ral[0], ralName: ral[1], c: ral[2], kgSheet, kgm2, est: !(pr.kg && pr.kg[ep]) || iso > 0 };
+  }
+  function mpSteelCtl(){
+    const s = mpSteelInfo(), sel = 'padding:5px 6px;border:1px solid #c9ced3;border-radius:6px;font-size:12px;';
+    const o = (arr, cur, f) => arr.map(x => `<option value="${x[0]}"${String(x[0]) === String(cur) ? ' selected' : ''}>${f(x)}</option>`).join('');
+    return `<select data-ji style="${sel}">${Object.keys(MP_JI).map(k => `<option value="${k}"${k === (mpMat.ji || '45-333-1000') ? ' selected' : ''}>${MP_JI[k].name}</option>`).join('')}</select>
+      <select data-ep style="${sel}">${s.pr.eps.map(e => `<option value="${e}"${e === s.ep ? ' selected' : ''}>${String(e).replace('.', ',')} mm</option>`).join('')}</select>
+      <select data-iso style="${sel}">${MP_ISO.map(i => `<option value="${i}"${i === s.iso ? ' selected' : ''}>${i ? 'Isolé PIR ' + i + ' mm (sandwich)' : 'Non isolé'}</option>`).join('')}</select>
+      <select data-ral style="${sel}">${o(MP_RAL, s.ral, r => 'RAL ' + r[0] + ' ' + r[1])}</select>
+      <div style="flex-basis:100%;font-size:11px;color:#6b7178;">Largeur utile ${s.pr.w} mm · hauteur de nervure ${s.pr.h} mm · pas ${s.pr.pitch} mm · longueur maxi ${s.pr.maxL / 1000} m · ${mpFr(s.kgm2, 2)} kg/m² ${s.est ? '(estimation, à confirmer sur la fiche Joris Ide)' : '(fiche Joris Ide)'}</div>`;
+  }
+  function mpApplySteelWidth(){
+    const m = MP_MATS.find(x => x.k === mpMat.k), el = $('largeurBac'); if (!el) return;
+    if (m && m.steel) { if (!mpMat.prevW) mpMat.prevW = el.value; el.value = (MP_JI[mpMat.ji] || MP_JI['45-333-1000']).w; }
+    else if (mpMat.prevW) { el.value = mpMat.prevW; mpMat.prevW = null; }
   }
   /* ===== v4 : matières & coloris, toiture cintrée, import Excel / DXF, envoi au plan de débit ===== */
   const MP_MATS = [
@@ -10496,13 +10578,15 @@ function createZincController(suffix, kind){
     { k: 'pf', fam: 'Alu', name: 'Alu Prefa', prefa: true, m: 0.55, r: 0.45 },
     { k: 'al', fam: 'Alu', name: 'Alu laqué', custom: true, m: 0.5, r: 0.45 },
     { k: 'ac', fam: 'Acier', name: 'Acier laqué', custom: true, m: 0.45, r: 0.5 },
-    { k: 'cu', fam: 'Cuivre', name: 'Cuivre', c: 0xb8733a, m: 0.9, r: 0.3 }
+    { k: 'cu', fam: 'Cuivre', name: 'Cuivre', c: 0xb8733a, m: 0.9, r: 0.3 },
+    { k: 'jb', fam: 'Bac acier', name: 'Bac acier Joris Ide (profilé)', steel: true, m: 0.5, r: 0.45 }
   ];
   const MP_PREFA = [['P.10 Anthracite', 0x3b3f44], ['P.10 Noir', 0x1f2124], ['P.10 Brun noyer', 0x5a3d2b], ['P.10 Brun foncé', 0x3d2b22], ['P.10 Rouge tuile', 0x8c3a2a], ['P.10 Gris clair', 0xa7abae], ['P.10 Gris pierre', 0x7d7f7d], ['P.10 Blanc', 0xe9e9e6], ['Gris argent métallisé', 0x9ea5ab], ['Naturel (brut)', 0xb7bcc0]];
-  let mpMat = { k: 'zn', pf: 0, custom: '#3b3f44' }, mpVault = null;
+  let mpMat = { k: 'zn', pf: 0, custom: '#3b3f44', ji: '45-333-1000', ep: 0.63, iso: 0, ral: '7016' }, mpVault = null;
   const mpDev = { w: 55, l: 50 };
   function mpMatNow(){
     const m = MP_MATS.find(x => x.k === mpMat.k) || MP_MATS[0];
+    if (m.steel) { const s = mpSteelInfo(); return { fam: 'Bac acier', c: s.c, m: m.m, r: m.r, steel: s, label: `${s.pr.name} ${String(s.ep).replace('.', ',')} mm ${s.iso ? '+ isolation PIR ' + s.iso + ' mm' : '(non isolé)'} RAL ${s.ral}` }; }
     let c = m.c, label = m.name;
     if (m.prefa) { c = MP_PREFA[mpMat.pf][1]; label = 'Alu Prefa — ' + MP_PREFA[mpMat.pf][0]; }
     else if (m.custom) { c = parseInt(mpMat.custom.slice(1), 16); label = m.name + ' ' + mpMat.custom.toUpperCase(); }
@@ -10511,11 +10595,15 @@ function createZincController(suffix, kind){
   const mpShade = (c, f) => { const r = Math.min(255, ((c >> 16) & 255) * f), g = Math.min(255, ((c >> 8) & 255) * f), b = Math.min(255, (c & 255) * f); return (r << 16) | (g << 8) | b; };
   function mpMatHtml(){
     const sel = 'padding:5px 6px;border:1px solid #c9ced3;border-radius:6px;font-size:12px;';
-    const m = MP_MATS.find(x => x.k === mpMat.k) || MP_MATS[0];
+    const m = MP_MATS.find(x => x.k === mpMat.k) || MP_MATS[0], nin = 'width:62px;padding:5px 6px;border:1px solid #c9ced3;border-radius:6px;font-size:12px;', fam = mpMatNow().fam;
     return `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;"><span style="font-size:11.5px;color:#4a5056;font-weight:600;">Matière :</span>
       <select data-mat style="${sel}">${MP_MATS.map(x => `<option value="${x.k}"${x.k === mpMat.k ? ' selected' : ''}>${x.name}</option>`).join('')}</select>
       ${m.prefa ? `<select data-prefa style="${sel}">${MP_PREFA.map((x, i) => `<option value="${i}"${i === mpMat.pf ? ' selected' : ''}>${x[0]}</option>`).join('')}</select>` : ''}
-      ${m.custom ? `<input data-custom type="color" value="${mpMat.custom}" style="width:36px;height:28px;border:1px solid #c9ced3;border-radius:6px;padding:1px;"><span style="font-size:11px;color:#6b7178;">teinte RAL au choix</span>` : ''}</div>`;
+      ${m.custom ? `<input data-custom type="color" value="${mpMat.custom}" style="width:36px;height:28px;border:1px solid #c9ced3;border-radius:6px;padding:1px;"><span style="font-size:11px;color:#6b7178;">teinte RAL au choix</span>` : ''}
+      ${m.steel ? mpSteelCtl() : `
+      <label style="font-size:11px;color:#4a5056;">Épaisseur (mm) <input data-th type="number" step="0.05" min="0.3" value="${mpDoss.th > 0 ? mpDoss.th : (MP_THK[fam] || 0.7)}" style="${nin}"></label>
+      <label style="font-size:11px;color:#4a5056;">Bobine (mm, 0 = auto) <input data-coil type="number" step="10" min="0" value="${mpDoss.coil || 0}" style="${nin}"></label>
+      <label style="font-size:11px;color:#4a5056;">Chutes % <input data-marge type="number" step="1" min="0" value="${mpDoss.marge}" style="${nin}width:50px;"></label>`}</div>`;
   }
   const mpImportHtml = () => `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;">
       <span style="font-size:11.5px;color:#4a5056;font-weight:600;">Rendez-vous :</span>
@@ -10532,12 +10620,12 @@ function createZincController(suffix, kind){
     mpDev.w = Math.max(0, parseFloat(a) || 0); mpDev.l = Math.max(0, parseFloat(b) || 0);
     const MT = mpMatNow(), groups = new Map();
     mpLastData.pans.forEach((p, pi) => mpBuildBacsForPan(p, pi).forEach(bc => {
-      const w = Math.round(bc.w + mpDev.w), len = Math.round(bc.lenMax + mpDev.l), key = w + 'x' + len + (bc.billard ? 'b' : '');
+      const w = Math.round(bc.w + (MT.steel ? 0 : mpDev.w)), len = Math.round(bc.lenMax + mpDev.l), key = w + 'x' + len + (bc.billard ? 'b' : '');
       if (!groups.has(key)) groups.set(key, { w, len, qty: 0, cut: bc.cut, billard: !!bc.billard, names: [] });
       const g = groups.get(key); g.qty++; if (g.names.length < 3) g.names.push((pi + 1) + '.' + (g.qty));
     }));
     let n = 0;
-    groups.forEach(g => { addCut(g.w, g.len, g.qty, `Bac ${isTasseaux ? 'tasseaux' : 'joint debout'}${g.cut ? ' recoupé' : ''}${g.billard ? ' queue de billard (effilé)' : ''} — ${MT.label}`, null, null, MT.fam); n += g.qty; });
+    groups.forEach(g => { addCut(g.w, g.len, g.qty, `Bac ${isTasseaux ? 'tasseaux' : 'joint debout'}${g.cut ? ' recoupé' : ''}${g.billard ? ' queue de billard (effilé)' : ''} — ${MT.label}`, null, null, MT.fam === 'Bac acier' ? 'Acier' : MT.fam); n += g.qty; });
     showToast(`${n} bacs (${groups.size} formats) envoyés au plan de débit — matière ${MT.fam}.`);
     const tb = document.querySelector('.tab-btn[data-tab="tab-debit"]'); if (tb) tb.click();
   }
@@ -10569,12 +10657,17 @@ function createZincController(suffix, kind){
   }
 
   /* ---------- 3D du cintré ---------- */
-  function mpVault3D(data, c){
-    const { M, add, addPin, eco } = c, v = data.vault, L = data.Lm, S = v.S, nb = Math.max(10, Math.ceil(S / 200)), cx0 = L / 2;
-    const P = (u, w, off) => { const ph = -v.th0 + w / v.R, rr = v.R + off; return new THREE.Vector3(u - cx0, v.f - v.R + rr * Math.cos(ph), rr * Math.sin(ph)); };
-    const N = w => { const ph = -v.th0 + w / v.R; return new THREE.Vector3(0, Math.cos(ph), Math.sin(ph)); };
-    const T = w => { const ph = -v.th0 + w / v.R; return new THREE.Vector3(0, -Math.sin(ph), Math.cos(ph)); };
-    const nMid = N(S / 2), mode = mpBacStartByPan[0] || 'left';
+  function mpVaultProf(vi, C){ return w => { const ph = -vi.th0 + w / vi.R; return { a: C / 2 + vi.R * Math.sin(ph), y: vi.f - vi.R + vi.R * Math.cos(ph), na: Math.sin(ph), ny: Math.cos(ph), ta: Math.cos(ph), ty: -Math.sin(ph) }; }; }
+  function mpVaultFns(data, pan){
+    const o = pan && pan.vo ? pan.vo : { axis: 'x', x0: 0, y0: 0, z0: 0, L: data.Lm, C: data.Wm }, v = pan && pan.vault ? pan.vault : data.vault, Cx = data.Lm / 2, Cy = data.Wm / 2, ay = o.axis === 'y', prof = v.prof ? v.prof : mpVaultProf(v, o.C);
+    const P = (u, w, off) => { const q = prof(w), across = q.a + off * q.na, y = o.z0 + q.y + off * q.ny; return ay ? new THREE.Vector3(o.x0 + across - Cx, y, o.y0 + u - Cy) : new THREE.Vector3(o.x0 + u - Cx, y, o.y0 + across - Cy); };
+    const N = w => { const q = prof(w); return ay ? new THREE.Vector3(q.na, q.ny, 0) : new THREE.Vector3(0, q.ny, q.na); };
+    const T = w => { const q = prof(w); return ay ? new THREE.Vector3(q.ta, q.ty, 0) : new THREE.Vector3(0, q.ty, q.ta); };
+    return { o, v, L: o.L, S: v.S, ay, prof, P, N, T, lenDir: ay ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0) };
+  }
+  function mpVault3D(data, c, pan, pi){
+    const { M, add, addPin, eco } = c, F = mpVaultFns(data, pan), { o, v, L, S, ay, P, N, T, lenDir } = F, nb = Math.max(10, Math.ceil(S / 200)), pidx = pi || 0;
+    const nMid = N(S / 2), mode = mpBacStartByPan[pidx] || 'left';
     const keep = f => mode === 'right' ? [L * (1 - f), L] : mode === 'center' ? [L / 2 - L * f / 2, L / 2 + L * f / 2] : [0, L * f];
     const sheet = (u1, u2, off, uvs, mat) => {
       const pos = [], uv = [], idx = [];
@@ -10598,7 +10691,7 @@ function createZincController(suffix, kind){
     }
     const cut = (f, off, uvs, mat, layer, rv) => { const [a, b] = keep(eco ? f : 1); add(layer, sheet(a, b, off, uvs, mat), nMid, rv); };
     cut(MP_CUT.volige, -26, 1200, M.volige, 'volige', 0.16); cut(MP_CUT.ecran, -12, 700, M.ecran, 'ecran', 0.28);
-    const bacs = mpBuildBacsForPan(data.pans[0], 0), dists = bacs.map((_, bi) => mpBacDistFrac(bi, bacs.length, 0)), shown = dists.map(d => !eco || d <= MP_CUT.bacs + 1e-9);
+    const bacs = mpBuildBacsForPan(pan || data.pans[0], pidx), dists = bacs.map((_, bi) => mpBacDistFrac(bi, bacs.length, pidx)), shown = dists.map(d => !eco || d <= MP_CUT.bacs + 1e-9);
     bacs.forEach((bc, bi) => { if (shown[bi]) add('bacs', sheet(bc.u1, bc.u2, 0, 0, M.bac[bi % 2]), nMid, 0.4 + 0.45 * dists[bi], dists[bi]); });
     for (let b = 1; b < bacs.length; b++) {
       if (!shown[b] && !shown[b - 1]) continue;
@@ -10606,8 +10699,10 @@ function createZincController(suffix, kind){
       add('bacs', isTasseaux ? ribbon(bacs[b].u1, 40, 29, M.seam) : ribbon(bacs[b].u1, MP_SEAM_H, 8, M.seam), nMid, 0.4 + 0.45 * d, d);
     }
     // Égouts (bords courbes) et rives
-    [80, S - 80].forEach(w => add('acc', mpBox(P(L / 2, w, 11), new THREE.Vector3(1, 0, 0), N(w), L, 6, 160, M.acc.egout), N(w), 0.92));
+    [80, S - 80].forEach((w, k) => { if (v.topMur && k === 0) return; add('acc', mpBox(P(L / 2, w, 11), lenDir, N(w), L, 6, 160, M.acc.egout), N(w), 0.92); });
+    if (v.topMur) { add('acc', mpBox(P(L / 2, 0, 0).add(new THREE.Vector3(0, 75, 0)), lenDir, new THREE.Vector3(0, 1, 0), L, 150, 4, M.acc.mur), N(0), 0.94); addPin('Solin contre mur', P(L / 2, 0, 160)); }
     [[0, 110], [L - 110, L]].forEach(([a, b]) => add('acc', sheet(a, b, MP_SEAM_H + 8, 0, M.acc.rive), nMid, 0.95));
+    if (pan) { const [ka, kb] = keep(MP_CUT.bacs); mpItems.filter(it => it.pan === pidx && (!eco || (it.u >= ka && it.u <= kb))).forEach(it => mpItem3D(it, { bs: mpPanBasis(pan), V: null, n3: N(it.v), v3d: T(it.v), M, add, addPin, cv: F })); }
     addPin('Bacs cintrés', P(L * 0.3, S * 0.5, 4)); addPin('Bande d\'égout', P(L * 0.5, 80, 20)); addPin('Rive', P(L - 55, S * 0.6, MP_SEAM_H + 12));
     if (eco) { const [a, b] = keep((MP_CUT.bacs + MP_CUT.ecran) / 2); addPin('Écran sous-toiture', P((a + b) / 2, S * 0.5, -12)); const [a2, b2] = keep((MP_CUT.ecran + MP_CUT.volige) / 2); addPin('Volige', P((a2 + b2) / 2, S * 0.5, -26)); addPin('Cintres (pannes)', P(100 + (L - 200) * 0.2, S * 0.5, -148)); }
   }
@@ -10764,9 +10859,11 @@ function createZincController(suffix, kind){
   function mpWireMat(root, own){
     const m = root.querySelector('[data-mat]'); if (!m) return;
     const again = () => { if (own) { root.innerHTML = mpMatHtml(); mpWireMat(root, true); } mpRefresh(); };
-    m.addEventListener('change', () => { mpMat.k = m.value; again(); });
+    m.addEventListener('change', () => { mpMat.k = m.value; mpApplySteelWidth(); again(); });
+    [['data-ji', 'ji'], ['data-ep', 'ep'], ['data-iso', 'iso'], ['data-ral', 'ral']].forEach(([a, k]) => { const e = root.querySelector('[' + a + ']'); if (e) e.addEventListener('change', () => { mpMat[k] = k === 'ji' || k === 'ral' ? e.value : +e.value; if (k === 'ji') { const pr = MP_JI[e.value]; if (!pr.eps.includes(+mpMat.ep)) mpMat.ep = pr.eps[0]; mpApplySteelWidth(); } again(); }); });
     const pf = root.querySelector('[data-prefa]'); if (pf) pf.addEventListener('change', () => { mpMat.pf = +pf.value; again(); });
     const cu = root.querySelector('[data-custom]'); if (cu) cu.addEventListener('change', () => { mpMat.custom = cu.value; mpRefresh(); });
+    [['data-th', 'th'], ['data-coil', 'coil'], ['data-marge', 'marge']].forEach(([a, k]) => { const e = root.querySelector('[' + a + ']'); if (e) e.addEventListener('change', () => { const n = parseFloat(e.value); mpDoss[k] = isFinite(n) && n >= 0 ? n : (k === 'marge' ? 5 : 0); }); });
   }
   function mpSetupV4(){
     const type = $('mpType'); if (!type) return;
@@ -10780,13 +10877,16 @@ function createZincController(suffix, kind){
   }
   /* ===== v5 : modeleur de volumes (on part d'un cube, on ajoute / déplace / redimensionne des volumes) ===== */
   let mpModel = { vols: [], sel: null, seq: 1 }, mpEdgeMap = null;
-  const MP_ROOF_NAME = { '2pans': '2 pans (pignon)', '4pans': '4 pans (croupe)', mono: 'Monopente / contre mur', pavillon: 'Pavillon (4 arêtiers en pointe)', arc: 'Cercle / demi-cercle / segment / anneau' };
+  const MP_ROOF_NAME = { '2pans': '2 pans (pignon)', '4pans': '4 pans (croupe)', mono: 'Monopente / contre mur', pavillon: 'Pavillon (4 arêtiers en pointe)', arc: 'Cercle / demi-cercle / segment / anneau', coude: 'Coude arrondi (2 ailes, faîtage qui tourne)', vault: 'Voûte (profil arrondi, rayon au choix)', dvault: 'Demi-voûte (plat puis arrondi jusqu\'au bardage)' };
+  const MP_SIDES = { one: 'D\'un seul côté', both: 'Des deux côtés (plat au milieu)' };
+  const MP_TOP = { mur: 'Contre mur (solin)', egout: 'Libre (bande d\'égout)' };
+  const MP_COIN = { 0: 'Coin arrondi en bas à droite', 90: 'Coin arrondi en bas à gauche', 180: 'Coin arrondi en haut à gauche', 270: 'Coin arrondi en haut à droite' };
   const MP_ROOF_OLD = Object.assign({ round: 'Rond (ancien)', demi: 'Demi-rond (ancien)' }, MP_ROOF_NAME);
-  const MP_SM = { ext: 'Vers le centre (égout à l\'extérieur)', int: 'Vers l\'extérieur (égout à l\'intérieur)', faitage: 'Faîtage circulaire (2 pans)' };
+  const MP_SM = { ext: 'Vers le centre (égout à l\'extérieur)', int: 'Vers l\'extérieur (égout à l\'intérieur)', faitage: 'Faîtage circulaire (2 pans / plateau)' };
   const MP_BACS = { billard: 'Queue de billard (1 bac effilé par pan)', droit: 'Bacs droits en facettes' };
   let mpWallH = 0;
   function mpClampField(k, n){
-    if (k === 'L' || k === 'W') return Math.max(1000, n); if (k === 'R' || k === 'Ro') return Math.max(500, n); if (k === 'hm') return Math.max(1500, n);
+    if (k === 'L' || k === 'W' || k === 'cw' || k === 'vl' || k === 'vc') return Math.max(1000, n); if (k === 'pc') return Math.min(45, Math.max(1, n)); if (k === 'L1' || k === 'L2' || k === 'vr' || k === 'fl') return Math.max(0, n); if (k === 'Rv') return Math.max(300, n); if (k === 'al') return Math.min(90, Math.max(10, n)); if (k === 'gm') return Math.min(30, Math.max(0, n)); if (k === 'R' || k === 'Ro') return Math.max(500, n); if (k === 'hm') return Math.max(1500, n);
     if (k === 'ang') return Math.min(360, Math.max(10, n)); if (k === 'z' || k === 'rp' || k === 'r' || k === 'rl' || k === 'Ri') return Math.max(0, n); return n;
   }
   const MP_HIPS = { both: '2 croupes (aux deux bouts)', first: '1 croupe (début)', last: '1 croupe (fin)' };
@@ -10795,7 +10895,9 @@ function createZincController(suffix, kind){
   function mpVolNormalize(v){
     if (v.roof === 'demi') { v.R = Math.max(500, +v.R || Math.round(Math.min(v.L, v.W) / 2) || 3000); const h = v.dir === 'r' || v.dir === 'l'; v.L = h ? v.R : 2 * v.R; v.W = h ? 2 * v.R : v.R; }
     if (v.roof === 'round') v.W = v.L;
-    if (v.roof === 'arc') { const b = mpArcBBox(v); if (v.cx == null) { v.cx = v.x - b.mx; v.cy = v.y - b.my; } v.x = v.cx + b.mx; v.y = v.cy + b.my; v.L = b.w; v.W = b.h; }
+    if (v.roof === 'dvault') { const ay = v.dir === 'r' || v.dir === 'l', pf = mpDemiProfile(v); v.vl = Math.max(1000, +v.vl || (ay ? v.W : v.L)); v.L = ay ? pf.Wp : v.vl; v.W = ay ? v.vl : pf.Wp; v.axis = ay ? 'y' : 'x'; }
+    if (v.roof === 'vault') { const ay = v.axis === 'y'; v.vl = Math.max(1000, +v.vl || (ay ? v.W : v.L)); v.vc = Math.max(1000, +v.vc || (ay ? v.L : v.W)); v.L = ay ? v.vc : v.vl; v.W = ay ? v.vl : v.vc; }
+    if (v.roof === 'arc' || v.roof === 'coude') { const b = mpShapeBBox(v); if (v.cx == null) { v.cx = v.x - b.mx; v.cy = v.y - b.my; } v.x = v.cx + b.mx; v.y = v.cy + b.my; v.L = b.w; v.W = b.h; }
     return v;
   }
   const MP_DIR_NAME = { d: 'monte vers le bas ↓', u: 'monte vers le haut ↑', r: 'monte vers la droite →', l: 'monte vers la gauche ←' };
@@ -10813,7 +10915,28 @@ function createZincController(suffix, kind){
     return out;
   }
   // S moins Q (Q convexe) → morceaux convexes extérieurs à Q.
+  function mpMergePieces(list){
+    const same = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 0.6, convex = P => { let s = 0; return P.every((p, i) => { const a = P[(i + 1) % P.length], b = P[(i + 2) % P.length], c = (a[0] - p[0]) * (b[1] - a[1]) - (a[1] - p[1]) * (b[0] - a[0]); if (Math.abs(c) < 1e-3) return true; if (s && Math.sign(c) !== s) return false; s = Math.sign(c); return true; }); };
+    let L = list.slice(), again = true;
+    while (again) {
+      again = false;
+      outer: for (let a = 0; a < L.length; a++) for (let b = a + 1; b < L.length; b++) {
+        const A = L[a], B = L[b];
+        for (let i = 0; i < A.length; i++) for (let j = 0; j < B.length; j++) {
+          if (same(A[(i + 1) % A.length], B[j]) && same(A[i], B[(j + 1) % B.length])) {
+            const M = []; for (let k = 1; k <= A.length; k++) M.push(A[(i + k) % A.length]);
+            for (let k = 2; k < B.length; k++) M.push(B[(j + k) % B.length]);
+            const C = M.filter((p, k) => { const q = M[(k + M.length - 1) % M.length], r = M[(k + 1) % M.length]; return Math.abs((p[0] - q[0]) * (r[1] - p[1]) - (p[1] - q[1]) * (r[0] - p[0])) > 1e-3 * Math.max(1, Math.hypot(r[0] - q[0], r[1] - q[1])); });
+            if (C.length >= 3 && convex(C)) { L.splice(b, 1); L[a] = C; again = true; break outer; }
+          }
+        }
+      }
+    }
+    return L;
+  }
   function mpSubConvex(S, Q){
+    { let inter = S; for (let i = 0; i < Q.length && inter.length >= 3; i++) { const a = Q[i], b = Q[(i + 1) % Q.length], g = Math.sign(mpArea2(Q)) || 1, A = -(b[1] - a[1]) * g, B = (b[0] - a[0]) * g; inter = mpHP(inter, A, B, -(A * a[0] + B * a[1])); }
+      if (inter.length < 3 || Math.abs(mpArea2(inter)) < 1000) return [S]; }
     const sg = Math.sign(mpArea2(Q)) || 1, res = []; let cur = S;
     for (let i = 0; i < Q.length && cur.length >= 3; i++) {
       const a = Q[i], b = Q[(i + 1) % Q.length], A = -(b[1] - a[1]) * sg, B = (b[0] - a[0]) * sg, C = -(A * a[0] + B * a[1]);
@@ -10843,7 +10966,7 @@ function createZincController(suffix, kind){
   // Volume = empreinte convexe + un plan par arête porteuse d'égout. Pan k = empreinte ∩ {plan k ≤ autres plans}.
   function mpArcGeom(v){
     const Ro = Math.max(500, +v.Ro || 3000), Ri = Math.min(Math.max(0, +v.Ri || 0), Ro - 300), ang = Math.min(360, Math.max(10, +v.ang || 360)), bacW = parseFloat($('largeurBac').value) || 500;
-    const billard = (v.bacs || 'billard') === 'billard', sm = Ri > 0 ? (v.sm || 'ext') : 'ext', edgeR = sm === 'int' ? Ri : Ro;
+    const billard = (v.bacs || 'billard') === 'billard', sm = v.sm === 'faitage' ? 'faitage' : (v.sm === 'int' && Ri > 0 ? 'int' : 'ext'), edgeR = sm === 'int' ? Ri : Ro;
     let n = billard ? Math.ceil(edgeR * ang * Math.PI / 180 / bacW) : Math.round(+v.n || 16);
     n = Math.max(2, Math.min(billard ? 160 : 48, n));
     return { Ro, Ri, ang, a0: (+v.a0 || 0) * Math.PI / 180, sm, n, billard, full: ang >= 359.99 };
@@ -10854,26 +10977,83 @@ function createZincController(suffix, kind){
     if (!g.full && g.Ri === 0) { xs.push(0); ys.push(0); }
     const mx = Math.min(...xs), my = Math.min(...ys); return { mx, my, w: Math.max(...xs) - mx, h: Math.max(...ys) - my };
   }
-  function mpArcPlanes(v, t0){
-    const g = mpArcGeom(v), cx = v.cx, cy = v.cy, z = v.z || 0, da = g.ang * Math.PI / 180 / g.n, ch = Math.cos(da / 2), t = t0 / ch, pt = (r, an) => [cx + r * Math.cos(an), cy + r * Math.sin(an)];
-    const outer = [], inner = [], planes = [];
-    for (let i = 0; i <= g.n; i++) { const an = g.a0 + da * i; outer.push(pt(g.Ro, an)); if (g.Ri > 0) inner.push(pt(g.Ri, an)); }
-    const S = (g.Ro - g.Ri) * ch, p = Math.min(S * 0.92, Math.max(S * 0.08, +v.rp || S / 2)), Hr = v.rmode === 'hauteur' ? t * S / 2 : t * p, single = g.billard, vol = v;
-    for (let i = 0; i < g.n; i++) {
-      const am = g.a0 + da * (i + 0.5), nx = Math.cos(am), ny = Math.sin(am), O0 = outer[i], O1 = outer[i + 1], I0 = g.Ri > 0 ? inner[i] : null, I1 = g.Ri > 0 ? inner[i + 1] : null;
-      if (g.sm === 'ext' || g.Ri === 0) planes.push({ poly: g.Ri > 0 ? [O0, O1, I1, I0] : [O0, O1, [cx, cy]], a: -t * nx, b: -t * ny, c: z + t * (O0[0] * nx + O0[1] * ny), single });
-      else if (g.sm === 'int') planes.push({ poly: [O0, O1, I1, I0], a: t * nx, b: t * ny, c: z - t * (I0[0] * nx + I0[1] * ny), single });
+  // Secteur d'anneau découpé en facettes : cône (égout extérieur), entonnoir (égout intérieur) ou faîtage circulaire (+ plateau central si disque plein).
+  function mpRingFacets(o){
+    const { cx, cy, Ro, Ri, a0, n, z, t0, sm, single } = o, da = o.ang / n, ch = Math.cos(da / 2), t = t0 / ch, pt = (r, an) => [cx + r * Math.cos(an), cy + r * Math.sin(an)];
+    const outer = [], inner = [], planes = [], Sr = Ro - Ri;
+    for (let i = 0; i <= n; i++) { const an = a0 + da * i; outer.push(pt(Ro, an)); if (Ri > 0) inner.push(pt(Ri, an)); }
+    const dq = Ri > 0 ? Sr / 2 : Sr * 0.4, q = Math.min(Sr * 0.92, Math.max(Sr * 0.08, +o.q || dq)), Hr = o.rmode === 'hauteur' ? t0 * Sr / 2 : t0 * q;
+    const tp = Math.tan(Math.max(1, Math.min(45, +o.pc || 5)) * Math.PI / 180) / ch;
+    for (let i = 0; i < n; i++) {
+      const am = a0 + da * (i + 0.5), nx = Math.cos(am), ny = Math.sin(am), O0 = outer[i], O1 = outer[i + 1], I0 = Ri > 0 ? inner[i] : null, I1 = Ri > 0 ? inner[i + 1] : null, base = { single, jg: single };
+      if (sm === 'ext') planes.push(Object.assign({ poly: Ri > 0 ? [O0, O1, I1, I0] : [O0, O1, [cx, cy]], a: -t * nx, b: -t * ny, c: z + t * (O0[0] * nx + O0[1] * ny) }, base));
+      else if (sm === 'int') planes.push(Object.assign({ poly: [O0, O1, I1, I0], a: t * nx, b: t * ny, c: z - t * (I0[0] * nx + I0[1] * ny) }, base));
       else {
-        const rr = g.Ro - p / ch, M0 = pt(rr, g.a0 + da * i), M1 = pt(rr, g.a0 + da * (i + 1)), sA = Hr / p, sB = Hr / (S - p);
-        planes.push({ poly: [O0, O1, M1, M0], a: -sA * nx, b: -sA * ny, c: z + sA * (O0[0] * nx + O0[1] * ny), single });
-        planes.push({ poly: [M0, M1, I1, I0], a: sB * nx, b: sB * ny, c: z - sB * (I0[0] * nx + I0[1] * ny), single });
+        const rr = Ro - q, M0 = pt(rr, a0 + da * i), M1 = pt(rr, a0 + da * (i + 1)), sA = Hr / (q * ch);
+        planes.push(Object.assign({ poly: [O0, O1, M1, M0], a: -sA * nx, b: -sA * ny, c: z + sA * (O0[0] * nx + O0[1] * ny) }, base));
+        if (Ri > 0) { const sB = Hr / ((Sr - q) * ch); planes.push(Object.assign({ poly: [M0, M1, I1, I0], a: sB * nx, b: sB * ny, c: z - sB * (I0[0] * nx + I0[1] * ny) }, base)); }
+        else planes.push(Object.assign({ poly: [M0, M1, [cx, cy]], a: -tp * nx, b: -tp * ny, c: z + Hr + tp * (M0[0] * nx + M0[1] * ny) }, base));
       }
     }
-    const foot = g.full ? outer.slice(0, g.n) : g.Ri > 0 ? outer.concat(inner.slice().reverse()) : outer.concat([[cx, cy]]);
-    return { rect: foot, holes: g.full && g.Ri > 0 ? [inner.slice(0, g.n)] : null, planes: planes.filter(q => Math.abs(mpArea2(q.poly)) > 1000), pl: planes, gable: null, mode: 'pans' };
+    return { planes, outer, inner, q, Hr, ch };
+  }
+  function mpArcPlanes(v, t0){
+    const g = mpArcGeom(v), cx = v.cx, cy = v.cy, z = v.z || 0;
+    const R = mpRingFacets({ cx, cy, Ro: g.Ro, Ri: g.Ri, a0: g.a0, ang: g.ang * Math.PI / 180, n: g.n, z, t0, q: +v.rp, rmode: v.rmode, sm: g.sm, single: g.billard, pc: +v.pc });
+    const foot = g.full ? R.outer.slice(0, g.n) : g.Ri > 0 ? R.outer.concat(R.inner.slice().reverse()) : R.outer.concat([[cx, cy]]);
+    const out = { rect: foot, holes: g.full && g.Ri > 0 ? [R.inner.slice(0, g.n)] : null, planes: R.planes.filter(q => Math.abs(mpArea2(q.poly)) > 1000), pl: R.planes, gable: null, mode: 'pans' };
+    if ((v.lant === 'yes' || v.lant === true) && g.full && g.Ri > 0 && g.sm === 'ext') out.extra = [{ type: 'lant', cx, cy, r: g.Ri, h: z + t0 * (g.Ro - g.Ri) }];
+    return out;
+  }
+  // Coude : aile droite + quart d'anneau + aile droite, avec un faîtage qui tourne dans le coin.
+  function mpCoudeGeom(v, cx, cy){
+    const cw = Math.max(1000, +v.cw || 5000), Ri = Math.max(300, +v.Ri || 1500), Ro = Ri + cw, L1 = Math.max(0, +v.L1 || 0), L2 = Math.max(0, +v.L2 || 0), bacW = parseFloat($('largeurBac').value) || 500;
+    const billard = (v.bacs || 'billard') === 'billard', A = (+v.a0 || 0) * Math.PI / 180, B = A + Math.PI / 2;
+    let n = billard ? Math.ceil(Ro * Math.PI / 2 / bacW) : Math.round(+v.n || 8); n = Math.max(2, Math.min(billard ? 160 : 48, n));
+    const pt = (r, an) => [cx + r * Math.cos(an), cy + r * Math.sin(an)], da = (B - A) / n, outer = [], inner = [];
+    for (let i = 0; i <= n; i++) { outer.push(pt(Ro, A + da * i)); inner.push(pt(Ri, A + da * i)); }
+    const d1 = [Math.sin(A), -Math.cos(A)], d2 = [-Math.sin(B), Math.cos(B)], sh = (p, d, L) => [p[0] + d[0] * L, p[1] + d[1] * L], foot = [];
+    if (L1 > 0) foot.push(sh(outer[0], d1, L1));
+    outer.forEach(p => foot.push(p));
+    if (L2 > 0) { foot.push(sh(outer[n], d2, L2)); foot.push(sh(inner[n], d2, L2)); }
+    inner.slice().reverse().forEach(p => foot.push(p));
+    if (L1 > 0) foot.push(sh(inner[0], d1, L1));
+    return { cw, Ri, Ro, L1, L2, billard, A, B, n, outer, inner, d1, d2, foot };
+  }
+  // Profil d'une demi-voûte : un plat (légère pente) puis un arc qui redescend jusqu'à la verticale du bardage.
+  function mpDemiProfile(v){
+    const F = Math.max(0, v.fl == null || v.fl === '' ? 5000 : +v.fl), R = Math.max(300, +v.Rv || 1500), al = Math.min(90, Math.max(10, +v.al || 90)) * Math.PI / 180, g = Math.min(30, Math.max(0, v.gm == null || v.gm === '' ? 3 : +v.gm)) * Math.PI / 180, both = v.sides === 'both';
+    const F1 = both ? F / 2 : F, Sa = R * al, S1 = F1 + Sa, drop = F1 * Math.sin(g) + R * (Math.cos(g) - Math.cos(g + al)), A1 = F1 * Math.cos(g) + R * (Math.sin(g + al) - Math.sin(g));
+    const half = w => w <= F1 ? { a: w * Math.cos(g), y: drop - w * Math.sin(g), na: Math.sin(g), ny: Math.cos(g), ta: Math.cos(g), ty: -Math.sin(g) }
+      : (() => { const ph = (w - F1) / R; return { a: F1 * Math.cos(g) + R * (Math.sin(g + ph) - Math.sin(g)), y: drop - F1 * Math.sin(g) + R * (Math.cos(g + ph) - Math.cos(g)), na: Math.sin(g + ph), ny: Math.cos(g + ph), ta: Math.cos(g + ph), ty: -Math.sin(g + ph) }; })();
+    const Wp = both ? 2 * A1 : A1, S = both ? 2 * S1 : S1, mirror = v.dir === 'u' || v.dir === 'l';
+    const base = w => { if (!both) return half(w); if (w <= S1) { const h = half(S1 - w); return { a: A1 - h.a, y: h.y, na: -h.na, ny: h.ny, ta: h.ta, ty: -h.ty }; } const h = half(w - S1); return { a: A1 + h.a, y: h.y, na: h.na, ny: h.ny, ta: h.ta, ty: h.ty }; };
+    const prof = w => { const q = base(Math.min(S, Math.max(0, w))); return mirror ? { a: Wp - q.a, y: q.y, na: -q.na, ny: q.ny, ta: -q.ta, ty: q.ty } : q; };
+    return { S, Wp, drop, prof, both, mirror };
+  }
+  function mpShapeBBox(v){
+    if (v.roof === 'arc') return mpArcBBox(v);
+    const f = mpCoudeGeom(v, 0, 0).foot, xs = f.map(p => p[0]), ys = f.map(p => p[1]), mx = Math.min(...xs), my = Math.min(...ys);
+    return { mx, my, w: Math.max(...xs) - mx, h: Math.max(...ys) - my };
+  }
+  function mpCoudePlanes(v, t0){
+    const g = mpCoudeGeom(v, v.cx, v.cy), z = v.z || 0, cx = v.cx, cy = v.cy;
+    const R = mpRingFacets({ cx, cy, Ro: g.Ro, Ri: g.Ri, a0: g.A, ang: Math.PI / 2, n: g.n, z, t0, q: +v.rp, rmode: v.rmode, sm: 'faitage', single: g.billard });
+    const planes = R.planes.map(q => Object.assign(q, { jg: true })), q = R.q, Hr = R.Hr, sA = Hr / q, sB = Hr / (g.cw - q), wings = [];
+    const wing = (th, d, L) => {
+      if (L <= 0) return;
+      const er = [Math.cos(th), Math.sin(th)], at = r => [cx + r * er[0], cy + r * er[1]], sh = p => [p[0] + d[0] * L, p[1] + d[1] * L], Po = at(g.Ro), Pm = at(g.Ro - q), Pi = at(g.Ri);
+      planes.push({ poly: [Po, sh(Po), sh(Pm), Pm], a: -sA * er[0], b: -sA * er[1], c: z + sA * (Po[0] * er[0] + Po[1] * er[1]), single: false, jg: true });
+      planes.push({ poly: [Pm, sh(Pm), sh(Pi), Pi], a: sB * er[0], b: sB * er[1], c: z - sB * (Pi[0] * er[0] + Pi[1] * er[1]), single: false, jg: true });
+      wings.push({ d, Po, Pm, Pi, Hr });
+    };
+    wing(g.A, g.d1, g.L1); wing(g.B, g.d2, g.L2);
+    return { rect: g.foot, holes: null, planes: planes.filter(p => Math.abs(mpArea2(p.poly)) > 1000), pl: planes, gable: null, mode: 'pans', wings };
   }
   function mpVolPlanes(v, t){
     if (v.roof === 'arc') return mpArcPlanes(v, t);
+    if (v.roof === 'coude') return mpCoudePlanes(v, t);
+    if (v.roof === 'vault' || v.roof === 'dvault') return { rect: [[v.x, v.y], [v.x + v.L, v.y], [v.x + v.L, v.y + v.W], [v.x, v.y + v.W]], holes: null, planes: [], pl: [], gable: null, mode: 'pans' };
     const F = mpVolFootprint(v), z = v.z || 0, x = v.x, y = v.y, x1 = x + v.L, y1 = y + v.W, n = F.length, sgn = Math.sign(mpArea2(F)) || 1;
     const edge = (i, s) => { const P = F[i], Q = F[(i + 1) % n], dx = Q[0] - P[0], dy = Q[1] - P[1], l = Math.hypot(dx, dy) || 1, nx = -dy / l * sgn, ny = dx / l * sgn; return { a: s * nx, b: s * ny, c: z - s * (P[0] * nx + P[1] * ny) }; };
     const rect4 = F.length === 4 ? { top: 0, right: 1, bottom: 2, left: 3 } : null;   // arêtes : y, x1, y1, x
@@ -10928,23 +11108,36 @@ function createZincController(suffix, kind){
         wp.planes.forEach(M => { if (Q.length >= 3) Q = mpHP(Q, -(P.a - M.a), -(P.b - M.b), -(P.c - M.c) + tol); });
         if (Q.length >= 3 && Math.abs(mpArea2(Q)) > 1) pieces = pieces.flatMap(S => mpSubConvex(S, Q));
       });
+      pieces = mpMergePieces(pieces);
       pieces.forEach(S0 => {
         const S = S0.filter((p, k) => { const q = S0[(k + S0.length - 1) % S0.length]; return Math.hypot(p[0] - q[0], p[1] - q[1]) > 1; });
         if (S.length < 3 || Math.abs(mpArea2(S)) < 20000) return;
         const pts = S.map(([x, y]) => { const h = P.a * x + P.b * y + P.c; return { x, y, h: Math.abs(h) < 0.01 ? 0 : h }; });
-        const gl = Math.hypot(P.a, P.b), up = { x: P.a / gl, y: P.b / gl }, u = { x: -up.y, y: up.x }, us = pts.map(q => q.x * u.x + q.y * u.y);
-        const lo = pts.reduce((m, q) => q.h < m.h ? q : m, pts[0]), top = pts.reduce((m, q) => q.h > m.h ? q : m, pts[0]), lu = lo.x * u.x + lo.y * u.y;
+        const gl = Math.hypot(P.a, P.b), up = { x: P.a / gl, y: P.b / gl }, u = { x: -up.y, y: up.x }, full = P.poly.map(([x, y]) => ({ x, y, h: P.a * x + P.b * y + P.c })), us = full.map(q => q.x * u.x + q.y * u.y);
+        const lo = full.reduce((m, q) => q.h < m.h ? q : m, full[0]), top = full.reduce((m, q) => q.h > m.h ? q : m, full[0]), lu = lo.x * u.x + lo.y * u.y, hminPiece = Math.min(...pts.map(q => q.h));
         const at = k => ({ x: lo.x + u.x * (k - lu), y: lo.y + u.y * (k - lu), h: lo.h });
-        pans.push({ pts, single: !!P.single, hmin: lo.h, eA: at(Math.min(...us)), eB: at(Math.max(...us)), eT: top, pl: P, vol: i, color: 0xc7cdd3 });
+        pans.push({ pts, single: !!P.single, jg: !!P.jg, fixedBasis: true, hmin: hminPiece, eA: at(Math.min(...us)), eB: at(Math.max(...us)), eT: top, pl: P, vol: i, color: 0xc7cdd3 });
       });
     }));
     // Coupe les arêtes aux points de jonction (T) pour classer chaque tronçon séparément.
+    // Voûtes (surfaces courbes) : pans posés librement, sans interaction avec les autres toits.
+    const vinfo = {};
+    vs.forEach((v, i) => {
+      if (v.roof !== 'vault' && v.roof !== 'dvault') return;
+      const dv = v.roof === 'dvault', pf = dv ? mpDemiProfile(v) : null, ay = dv ? (v.dir === 'r' || v.dir === 'l') : v.axis === 'y', C = dv ? pf.Wp : (ay ? v.L : v.W), Lv = ay ? v.W : v.L;
+      const vi = dv ? { S: pf.S, prof: pf.prof, f: pf.drop, topMur: !pf.both && v.top !== 'egout' } : mpVaultInfo(C, +v.vr), z = v.z || 0, x = v.x, y = v.y; vinfo[i] = vi;
+      const hiMid = dv && !pf.both ? (v.dir === 'd' ? { x: x + v.L / 2, y } : v.dir === 'u' ? { x: x + v.L / 2, y: y + v.W } : v.dir === 'r' ? { x, y: y + v.W / 2 } : { x: x + v.L, y: y + v.W / 2 }) : null;
+      pans.push({ pts: [[x, y], [x + v.L, y], [x + v.L, y + v.W], [x, y + v.W]].map(([px, py]) => ({ x: px, y: py, h: z })), curved: true, fixedBasis: true, vol: i, single: false, jg: false, hmin: z,
+        eA: { x, y, h: z }, eB: ay ? { x, y: y + Lv, h: z } : { x: x + Lv, y, h: z }, eT: ay ? { x: x + C, y, h: z } : { x, y: y + C, h: z },
+        devLen: vi.S, areaK: vi.S / C, vault: (vi.prof ? vi : Object.assign(vi, { prof: mpVaultProf(vi, C) })), hiMid, topKind: v.top === 'egout' ? 'egout' : 'mur', vo: { axis: ay ? 'y' : 'x', x0: x, y0: y, z0: z, L: Lv, C }, pl: { a: 0, b: 0, c: z }, color: 0xc7cdd3 });
+    });
     pans.forEach((p, pi) => {
+      if (p.curved) return;
       const out = [];
       p.pts.forEach((A, k) => {
         const B = p.pts[(k + 1) % p.pts.length], d = { x: B.x - A.x, y: B.y - A.y, h: B.h - A.h }, Ln = Math.hypot(d.x, d.y, d.h); out.push(A); if (Ln < 3) return;
         const cuts = [];
-        pans.forEach((q, qi) => { if (qi !== pi) q.pts.forEach(C => {
+        pans.forEach((q, qi) => { if (qi !== pi && !q.curved) q.pts.forEach(C => {
           const r = { x: C.x - A.x, y: C.y - A.y, h: C.h - A.h }, s = (r.x * d.x + r.y * d.y + r.h * d.h) / Ln;
           if (s > 1.5 && s < Ln - 1.5 && Math.hypot(r.x - s * d.x / Ln, r.y - s * d.y / Ln, r.h - s * d.h / Ln) < 1.5) cuts.push(s);
         }); });
@@ -10953,7 +11146,7 @@ function createZincController(suffix, kind){
       p.pts = out;
     });
     // Classement des arêtes : égout, rive, faîtage, arêtier, noue (ou « none » = joint dans un même plan).
-    const E = []; pans.forEach((p, pi) => p.pts.forEach((A, k) => E.push({ pi, A, B: p.pts[(k + 1) % p.pts.length] })));
+    const E = []; pans.forEach((p, pi) => { if (!p.curved) p.pts.forEach((A, k) => E.push({ pi, A, B: p.pts[(k + 1) % p.pts.length] })); });
     const ov = (e, f) => {
       const d = { x: e.B.x - e.A.x, y: e.B.y - e.A.y, h: e.B.h - e.A.h }, Ln = Math.hypot(d.x, d.y, d.h); if (Ln < 1) return null;
       const w = { x: d.x / Ln, y: d.y / Ln, h: d.h / Ln }, tt = [], ds = [f.A, f.B].map(q => {
@@ -10980,7 +11173,7 @@ function createZincController(suffix, kind){
         const p = pans[e.pi], q = pans[partners[0].pi], cx = p.pts.reduce((s, z) => s + z.x, 0) / p.pts.length, cy = p.pts.reduce((s, z) => s + z.y, 0) / p.pts.length;
         const diff = (q.pl.a * cx + q.pl.b * cy + q.pl.c) - (p.pl.a * cx + p.pl.b * cy + p.pl.c);
         kind = Math.abs(diff) < 1 ? 'none' : diff > 0 ? (dh < 1 ? 'faitage' : 'aretier') : 'noue';
-        if (dh >= 1 && p.single && q.single && p.vol === q.vol && kind !== 'none') kind = 'seam';
+        if (dh >= 1 && p.jg && q.jg && p.vol === q.vol && kind !== 'none') kind = 'seam';
       }
       if (kind === 'seam') map.set(mpKey(e.A, e.B), e.pi < partners[0].pi ? 'seam' : 'none');
       else { map.set(mpKey(e.A, e.B), kind); map.set(mpKey(e.B, e.A), kind); }
@@ -10989,6 +11182,10 @@ function createZincController(suffix, kind){
         low.forEach(([a, b]) => { const a2 = Math.max(a, end); if (b > a2) { cov += b - a2; end = b; } });
         tot[kind] += Math.max(0, Ln - cov);
       }
+    });
+    pans.forEach(p => {
+      if (!p.curved) return;
+      p.pts.forEach((A, k) => { const B = p.pts[(k + 1) % 4], along = p.vo.axis === 'y' ? Math.abs(B.y - A.y) > Math.abs(B.x - A.x) : Math.abs(B.x - A.x) > Math.abs(B.y - A.y); let kind = along ? 'egout' : 'rive'; if (along && p.hiMid && Math.hypot((A.x + B.x) / 2 - p.hiMid.x, (A.y + B.y) / 2 - p.hiMid.y) < 2) kind = p.topKind; map.set(mpKey(A, B), kind); map.set(mpKey(B, A), kind); tot[kind] += along ? Math.hypot(B.x - A.x, B.y - A.y) : p.devLen; });
     });
     mpEdgeMap = map;
     const NAMES = { faitage: 'Faîtage (total)', aretier: 'Arêtiers (total)', noue: 'Noues (total)', mur: 'Solins contre mur (total)' };
@@ -11007,9 +11204,25 @@ function createZincController(suffix, kind){
         const g = VP[i].gable, mid = g.ax === 'y' ? v.y + v.W / 2 : v.x + v.L / 2, hs = s => g.ax === 'y' ? hAt(v.x + s, mid) : hAt(mid, v.y + s);
         fill = { axis: g.ax, end: g.end, depth: 200, pts: [[S0, 0], [g.S - S0, 0], [g.S - S0, Math.max(0, hs(g.S - S0))], [g.S / 2, Math.max(0, hs(g.S / 2))], [S0, Math.max(0, hs(S0))]] };
       }
+      if (VP[i].wings) fill = VP[i].wings.map(w => {
+        const ax = Math.abs(w.d[0]) > 0.5, k = ax ? 1 : 0, b0 = ax ? v.y : v.x, so = w.Po[k] - b0, sm = w.Pm[k] - b0, si = w.Pi[k] - b0, lo = Math.min(so, si), hi = Math.max(so, si), osg = Math.sign(so - sm) || 1;
+        const hq = s => Math.max(0, w.Hr * (1 - Math.abs(s - sm) / Math.max(1, Math.abs((Math.sign(s - sm) === osg ? so : si) - sm))));
+        return { axis: ax ? 'x' : 'y', end: (ax ? w.d[0] : w.d[1]) < 0 ? 'min' : 'max', depth: 200, pts: [[lo + S0, 0], [hi - S0, 0], [hi - S0, hq(hi - S0)], [sm, w.Hr], [lo + S0, hq(lo + S0)]] };
+      });
+      if (v.roof === 'dvault') {
+        const vi = vinfo[i], ay = v.dir === 'r' || v.dir === 'l', C = ay ? v.L : v.W, arr = [];
+        for (let k = 0; k <= 40; k++) { const q = vi.prof(vi.S * k / 40); arr.push([Math.min(C - S0, Math.max(S0, q.a)), Math.max(0, q.y)]); }
+        arr.sort((p, q) => q[0] - p[0]);
+        fill = ['min', 'max'].map(end => ({ axis: ay ? 'y' : 'x', end, depth: 200, pts: [[S0, 0], [C - S0, 0]].concat(arr) }));
+      }
+      if (v.roof === 'vault') {
+        const vi = vinfo[i], ay = v.axis === 'y', C = ay ? v.L : v.W, pts = [[S0, 0], [C - S0, 0]];
+        for (let k = 0; k <= 14; k++) { const s = C - S0 - (C - 2 * S0) * k / 14; pts.push([s, Math.max(0, vi.f - vi.R + Math.sqrt(Math.max(0, vi.R * vi.R - (s - C / 2) * (s - C / 2))))]); }
+        fill = ['min', 'max'].map(end => ({ axis: ay ? 'y' : 'x', end, depth: 200, pts }));
+      }
       return { x0: v.x, y0: v.y, sx: v.L, sy: v.W, z: v.z, fill, poly: VP[i].rect, holes: VP[i].holes };
     });
-    return { segs, pans, Lm: maxX - minX, Wm: maxY - minY, rects, valleys: new Set(), tan: t, houseH: Math.max(1500, zMin), type: 'modele', VP: null, edgeTotals: tot, model: over ? null : mpModel, off: { x: minX, y: minY } };
+    return { segs, pans, Lm: maxX - minX, Wm: maxY - minY, rects, valleys: new Set(), tan: t, houseH: Math.max(1500, zMin), type: 'modele', VP: null, extras: VP.flatMap(vp => vp.extra || []), edgeTotals: tot, model: over ? null : mpModel, off: { x: minX, y: minY } };
   }
   function mpModelInit(L, W){ mpModel = { vols: [{ id: 1, x: 0, y: 0, L, W, z: 0, roof: '2pans', axis: L >= W ? 'x' : 'y', dir: 'd', rp: 0, rmode: 'pente', r: 0, n: 24, rl: 0, hips: 'both', R: 3000, chord: 'mur', hm: 3000 }], sel: 1, seq: 2 }; }
 
@@ -11025,16 +11238,20 @@ function createZincController(suffix, kind){
   function mpModelHtml(){
     const sel = mpModel.vols.find(v => v.id === mpModel.sel) || mpModel.vols[0]; if (!sel) return '';
     if (sel.hm == null) sel.hm = 3000 + (sel.z || 0);
-    const arcOn = sel.roof === 'arc', chip = (v, i) => `<button type="button" data-vsel="${v.id}" style="${MP_BTN}${v.id === sel.id ? 'background:#ffe3b8;border-color:#ff8a00;' : ''}">V${i + 1}</button>`;
+    if (sel.pc == null) sel.pc = 5;
+    const arcOn = sel.roof === 'arc', coOn = sel.roof === 'coude', vaOn = sel.roof === 'vault', dvOn = sel.roof === 'dvault', cen = arcOn || coOn, chip = (v, i) => `<button type="button" data-vsel="${v.id}" style="${MP_BTN}${v.id === sel.id ? 'background:#ffe3b8;border-color:#ff8a00;' : ''}">V${i + 1}</button>`;
     const inp = (k, l) => `<label style="font-size:11px;display:flex;flex-direction:column;gap:2px;color:#4a5056;">${l}<input data-vf="${k}" type="number" step="100" value="${Math.round(sel[k])}" style="width:88px;padding:5px 6px;border:1px solid #c9ced3;border-radius:6px;font-size:12px;"></label>`;
     const selB = (k, l, o) => `<label style="font-size:11px;display:flex;flex-direction:column;gap:2px;color:#4a5056;">${l}<select data-vf="${k}" style="padding:5px 6px;border:1px solid #c9ced3;border-radius:6px;font-size:12px;">${Object.keys(o).map(q => `<option value="${q}"${q === sel[k] ? ' selected' : ''}>${o[q]}</option>`).join('')}</select></label>`;
     return `<div style="border:1px solid #cfe3df;border-radius:8px;padding:8px;margin-bottom:8px;background:#f4fbf9;">
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;"><span style="font-size:12px;font-weight:700;color:#0f766e;">Modeleur — volumes :</span>${mpModel.vols.map(chip).join('')}<button type="button" data-vadd style="${MP_BTN}">+ Cube</button></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">${arcOn ? inp('cx', 'Centre X') + inp('cy', 'Centre Y') : inp('x', 'X (mm)') + inp('y', 'Y (mm)')}${arcOn || sel.roof === 'demi' ? '' : inp('L', sel.roof === 'round' ? 'Diamètre' : 'Longueur')}${arcOn || sel.roof === 'demi' || sel.roof === 'round' ? '' : inp('W', 'Largeur')}${selB('roof', 'Toit', (sel.roof === 'round' || sel.roof === 'demi') ? MP_ROOF_OLD : MP_ROOF_NAME)}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">${cen ? inp('cx', coOn ? 'Centre du coude X' : 'Centre X') + inp('cy', coOn ? 'Centre du coude Y' : 'Centre Y') : inp('x', 'X (mm)') + inp('y', 'Y (mm)')}${cen || vaOn || dvOn || sel.roof === 'demi' ? '' : inp('L', sel.roof === 'round' ? 'Diamètre' : 'Longueur')}${cen || vaOn || dvOn || sel.roof === 'demi' || sel.roof === 'round' ? '' : inp('W', 'Largeur')}${selB('roof', 'Toit', (sel.roof === 'round' || sel.roof === 'demi') ? MP_ROOF_OLD : MP_ROOF_NAME)}
         ${inp('hm', 'Hauteur du bâtiment / égout (mm)')}
         ${sel.roof === '2pans' ? selB('axis', 'Faîtage', { x: 'horizontal →', y: 'vertical ↓' }) + inp('rp', 'Faîtage à (mm du bord haut/gauche, 0 = milieu)') + selB('rmode', 'Si décalé', MP_RMODE) : ''}${sel.roof === 'mono' ? selB('dir', 'Pente', MP_DIR_NAME) : ''}
         ${sel.roof === '4pans' ? inp('rl', 'Longueur de faîtage (0 = auto)') + selB('hips', 'Croupes', MP_HIPS) + inp('r', 'Coins arrondis : rayon (0 = droit)') : ''}${sel.roof === 'round' ? inp('n', 'Nombre de facettes (3 à 48)') : ''}
-        ${arcOn ? inp('Ro', 'Rayon extérieur (mm)') + inp('Ri', 'Rayon intérieur (0 = plein)') + inp('ang', 'Angle (°) · 360 = cercle') + inp('a0', 'Départ (°) · 0 = droite, 90 = bas') + selB('sm', 'Pente', MP_SM) + (sel.sm === 'faitage' && sel.Ri > 0 ? inp('rp', 'Faîtage à (mm de l\'extérieur, 0 = milieu)') + selB('rmode', 'Si décalé', MP_RMODE) : '') + selB('bacs', 'Bacs sur l\'arrondi', MP_BACS) + (sel.bacs === 'droit' ? inp('n', 'Facettes (4 à 48)') : '') + `<div style="flex-basis:100%;display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><span style="font-size:11px;color:#4a5056;">Formes :</span>` + [['360,0', 'Cercle'], ['180,0', 'Demi-cercle'], ['90,0', 'Quart'], ['360,1', 'Anneau'], ['180,1', 'Demi-anneau']].map(q => `<button type="button" data-arcp="${q[0]}" style="${MP_BTN}">${q[1]}</button>`).join('') + '</div>' : ''}
+        ${arcOn ? inp('Ro', 'Rayon extérieur (mm)') + inp('Ri', 'Rayon intérieur (0 = plein)') + inp('ang', 'Angle (°) · 360 = cercle') + inp('a0', 'Départ (°) · 0 = droite, 90 = bas') + selB('sm', 'Pente', MP_SM) + (sel.sm === 'faitage' ? inp('rp', 'Faîtage à (mm de l\'extérieur, 0 = auto)') + selB('rmode', 'Si décalé', MP_RMODE) + (sel.Ri > 0 ? '' : inp('pc', 'Pente du plateau central (°)')) : '') + (sel.sm !== 'faitage' && sel.sm !== 'int' && sel.Ri > 0 && sel.ang >= 359 ? selB('lant', 'Centre', { no: 'Ouvert', yes: 'Avec lanterneau' }) : '') + selB('bacs', 'Bacs sur l\'arrondi', MP_BACS) + (sel.bacs === 'droit' ? inp('n', 'Facettes (4 à 48)') : '') + `<div style="flex-basis:100%;display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><span style="font-size:11px;color:#4a5056;">Formes :</span>` + [['360,0', 'Cercle'], ['180,0', 'Demi-cercle'], ['90,0', 'Quart'], ['360,1', 'Anneau'], ['180,1', 'Demi-anneau']].map(q => `<button type="button" data-arcp="${q[0]}" style="${MP_BTN}">${q[1]}</button>`).join('') + '</div>' : ''}
+        ${coOn ? inp('cw', 'Largeur du bâtiment') + inp('Ri', 'Rayon intérieur du coude') + inp('L1', 'Longueur aile 1') + inp('L2', 'Longueur aile 2') + `<label style="font-size:11px;display:flex;flex-direction:column;gap:2px;color:#4a5056;">Coin<select data-vf="a0" style="padding:5px 6px;border:1px solid #c9ced3;border-radius:6px;font-size:12px;">${Object.keys(MP_COIN).map(k => `<option value="${k}"${+k === +sel.a0 ? ' selected' : ''}>${MP_COIN[k]}</option>`).join('')}</select></label>` + inp('rp', 'Faîtage à (mm de l\'extérieur, 0 = milieu)') + selB('rmode', 'Si décalé', MP_RMODE) + selB('bacs', 'Bacs dans le coude', MP_BACS) + (sel.bacs === 'droit' ? inp('n', 'Facettes du coude (3 à 48)') : '') : ''}
+        ${dvOn ? (() => { if (sel.fl == null) { sel.fl = 5000; sel.Rv = 1500; sel.al = 90; sel.gm = 3; sel.sides = sel.sides || 'one'; sel.top = sel.top || 'mur'; } const pf = mpDemiProfile(sel); return inp('vl', 'Longueur') + inp('fl', sel.sides === 'both' ? 'Longueur du plat (total)' : 'Longueur du plat (mm)') + inp('Rv', 'Rayon de la demi-voûte') + inp('al', 'Angle de l\'arc (°) · 90 = jusqu\'à la verticale') + inp('gm', 'Pente du plat (°)') + selB('dir', 'Descend vers', MP_ARC) + selB('sides', 'Demi-voûtes', MP_SIDES) + (sel.sides === 'both' ? '' : selB('top', 'Bord haut', MP_TOP)) + `<div style="flex-basis:100%;font-size:11.5px;color:#0f766e;">Largeur en plan ${Math.round(pf.Wp)} mm · chute jusqu'au bardage ${Math.round(pf.drop)} mm · développé d'un bac ${Math.round(pf.S)} mm</div>`; })() : ''}
+        ${vaOn ? (() => { const C = sel.axis === 'y' ? sel.L : sel.W, vi = mpVaultInfo(C, +sel.vr); return inp('vl', 'Longueur de la voûte') + inp('vc', 'Corde (portée)') + inp('vr', 'Rayon (0 = auto)') + selB('axis', 'Sens', { x: 'longueur horizontale →', y: 'longueur verticale ↓' }) + `<div style="flex-basis:100%;font-size:11.5px;color:#0f766e;">Flèche ${Math.round(vi.f)} mm · rayon ${Math.round(vi.R)} mm · développé d'un bac ${Math.round(vi.S)} mm</div>`; })() : ''}
         ${sel.roof === 'demi' ? inp('R', 'Rayon (mm)') + selB('dir', 'Arc vers', MP_ARC) + selB('chord', 'Côté droit', MP_CHORD) + inp('n', 'Facettes de l\'arc (4 à 48)') : ''}
         <button type="button" data-vrecalc style="${MP_BTN}background:#e6f2ff;border-color:#7fb0e6;">↻ Recalculer</button><button type="button" data-vdup style="${MP_BTN}">Dupliquer</button>${mpModel.vols.length > 1 ? `<button type="button" data-vdel style="${MP_BTN}color:#b3261e;border-color:#e6b8b4;">Supprimer</button>` : ''}</div>
       <div style="font-size:11px;color:#6b7178;margin-top:6px;">Glisse le rond pour déplacer un volume, le carré pour l'agrandir. Les volumes qui se chevauchent forment les noues automatiquement. Même pente partout.</div></div>`;
@@ -11060,8 +11277,11 @@ function createZincController(suffix, kind){
     wrap.querySelectorAll('[data-vf]').forEach(el => el.addEventListener('change', () => {
       const s = sel(), k = el.dataset.vf; if (k === 'roof' && el.value === 'round') { s.W = s.L; s.n = s.n && s.n >= 6 ? s.n : 24; }
       if (k === 'roof' && el.value === 'arc') { s.Ro = s.Ro || Math.max(500, Math.round(Math.min(s.L, s.W) / 2 / 100) * 100); s.Ri = s.Ri || 0; s.ang = s.ang || 360; s.a0 = s.a0 || 0; s.sm = s.sm || 'ext'; s.bacs = s.bacs || 'billard'; s.cx = s.x + s.Ro; s.cy = s.y + s.Ro; }
+      if (k === 'roof' && el.value === 'coude') { s.cw = s.cw || 5000; s.Ri = s.Ri > 0 ? s.Ri : 1500; s.L1 = s.L1 == null ? 5000 : s.L1; s.L2 = s.L2 == null ? 5000 : s.L2; s.a0 = s.a0 || 0; s.rmode = s.rmode || 'pente'; s.bacs = s.bacs || 'billard'; s.cx = s.x + s.L / 2; s.cy = s.y + s.W / 2; }
+      if (k === 'roof' && el.value === 'dvault') { s.fl = 5000; s.Rv = 1500; s.al = 90; s.gm = 3; s.sides = 'one'; s.top = 'mur'; if (!'durl'.includes(s.dir)) s.dir = 'd'; s.vl = (s.dir === 'r' || s.dir === 'l') ? s.W : s.L; }
+      if (k === 'roof' && el.value === 'vault') { s.vl = s.axis === 'y' ? s.W : s.L; s.vc = s.axis === 'y' ? s.L : s.W; s.vr = 0; }
       if (k === 'roof' && el.value === 'demi') { s.R = s.R || Math.round(Math.min(s.L, s.W) / 2); s.chord = s.chord || 'mur'; s.n = s.n && s.n <= 24 ? s.n : 12; }
-      if (k === 'roof' || k === 'axis' || k === 'dir' || k === 'rmode' || k === 'hips' || k === 'chord' || k === 'sm' || k === 'bacs') s[k] = el.value;
+      if (k === 'roof' || k === 'axis' || k === 'dir' || k === 'rmode' || k === 'hips' || k === 'chord' || k === 'sm' || k === 'bacs' || k === 'lant' || k === 'sides' || k === 'top') s[k] = el.value;
       else if (k === 'n') s.n = Math.max(3, Math.min(48, Math.round(parseFloat(el.value) || 24)));
       else { const n = parseFloat(el.value); if (isFinite(n)) s[k] = mpClampField(k, n); }
       mpModelChanged();
@@ -11071,13 +11291,16 @@ function createZincController(suffix, kind){
     svg.addEventListener('pointerdown', e => {
       const h = e.target.closest('[data-vh]'); if (!h) return;
       const [mode, id] = h.dataset.vh.split(':'), v = mpModel.vols.find(q => q.id === +id), P = toPlan(e); if (!v || !P) return;
-      dr = { mode, v, P, o: { x: v.x, y: v.y, L: v.L, W: v.W, R: v.R, Ro: v.Ro } }; mpModel.sel = v.id;
+      dr = { mode, v, P, o: { x: v.x, y: v.y, L: v.L, W: v.W, R: v.R, Ro: v.Ro, cw: v.cw, vl: v.vl, vc: v.vc } }; mpModel.sel = v.id;
       if (svg.setPointerCapture) svg.setPointerCapture(e.pointerId); e.preventDefault(); e.stopImmediatePropagation();
     }, true);
     svg.addEventListener('pointermove', e => {
       if (!dr) return; const P = toPlan(e); if (!P) return;
       const sn = q => Math.round(q / 100) * 100, dx = P.x - dr.P.x, dy = P.y - dr.P.y;
-      if (dr.mode === 'move') { dr.v.x = sn(dr.o.x + dx); dr.v.y = sn(dr.o.y + dy); if (dr.v.roof === 'arc') { const b = mpArcBBox(dr.v); dr.v.cx = dr.v.x - b.mx; dr.v.cy = dr.v.y - b.my; } }
+      if (dr.mode === 'move') { dr.v.x = sn(dr.o.x + dx); dr.v.y = sn(dr.o.y + dy); if (dr.v.roof === 'arc' || dr.v.roof === 'coude') { const b = mpShapeBBox(dr.v); dr.v.cx = dr.v.x - b.mx; dr.v.cy = dr.v.y - b.my; } }
+      else if (dr.v.roof === 'coude') { dr.v.cw = Math.max(1000, sn((dr.o.cw || 5000) + Math.max(dx, dy) / 2)); mpVolNormalize(dr.v); }
+      else if (dr.v.roof === 'dvault') { dr.v.vl = Math.max(1000, sn((dr.o.vl || 8000) + ((dr.v.dir === 'r' || dr.v.dir === 'l') ? dy : dx))); mpVolNormalize(dr.v); }
+      else if (dr.v.roof === 'vault') { const ay = dr.v.axis === 'y'; dr.v.vl = Math.max(1000, sn((dr.o.vl || 8000) + (ay ? dy : dx))); dr.v.vc = Math.max(1000, sn((dr.o.vc || 5000) + (ay ? dx : dy))); mpVolNormalize(dr.v); }
       else if (dr.v.roof === 'arc') { dr.v.Ro = Math.max(500, sn((dr.o.Ro || 3000) + Math.max(dx, dy) / 2)); mpVolNormalize(dr.v); } else if (dr.v.roof === 'demi') { dr.v.R = Math.max(500, sn((dr.o.R || 3000) + Math.max(dx, dy))); mpVolNormalize(dr.v); }
       else { dr.v.L = Math.max(1000, sn(dr.o.L + dx)); dr.v.W = dr.v.roof === 'round' ? dr.v.L : Math.max(1000, sn(dr.o.W + dy)); }
       const g = svg.querySelector(`[data-vol="${dr.v.id}"]`); if (g) g.innerHTML = mpVolInner(dr.v, mpModel.vols.indexOf(dr.v), data.off, fs, true);
@@ -11085,10 +11308,394 @@ function createZincController(suffix, kind){
     const end = () => { if (!dr) return; dr = null; mpModelChanged(); };
     svg.addEventListener('pointerup', end); svg.addEventListener('pointercancel', end);
   }
+  /* ===== v6 : dossier complet (PDF, impression, Excel) : plan de pose, vues 3D, débit de matière, poids ===== */
+  const MP_THK = { Zinc: 0.7, Alu: 0.7, Acier: 0.63, Cuivre: 0.6 }, MP_DENS = { Zinc: 7.2, Alu: 2.7, Acier: 7.85, Cuivre: 8.9 };
+  const MP_ACC_DEV = { egout: [250, 'Bande d\'égout'], rive: [333, 'Rives (retombée 20 cm)'], faitage: [333, 'Faîtage / tête de mur'], aretier: [333, 'Arêtiers'], noue: [333, 'Noues'], mur: [250, 'Solins contre mur'] };
+  const mpDoss = { th: 0, coil: 0, marge: 5 };
+  const mpFr = (v, d) => (+v).toLocaleString('fr-FR', { minimumFractionDigits: d == null ? 1 : d, maximumFractionDigits: d == null ? 1 : d });
+  const mpAscii = s => String(s == null ? '' : s).replace(/→/g, '>').replace(/✎/g, '').replace(/½/g, '1/2').replace(/[^\x00-\xFF]/g, '-');
+  const MP_MODE_TXT = { left: 'départ à gauche, pose vers la droite', right: 'départ à droite, pose vers la gauche', center: 'départ au centre, pose vers les 2 côtés' };
+
+  function mpEdgeLens(data){
+    const ed = { egout: 0, rive: 0, faitage: 0, aretier: 0, noue: 0, mur: 0 }, seen = new Set();
+    data.pans.forEach(p => {
+      const bs = mpPanBasis(p);
+      p.pts.forEach((a, i) => { const b = p.pts[(i + 1) % p.pts.length], k1 = mpKey(a, b), k2 = mpKey(b, a); if (seen.has(k1) || seen.has(k2)) return; seen.add(k1); const kk = mpEdgeKind(a, b, bs.u, data.valleys); if (ed[kk] !== undefined) ed[kk] += Math.hypot(b.x - a.x, b.y - a.y, b.h - a.h); });
+    });
+    if (data.edgeTotals) Object.assign(ed, data.edgeTotals);
+    return ed;
+  }
+  function mpDossier(){
+    const data = mpLastData; if (!data) return null;
+    const MT = mpMatNow(), fam = MT.fam, st = MT.steel, th = st ? st.ep : (mpDoss.th > 0 ? mpDoss.th : MP_THK[fam]), dens = st ? 7.85 : MP_DENS[fam];
+    const rows = [], groups = new Map(), panInfo = [];
+    let surf = 0, kgNet = 0, kgGross = 0, lin = 0, nF = 0, nC = 0, nBill = 0, clips = 0, seamLin = 0, metrage = 0, maxDevW = 0;
+    data.pans.forEach((p, pi) => {
+      const bacs = mpBuildBacsForPan(p, pi); if (!bacs.length) return;
+      const order = bacs.map((_, i) => i).sort((a, b) => mpBacDistFrac(a, bacs.length, pi) - mpBacDistFrac(b, bacs.length, pi)); let avg = 0;
+      order.forEach((bi, rank) => {
+        const b = bacs[bi], wTop = b.billard ? b.wTop : b.w, devW = b.w + (st ? 0 : mpDev.w), devL = b.lenMax + mpDev.l, netL = b.billard ? b.lenMax : (b.lenMin + b.lenMax) / 2;
+        const area = b.polys.reduce((t, pl) => t + mpPoly2Area(pl.p2), 0) * (p.areaK || 1) / 1e6;
+        const kn = st ? area * st.kgm2 : ((b.w + wTop) / 2 + mpDev.w) * (netL + mpDev.l) / 1e6 * th * dens, kg = st ? devW * devL / 1e6 * st.kgm2 : devW * devL / 1e6 * th * dens;
+        const type = b.billard ? 'Queue de billard' : !b.cut ? 'Entier' : (b.half ? '1/2 bac' : 'Recoupé') + ' ' + Math.round(b.w) + ' mm', no = (pi + 1) + '.' + (rank + 1);
+        rows.push({ no, pan: pi + 1, w: b.w, wTop: b.billard ? b.wTop : null, lenMin: b.lenMin, lenMax: b.lenMax, type, cuts: (b.cuts || []).join(', '), devW, devL, area, kn, kg, billard: !!b.billard });
+        const key = Math.round(devW) + 'x' + Math.round(devL) + (b.billard ? 'b' : ''), g = groups.get(key) || { devW, devL, qty: 0, billard: !!b.billard, wTop, kg, kn: 0, nos: [] };
+        g.qty++; g.kn += kn; if (g.nos.length < 4) g.nos.push(no); groups.set(key, g);
+        surf += area; kgNet += kn; kgGross += kg; lin += netL / 1000; metrage += devL / 1000; maxDevW = Math.max(maxDevW, devW); avg += netL; b.cut ? nC++ : nF++; if (b.billard) nBill++;
+      });
+      avg /= bacs.length; clips += bacs.length * Math.max(2, Math.ceil(avg / 500) + 1); if (!bacs[0].billard) seamLin += (bacs.length - 1) * avg / 1000;
+      panInfo.push({ pan: pi + 1, n: bacs.length, mode: mpBacStartByPan[pi] || 'left', last: (pi + 1) + '.' + bacs.length, billard: !!bacs[0].billard, curved: !!p.curved });
+    });
+    const std = [500, 600, 670, 800, 1000], coilW = st ? st.pr.w : (mpDoss.coil > 0 ? mpDoss.coil : (std.find(w => w >= maxDevW) || Math.ceil(maxDevW / 50) * 50)), marge = st ? 0 : (mpDoss.marge >= 0 ? mpDoss.marge : 5);
+    const metrageCmd = metrage * (1 + marge / 100), coilKg = st ? kgGross : metrageCmd * coilW / 1000 * th * dens;
+    const ed = mpEdgeLens(data), acc = [], ACC = st ? MP_ACC_STEEL : MP_ACC_DEV; let accKg = 0, accSurf = 0;
+    Object.keys(ACC).forEach(k => { if (!(ed[k] > 1)) return; const dw = ACC[k][0], s = ed[k] / 1000 * dw / 1000, kg = s * th * dens; acc.push({ k, label: ACC[k][1], len: ed[k], dw, surf: s, kg, nb: Math.ceil(ed[k] / 3000) }); accKg += kg; accSurf += s; });
+    // Chiens assis : toiture + joues en même matière, solin arrière et noues latérales.
+    const dormers = mpItems.filter(it => it.type === 'chien').map(it => {
+      const p = data.pans[it.pan]; if (!p) return null; const bs = mpPanBasis(p), g = mpChienGeom(it, bs), hf = +it.hf || 1100, w = +it.w || 1200, Lr = g.Lh / Math.cos(g.pc * Math.PI / 180) + 150;
+      return { w, roof: (w + 300) / 1000 * Lr / 1000, cheek: hf * g.Lh / 1e6, solin: w + 200, noue: 2 * g.hs };
+    }).filter(Boolean);
+    if (dormers.length) {
+      const sum = k => dormers.reduce((t, d) => t + d[k], 0), sz = sum('roof') + sum('cheek'), dwn = st ? 500 : 333;
+      acc.push({ k: 'chien', label: 'Chiens assis : toiture + joues (' + dormers.length + ')', len: sum('w'), dw: '', surf: sz, kg: sz * th * dens, nb: '' });
+      acc.push({ k: 'chienS', label: 'Solins arrière de chiens assis', len: sum('solin'), dw: 250, surf: sum('solin') / 1000 * 0.25, kg: sum('solin') / 1000 * 0.25 * th * dens, nb: Math.ceil(sum('solin') / 3000) });
+      acc.push({ k: 'chienN', label: 'Noues latérales de chiens assis', len: sum('noue'), dw: dwn, surf: sum('noue') / 1000 * dwn / 1000, kg: sum('noue') / 1000 * dwn / 1000 * th * dens, nb: Math.ceil(sum('noue') / 3000) });
+      acc.slice(-3).forEach(a => { accKg += a.kg; accSurf += a.surf; });
+    }
+    const warn = [];
+    if (st) {
+      data.pans.forEach((p, pi) => { if (p.curved) return; const bs = mpPanBasis(p), slope = bs.v.h / (Math.hypot(bs.v.x, bs.v.y) || 1) * 100; if (slope < 7) warn.push(`Pan ${pi + 1} : pente ${mpFr(slope, 1)} % inférieure à 7 % (minimum du DTU 40.35, à vérifier selon la zone et le rampant).`); });
+      rows.forEach(r => { if (r.lenMax > st.pr.maxL) warn.push(`Bac ${r.no} : longueur ${mpFr(r.lenMax / 1000, 2)} m supérieure au maxi de fabrication (${st.pr.maxL / 1000} m) : prévoir un recouvrement transversal.`); else if (r.lenMax / 1000 > st.pr.maxRamp) warn.push(`Bac ${r.no} : rampant ${mpFr(r.lenMax / 1000, 1)} m supérieur à ${st.pr.maxRamp} m (maxi du profil).`); });
+      if (data.pans.some(p => p.single)) warn.push('Les bacs « queue de billard » (effilés) ne sont pas réalisables en bac acier profilé : passe en « bacs droits en facettes » pour les parties rondes.');
+    }
+    const sel = $('mpType'), typeTxt = sel && sel.options && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex].text : data.type;
+    const vols = data.type === 'modele' && mpModel.vols.length ? mpModel.vols.map((v, i) => `V${i + 1} : ${MP_ROOF_OLD[v.roof] || v.roof} · ${Math.round(v.L)} x ${Math.round(v.W)} mm · hauteur d'égout ${Math.round(v.hm != null ? v.hm : 3000 + (v.z || 0))} mm`) : [`${typeTxt} · ${Math.round(data.Lm)} x ${Math.round(data.Wm)} mm`];
+    return { data, MT, fam, th, dens, rows, groups: [...groups.values()], panInfo, surf, kgNet, kgGross, lin, nF, nC, nBill, clips, seamLin, metrage, metrageCmd, coilW, marge, coilKg, maxDevW, acc, accKg, accSurf, ed,
+      kgPose: kgNet + accKg, kgCmd: coilKg + accKg * (1 + marge / 100), vols, typeTxt, st, warn: warn.slice(0, 8), dormers,
+      keyCmd: st ? `${mpFr(kgGross / (st.kgm2 || 1), 1)} m2 de tôles = ${mpFr(kgGross, 0)} kg` : `${mpFr(metrageCmd, 1)} m de bobine ${coilW} mm = ${mpFr(coilKg, 0)} kg`,
+      matTitle: st ? 'Tôles à commander' : 'Besoin en matière (bobine)',
+      matLines: st ? [`Profil : ${st.pr.name} - largeur utile ${st.pr.w} mm - nervures de ${st.pr.h} mm tous les ${st.pr.pitch} mm`, `${st.iso ? 'Panneau sandwich PIR ' + st.iso + ' mm' : 'Tôle non isolée'} - acier ${String(st.ep).replace('.', ',')} mm - RAL ${st.ral} ${st.ralName}`, `Masse surfacique : ${mpFr(st.kgm2, 2)} kg/m2 ${st.est ? '(estimation, à confirmer sur la fiche Joris Ide)' : '(fiche Joris Ide)'}`, `Surface à commander : ${mpFr(kgGross / (st.kgm2 || 1), 1)} m2 en ${rows.length} tôles - poids ${mpFr(kgGross, 0)} kg`, `Vis auto-perceuses (estimation) : ${Math.ceil(surf * (st.pr.screws || 7))} - vis de couture : ${Math.ceil(seamLin * 3)}`, `Closoirs : faîtage / arêtiers ${mpFr((ed.faitage + ed.aretier) / 1000, 1)} m - égout ${mpFr(ed.egout / 1000, 1)} m`]
+        : [`Largeur de bobine : ${coilW} mm${mpDoss.coil > 0 ? '' : ' (choisie automatiquement)'}${maxDevW > coilW ? '  /!\\ largeur développée max ' + Math.round(maxDevW) + ' mm > bobine' : ''}`, `Métrage des bacs : ${mpFr(metrage, 1)} m - avec ${marge} % de chutes : ${mpFr(metrageCmd, 1)} m`, `Poids de bobine à commander : ${mpFr(coilKg, 0)} kg (épaisseur ${mpFr(th, 2)} mm)`, `Poids posé estimé des bacs : ${mpFr(kgNet, 0)} kg`],
+      hyp: st ? ['Poids = surface x masse surfacique du profil (fiche Joris Ide pour le 45-333-1000 et le Vieo Edge 500 ; autres profils et isolation estimés).', `Tôles débitées à la longueur du rampant + ${mpDev.l} mm de débord d'égout ; largeur utile ${st.pr.w} mm.`, 'Accessoires sur développé moyen (égout 250, rives / faîtière / arêtiers 333, noues 500, solins 250 mm) en acier de même épaisseur.', 'Fixations : environ 7 vis/m2 (12/m2 pour le joint debout acier) + vis de couture ; à confirmer selon le DTU 40.35 et la zone de vent.']
+        : [`Poids = surface développée x épaisseur (${mpFr(th, 2)} mm) x densité (${mpFr(dens, 1)}) ; estimation à +/- 5 %.`, `Les largeurs et longueurs développées ajoutent ${mpDev.w} mm (relevés de joint) et ${mpDev.l} mm (égout / faîtage) à chaque bac.`, 'Les bacs queue de billard sont comptés sur leur rectangle englobant pour la commande ; le poids posé utilise la surface réelle effilée.', 'Les accessoires sont calculés sur un développé moyen (égout 250 mm, rives / faîtage / arêtiers / noues 333 mm, solins 250 mm).', 'Pattes de fixation : 1 fixe + coulissantes environ tous les 500 mm. À confirmer selon la fiche technique du système.'],
+      site: ((document.getElementById('projectSiteName') || {}).value || '').trim(), date: new Date().toLocaleDateString('fr-FR'), sys: st ? (st.iso ? 'Bac acier isolé' : 'Bac acier') : (isTasseaux ? 'Bac à tasseaux' : 'Joint debout'),
+      pente: parseFloat($('mpPente').value) || 25, items: mpItems.map(it => ({ name: mpItemName(it), pan: it.pan + 1, u: it.u, v: it.v, w: it.w, h: it.h || it.d || it.hf || '', hh: it.hh || '' })) };
+  }
+
+  /* ---------- vues 3D ---------- */
+  function mpCapture3DViews(){
+    if (!mp3dRenderer || !mp3dGroup || !mpLastData) return [];
+    const cont = mp3dRenderer.domElement.parentElement, W0 = cont.clientWidth || 800, H0 = cont.clientHeight || 500;
+    const save = { eco: mpEcorche, ex: mpExplodeAmount, th: mpCam.th, ph: mpCam.ph, r: mpCam.r, pr: mp3dRenderer.getPixelRatio() }, out = [];
+    const views = [['Vue d\'ensemble - toiture terminée', false, 0, 0.75, 1.0], ['Vue arrière', false, 0, 0.75 + Math.PI, 1.0], ['Vue écorchée - charpente, volige, écran sous-toiture', true, 0, 0.75, 0.95], ['Vue éclatée des couches', false, MP_EXPLODE_MAX * 0.85, 0.6, 0.85]];
+    mp3dRenderer.setPixelRatio(1);
+    try {
+      views.forEach(([title, eco, ex, th, ph]) => {
+        mpEcorche = eco; mpExplodeAmount = ex; mpDraw3D(mpLastData, true); mpApplyExplode();
+        mpCam.th = th; mpCam.ph = ph; mpCam.r = mpCam.r0 * 0.95; mpUpdateCam();
+        mp3dRenderer.setSize(1500, 1000, false); mp3dCamera.aspect = 1.5; mp3dCamera.updateProjectionMatrix();
+        mp3dRenderer.render(mp3dScene, mp3dCamera);
+        out.push({ title, url: mp3dRenderer.domElement.toDataURL('image/jpeg', 0.9) });
+      });
+    } finally {
+      mpEcorche = save.eco; mpExplodeAmount = save.ex; mpDraw3D(mpLastData, true); mpApplyExplode();
+      mpCam.th = save.th; mpCam.ph = save.ph; mpCam.r = save.r; mpUpdateCam();
+      mp3dRenderer.setPixelRatio(save.pr); mp3dRenderer.setSize(W0, H0, false); mp3dCamera.aspect = W0 / H0; mp3dCamera.updateProjectionMatrix(); mpRender();
+    }
+    return out;
+  }
+  /* ---------- plan de pose 2D propre ---------- */
+  function mpPlanSvgClean(){
+    const svg = $('mpPlanWrap') && $('mpPlanWrap').querySelector('svg'); if (!svg) return null;
+    const c = svg.cloneNode(true);
+    c.querySelectorAll('[data-vh],[data-vol]').forEach(n => n.remove());
+    c.querySelectorAll('[data-dim]').forEach(g => { g.removeAttribute('data-dim'); g.removeAttribute('style'); g.querySelectorAll('text').forEach(t => { t.textContent = t.textContent.replace(' ✎', ''); }); });
+    c.querySelectorAll('[data-item]').forEach(g => g.removeAttribute('style'));
+    const vb = (c.getAttribute('viewBox') || '0 0 1000 1000').split(/\s+/).map(Number), W = 2400, H = Math.round(W * vb[3] / vb[2]);
+    c.setAttribute('xmlns', 'http://www.w3.org/2000/svg'); c.setAttribute('width', W); c.setAttribute('height', H); c.removeAttribute('style');
+    return { vb, W, H, markup: new XMLSerializer().serializeToString(c) };
+  }
+  function mpSvgToCanvas(plan){
+    return new Promise(res => {
+      const url = URL.createObjectURL(new Blob([plan.markup], { type: 'image/svg+xml;charset=utf-8' })), img = new Image();
+      img.onload = () => { const cv = document.createElement('canvas'); cv.width = plan.W; cv.height = plan.H; const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, plan.W, plan.H); g.drawImage(img, 0, 0, plan.W, plan.H); URL.revokeObjectURL(url); res(cv); };
+      img.onerror = () => { URL.revokeObjectURL(url); res(null); }; img.src = url;
+    });
+  }
+  /* ---------- PDF ---------- */
+  function mpPdfTable(doc, y, cols, rows, o){
+    const M = 12, rh = o.rh || 5.2, w = cols.reduce((s, c) => s + c.w, 0), head = () => {
+      doc.setFillColor(15, 118, 110); doc.rect(M, y - 4, w, rh, 'F'); doc.setTextColor(255); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); let x = M;
+      cols.forEach(c => { doc.text(mpAscii(c.t), c.al === 'r' ? x + c.w - 1.5 : x + 1.5, y - 0.4, { align: c.al === 'r' ? 'right' : 'left' }); x += c.w; });
+      doc.setTextColor(0); y += rh; doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+    };
+    head();
+    rows.forEach((r, i) => {
+      if (y > 198) { o.newPage(); y = o.top; head(); }
+      if (r.bold) doc.setFont('helvetica', 'bold'); else if (i % 2) { doc.setFillColor(243, 246, 248); doc.rect(M, y - 4, w, rh, 'F'); }
+      let x = M; (r.c || r).forEach((v, k) => { const c = cols[k]; doc.text(mpAscii(v), c.al === 'r' ? x + c.w - 1.5 : x + 1.5, y - 0.4, { align: c.al === 'r' ? 'right' : 'left', maxWidth: c.w - 3 }); x += c.w; });
+      doc.setFont('helvetica', 'normal'); y += rh;
+    });
+    return y + 2;
+  }
+  async function mpExportPdf(){
+    const D = mpDossier(); if (!D) { showToast('Calcule d\'abord le calepinage.'); return; }
+    showToast('Génération du dossier PDF…');
+    let views = []; try { views = mpCapture3DViews(); } catch (e) { console.error('Vues 3D', e); }
+    const plan = mpPlanSvgClean(); let planCv = null; if (plan) { try { planCv = await mpSvgToCanvas(plan); } catch (e) { console.error(e); } }
+    const { jsPDF } = window.jspdf, doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' }), W = 297, H = 210, M = 12;
+    const head = t => { doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(15, 118, 110); doc.text(mpAscii(t), M, 14); doc.setTextColor(90); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text(mpAscii(`ALTEMA - ${D.sys} - ${D.MT.label}${D.site ? ' - ' + D.site : ''}`), W - M, 14, { align: 'right' }); doc.setTextColor(0); doc.setDrawColor(15, 118, 110); doc.line(M, 17, W - M, 17); };
+    const newPage = t => () => { doc.addPage(); head(t); };
+    const H2 = (t, y) => { doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.setTextColor(15, 118, 110); doc.text(mpAscii(t), M, y); doc.setTextColor(0); doc.setFont('helvetica', 'normal'); doc.setFontSize(9); return y + 6; };
+    // 1 — synthèse
+    head('Dossier de pose - toiture zinc');
+    let y = H2('Chantier', 26);
+    [`Client / chantier : ${D.site || '-'}`, `Date : ${D.date}`, `Système : ${D.sys}`, `Matière : ${D.MT.label} - épaisseur ${mpFr(D.th, 2)} mm - densité ${mpFr(D.dens, 1)}`, `Pente : ${D.pente} deg - largeur de bac : ${parseFloat($('largeurBac').value) || 500} mm`].concat(D.vols).forEach(l => { doc.text(mpAscii(l), M, y); y += 5; });
+    let yR = H2('Chiffres clés', 26);
+    [[`Surface de couverture`, `${mpFr(D.surf, 2)} m2`], ['Bacs', `${D.rows.length} (${D.nF} entiers - ${D.nC} recoupés${D.nBill ? ' - ' + D.nBill + ' queue de billard' : ''})`], ['Linéaire de bacs', `${mpFr(D.lin, 1)} m`], ['Poids estimé posé (bacs + accessoires)', `${mpFr(D.kgPose, 0)} kg`], ['Matière à commander', D.keyCmd], ['Accessoires', `${mpFr(D.accSurf, 1)} m2 - ${mpFr(D.accKg, 0)} kg`], [D.st ? 'Vis auto-perceuses (estimation)' : 'Pattes de fixation', String(D.st ? Math.ceil(D.surf * (D.st.pr.screws || 7)) : D.clips)]].forEach(([a, b]) => { doc.text(mpAscii(a), 150, yR); doc.setFont('helvetica', 'bold'); doc.text(mpAscii(b), W - M, yR, { align: 'right' }); doc.setFont('helvetica', 'normal'); yR += 5.5; });
+    y = Math.max(y, yR) + 6;
+    if (D.warn.length) { y = H2('Points d\'attention', y); doc.setTextColor(170, 40, 30); D.warn.forEach(w => { doc.text(mpAscii('- ' + w), M, y, { maxWidth: W - 2 * M }); y += 5; }); doc.setTextColor(0); y += 2; }
+    y = H2('Sens de pose par pan', y);
+    y = mpPdfTable(doc, y + 2, [{ t: 'Pan', w: 16 }, { t: 'Bacs', w: 16, al: 'r' }, { t: 'Premier > dernier', w: 40 }, { t: 'Sens de pose', w: 140 }, { t: 'Type', w: 60 }], D.panInfo.map(p => [String(p.pan), String(p.n), `${p.pan}.1 > ${p.last}`, MP_MODE_TXT[p.mode] || '', p.curved ? 'Voûte (bacs développés)' : p.billard ? 'Queue de billard' : 'Bacs parallèles']), { top: 26, newPage: newPage('Sens de pose') });
+    // 2 — plan de pose
+    doc.addPage(); head('Plan de pose 2D - numérotation et sens de pose');
+    if (planCv) { const aw = W - 2 * M, ah = H - 52, k = Math.min(aw / planCv.width, ah / planCv.height), iw = planCv.width * k, ih = planCv.height * k; doc.addImage(planCv.toDataURL('image/jpeg', 0.92), 'JPEG', M + (aw - iw) / 2, 21, iw, ih); }
+    else { doc.text('Plan indisponible (ouvre le plan avant d\'exporter).', M, 30); }
+    const lg = [[[59, 127, 196], 'Bande d\'égout'], [[224, 90, 43], 'Faîtage'], [[224, 138, 43], 'Arêtier / noue'], [[154, 161, 168], 'Rive'], [[141, 110, 99], 'Solin contre mur'], [[47, 111, 176], 'Sens de pose']]; let lx = M;
+    lg.forEach(([c, t]) => { doc.setDrawColor(c[0], c[1], c[2]); doc.setLineWidth(1.2); doc.line(lx, H - 24, lx + 8, H - 24); doc.setLineWidth(0.2); doc.setFontSize(8); doc.setTextColor(60); doc.text(mpAscii(t), lx + 10, H - 22.8); lx += 12 + doc.getTextWidth(mpAscii(t)) + 4; });
+    doc.setFontSize(8); doc.setTextColor(60);
+    ['Numéro = pan.ordre de pose (1 = bac de départ). La flèche bleue indique le sens de pose de chaque pan. Bacs en orange = demi-bacs / bacs recoupés (largeur indiquée).', 'Les cotes en vert sont en mm. Les bacs « queue de billard » sont effilés : large à l\'égout, étroits vers le haut.'].forEach((t, i) => doc.text(mpAscii(t), M, H - 16 + i * 4.5)); doc.setTextColor(0);
+    // 3 — vues 3D
+    if (views.length) {
+      doc.addPage(); head('Vues 3D'); const cw = (W - 2 * M - 8) / 2, ch = cw / 1.5;
+      views.forEach((v, i) => { const x = M + (i % 2) * (cw + 8), yy = 22 + Math.floor(i / 2) * (ch + 11); doc.addImage(v.url, 'JPEG', x, yy, cw, ch); doc.setFontSize(8.5); doc.setFont('helvetica', 'bold'); doc.text(mpAscii(v.title), x, yy + ch + 4.5); doc.setFont('helvetica', 'normal'); });
+    }
+    // 3 bis — gabarits de courbure
+    mpCurveSheets().forEach(sh => mpPdfCurve(doc, sh, head, () => doc.addPage()));
+    // 4 — débit bac par bac
+    doc.addPage(); head('Débit des bacs - pièce par pièce'); let yy = 26;
+    yy = mpPdfTable(doc, yy, [{ t: 'N°', w: 16 }, { t: 'Largeur', w: 24, al: 'r' }, { t: 'Longueur', w: 38, al: 'r' }, { t: 'Type / découpe', w: 74 }, { t: 'Dév. larg.', w: 24, al: 'r' }, { t: 'Dév. long.', w: 24, al: 'r' }, { t: 'm2', w: 20, al: 'r' }, { t: 'kg', w: 20, al: 'r' }, { t: 'kg à cmd', w: 22, al: 'r' }],
+      D.rows.map(r => [r.no, r.billard ? `${Math.round(r.w)} > ${Math.round(r.wTop)}` : String(Math.round(r.w)), Math.abs(r.lenMax - r.lenMin) > 20 ? `${Math.round(r.lenMin)} > ${Math.round(r.lenMax)}` : String(Math.round(r.lenMax)), r.type + (r.cuts ? ' - decoupe ' + r.cuts : ''), String(Math.round(r.devW)), String(Math.round(r.devL)), mpFr(r.area, 2), mpFr(r.kn, 2), mpFr(r.kg, 2)]).concat([{ bold: true, c: ['TOTAL', '', '', `${D.rows.length} bacs`, '', '', mpFr(D.surf, 2), mpFr(D.kgNet, 1), mpFr(D.kgGross, 1)] }]), { top: 26, newPage: newPage('Débit des bacs - suite') });
+    // 5 — formats groupés + besoin matière + accessoires
+    if (yy > 120) { doc.addPage(); head('Débit de matière et poids'); yy = 26; }
+    yy = H2('Formats à débiter (regroupés)', yy);
+    yy = mpPdfTable(doc, yy + 2, [{ t: 'Format développé (l x L) mm', w: 70 }, { t: 'Qté', w: 18, al: 'r' }, { t: 'Type', w: 44 }, { t: 'N° (exemples)', w: 70 }, { t: 'kg / pièce', w: 26, al: 'r' }, { t: 'kg total', w: 26, al: 'r' }],
+      D.groups.map(g => [`${Math.round(g.devW)} x ${Math.round(g.devL)}`, String(g.qty), g.billard ? 'Queue de billard' : 'Bac', g.nos.join(', ') + (g.qty > 4 ? ' ...' : ''), mpFr(g.kg, 2), mpFr(g.kg * g.qty, 1)]), { top: 26, newPage: newPage('Débit de matière') });
+    if (yy > 150) { doc.addPage(); head('Débit de matière et poids'); yy = 26; }
+    yy = H2(D.matTitle, yy);
+    D.matLines.forEach(l => { doc.text(mpAscii(l), M, yy, { maxWidth: W - 2 * M }); yy += 5; });
+    yy = H2('Accessoires et linéaires', yy + 4);
+    yy = mpPdfTable(doc, yy + 2, [{ t: 'Accessoire', w: 70 }, { t: 'Longueur', w: 30, al: 'r' }, { t: 'Dév. (mm)', w: 24, al: 'r' }, { t: 'Surface m2', w: 28, al: 'r' }, { t: 'kg', w: 24, al: 'r' }, { t: 'Barres de 3 m', w: 30, al: 'r' }],
+      D.acc.map(a => [a.label, `${mpFr(a.len / 1000, 2)} m`, String(a.dw), mpFr(a.surf, 2), mpFr(a.kg, 1), String(a.nb)]).concat([{ bold: true, c: ['TOTAL accessoires', '', '', mpFr(D.accSurf, 2), mpFr(D.accKg, 1), ''] }]), { top: 26, newPage: newPage('Accessoires') });
+    if (D.seamLin > 0) { doc.text(mpAscii(`${D.st ? 'Recouvrements latéraux' : isTasseaux ? 'Tasseaux + couvre-joints' : 'Joints debout'} : ${mpFr(D.seamLin, 1)} m linéaires - pattes de fixation : ${D.clips}`), M, yy); yy += 6; }
+    if (D.items.length) { yy = H2('Éléments en toiture', yy + 2); D.items.forEach(it => { doc.text(mpAscii(`${it.name} - pan ${it.pan} - décalage ${Math.round(it.u)} mm - distance à l'égout ${Math.round(it.v)} mm - ${Math.round(it.w)}${it.h ? ' x ' + Math.round(it.h) : ''} mm`), M, yy); yy += 5; }); }
+    if (yy > 170) { doc.addPage(); head('Hypothèses'); yy = 26; } else yy += 4;
+    yy = H2('Hypothèses de calcul', yy); doc.setFontSize(8); doc.setTextColor(70);
+    D.hyp.forEach(l => { doc.text(mpAscii('- ' + l), M, yy, { maxWidth: W - 2 * M }); yy += 4.5; });
+    const n = doc.internal.getNumberOfPages(); for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFontSize(8); doc.setTextColor(120); doc.text(`${i} / ${n}`, W - M, H - 6, { align: 'right' }); doc.text('Document généré par le calculateur ALTEMA', M, H - 6); }
+    doc.save(`dossier_toiture_${isTasseaux ? 'tasseaux' : 'jointdebout'}_altema.pdf`); showToast('Dossier PDF généré.');
+  }
+  /* ---------- impression ---------- */
+  async function mpPrintDossier(){
+    const D = mpDossier(); if (!D) { showToast('Calcule d\'abord le calepinage.'); return; }
+    let views = []; try { views = mpCapture3DViews(); } catch (e) { console.error(e); }
+    const plan = mpPlanSvgClean(), esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;'), tb = (h, r) => `<table><thead><tr>${h.map(x => `<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${r.map(a => `<tr${a.bold ? ' class="b"' : ''}>${(a.c || a).map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Dossier toiture ${esc(D.site)}</title><style>
+      @page{size:A4 landscape;margin:10mm} body{font:11px/1.35 Arial,sans-serif;color:#111;margin:0} h1{font-size:18px;color:#0f766e;margin:0 0 6px} h2{font-size:13px;color:#0f766e;margin:14px 0 5px;border-bottom:1.5px solid #0f766e}
+      table{border-collapse:collapse;width:100%;font-size:10px} th{background:#0f766e;color:#fff;text-align:left;padding:3px 5px} td{padding:2px 5px;border-bottom:1px solid #dde3e8} tr.b td{font-weight:700;background:#eef3f5}
+      .pg{page-break-before:always} .kv{display:grid;grid-template-columns:1fr 1fr;gap:2px 24px} .kv div{display:flex;justify-content:space-between;border-bottom:1px dotted #bbb;padding:1px 0} svg{width:100%;height:auto;max-height:165mm} .v{display:grid;grid-template-columns:1fr 1fr;gap:8px} .v img{width:100%} .v b{font-size:10px} .n{color:#555;font-size:9.5px}</style></head><body>
+      <h1>Dossier de pose — toiture ${esc(D.sys)}</h1>
+      <div class="kv"><div><span>Chantier</span><b>${esc(D.site || '—')}</b></div><div><span>Date</span><b>${esc(D.date)}</b></div><div><span>Matière</span><b>${esc(D.MT.label)}</b></div><div><span>Épaisseur / densité</span><b>${mpFr(D.th, 2)} mm / ${mpFr(D.dens, 1)}</b></div><div><span>Pente</span><b>${D.pente}°</b></div><div><span>Largeur de bac</span><b>${parseFloat($('largeurBac').value) || 500} mm</b></div>
+      <div><span>Surface de couverture</span><b>${mpFr(D.surf, 2)} m²</b></div><div><span>Bacs</span><b>${D.rows.length} (${D.nF} entiers · ${D.nC} recoupés${D.nBill ? ' · ' + D.nBill + ' queue de billard' : ''})</b></div><div><span>Poids posé estimé</span><b>${mpFr(D.kgPose, 0)} kg</b></div><div><span>Matière à commander</span><b>${esc(D.keyCmd)}</b></div><div><span>Accessoires</span><b>${mpFr(D.accSurf, 1)} m² · ${mpFr(D.accKg, 0)} kg</b></div><div><span>Pattes de fixation</span><b>${D.clips}</b></div></div>
+      <div class="n">${D.vols.map(esc).join('<br>')}</div>
+      ${D.warn.length ? `<h2 style="color:#b3261e">Points d'attention</h2><p style="color:#b3261e">${D.warn.map(esc).join('<br>')}</p>` : ''}
+      <h2>Sens de pose par pan</h2>${tb(['Pan', 'Bacs', 'Premier → dernier', 'Sens de pose', 'Type'], D.panInfo.map(p => [p.pan, p.n, `${p.pan}.1 → ${p.last}`, MP_MODE_TXT[p.mode] || '', p.curved ? 'Voûte (bacs développés)' : p.billard ? 'Queue de billard' : 'Bacs parallèles']))}
+      <div class="pg"><h2>Plan de pose 2D — numérotation et sens de pose</h2>${plan ? plan.markup : '<p>Plan indisponible.</p>'}<p class="n">Numéro = pan.ordre de pose (1 = bac de départ). Flèche bleue = sens de pose. Orange = demi-bacs / bacs recoupés. Les bacs « queue de billard » sont effilés (large à l'égout).</p></div>
+      ${views.length ? `<div class="pg"><h2>Vues 3D</h2><div class="v">${views.map(v => `<div><img src="${v.url}"><b>${esc(v.title)}</b></div>`).join('')}</div></div>` : ''}
+      ${mpCurveSheets().map(sh => { const c = mpCurveSvg(sh); return `<div class="pg"><h2>Gabarit de courbure — ${esc(sh.title)} <span class="n">(aperçu 1:${c.N}, réglable)</span></h2>${c.svg}${tb([sh.kind === 'profile' ? 'Distance au bord (mm)' : 'Sur la corde (mm)', 'Hauteur (mm)'], sh.ords.map(o => [Math.round(o[0]), Math.round(o[1])]))}</div>`; }).join('')}
+      <div class="pg"><h2>Débit des bacs — pièce par pièce</h2>${tb(['N°', 'Largeur', 'Longueur', 'Type / découpe', 'Dév. larg.', 'Dév. long.', 'm²', 'kg', 'kg à cmd'], D.rows.map(r => [r.no, r.billard ? `${Math.round(r.w)} → ${Math.round(r.wTop)}` : Math.round(r.w), Math.abs(r.lenMax - r.lenMin) > 20 ? `${Math.round(r.lenMin)} → ${Math.round(r.lenMax)}` : Math.round(r.lenMax), r.type + (r.cuts ? ' · découpe ' + r.cuts : ''), Math.round(r.devW), Math.round(r.devL), mpFr(r.area, 2), mpFr(r.kn, 2), mpFr(r.kg, 2)]).concat([{ bold: true, c: ['TOTAL', '', '', D.rows.length + ' bacs', '', '', mpFr(D.surf, 2), mpFr(D.kgNet, 1), mpFr(D.kgGross, 1)] }]))}</div>
+      <div class="pg"><h2>Formats à débiter (regroupés)</h2>${tb(['Format développé (l × L) mm', 'Qté', 'Type', 'N° (exemples)', 'kg / pièce', 'kg total'], D.groups.map(g => [`${Math.round(g.devW)} × ${Math.round(g.devL)}`, g.qty, g.billard ? 'Queue de billard' : 'Bac', g.nos.join(', ') + (g.qty > 4 ? ' …' : ''), mpFr(g.kg, 2), mpFr(g.kg * g.qty, 1)]))}
+      <h2>${esc(D.matTitle)}</h2><p>${D.matLines.map(esc).join('<br>')}</p>
+      <h2>Accessoires et linéaires</h2>${tb(['Accessoire', 'Longueur', 'Dév. (mm)', 'Surface m²', 'kg', 'Barres de 3 m'], D.acc.map(a => [a.label, mpFr(a.len / 1000, 2) + ' m', a.dw, mpFr(a.surf, 2), mpFr(a.kg, 1), a.nb]).concat([{ bold: true, c: ['TOTAL accessoires', '', '', mpFr(D.accSurf, 2), mpFr(D.accKg, 1), ''] }]))}
+      ${D.seamLin > 0 ? `<p>${isTasseaux ? 'Tasseaux + couvre-joints' : 'Joints debout'} : ${mpFr(D.seamLin, 1)} m linéaires · pattes de fixation : ${D.clips}</p>` : ''}
+      ${D.items.length ? `<h2>Éléments en toiture</h2>${tb(['Élément', 'Pan', 'Décalage', 'Dist. égout', 'Dimensions'], D.items.map(it => [it.name, it.pan, Math.round(it.u) + ' mm', Math.round(it.v) + ' mm', Math.round(it.w) + (it.h ? ' × ' + Math.round(it.h) : '') + ' mm']))}` : ''}
+      <h2>Hypothèses de calcul</h2><p class="n">${D.hyp.map(esc).join('<br>')}</p></div>
+      </body></html>`;
+    const fr = document.createElement('iframe'); fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;'; document.body.appendChild(fr);
+    fr.contentDocument.open(); fr.contentDocument.write(html); fr.contentDocument.close();
+    setTimeout(() => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (e) { showToast('Impression impossible ici : utilise « PDF complet ».'); } setTimeout(() => fr.remove(), 60000); }, 600);
+  }
+  /* ---------- Excel ---------- */
+  function mpExportXlsx(){
+    const D = mpDossier(); if (!D) { showToast('Calcule d\'abord le calepinage.'); return; }
+    const wb = XLSX.utils.book_new(), add = (n, rows) => XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), n);
+    add('Résumé', [['Chantier', D.site], ['Date', D.date], ['Système', D.sys], ['Matière', D.MT.label], ['Épaisseur (mm)', D.th], ['Densité', D.dens], ['Pente (°)', D.pente], ['Surface de couverture (m²)', +D.surf.toFixed(2)], ['Bacs', D.rows.length], ['Bacs entiers', D.nF], ['Bacs recoupés', D.nC], ['Bacs queue de billard', D.nBill], ['Linéaire de bacs (m)', +D.lin.toFixed(1)], ['Matière à commander', D.keyCmd], ['Poids posé estimé (kg)', +D.kgPose.toFixed(0)], [D.st ? 'Vis auto-perceuses (estimation)' : 'Pattes de fixation', D.st ? Math.ceil(D.surf * (D.st.pr.screws || 7)) : D.clips]].concat(D.matLines.map(l => ['Détail matière', l])).concat(D.warn.map(w => ['Point d\'attention', w])).concat(D.vols.map(v => ['Volume', v])).map(r => ({ Rubrique: r[0], Valeur: r[1] })));
+    add('Bacs', D.rows.map(r => ({ 'N°': r.no, Pan: r.pan, 'Largeur (mm)': Math.round(r.w), 'Largeur haut (mm)': r.wTop == null ? '' : Math.round(r.wTop), 'Longueur min (mm)': Math.round(r.lenMin), 'Longueur max (mm)': Math.round(r.lenMax), Type: r.type, 'Découpe': r.cuts, 'Dév. largeur (mm)': Math.round(r.devW), 'Dév. longueur (mm)': Math.round(r.devL), 'Surface (m²)': +r.area.toFixed(3), 'Poids posé (kg)': +r.kn.toFixed(2), 'Poids à commander (kg)': +r.kg.toFixed(2) })));
+    add('Formats à débiter', D.groups.map(g => ({ 'Largeur développée (mm)': Math.round(g.devW), 'Longueur développée (mm)': Math.round(g.devL), Quantité: g.qty, Type: g.billard ? 'Queue de billard' : 'Bac', 'kg / pièce': +g.kg.toFixed(2), 'kg total': +(g.kg * g.qty).toFixed(1), 'Exemples': g.nos.join(', ') })));
+    add('Accessoires', D.acc.map(a => ({ Accessoire: a.label, 'Longueur (m)': +(a.len / 1000).toFixed(2), 'Développé (mm)': a.dw, 'Surface (m²)': +a.surf.toFixed(2), 'Poids (kg)': +a.kg.toFixed(1), 'Barres de 3 m': a.nb })));
+    add('Sens de pose', D.panInfo.map(p => ({ Pan: p.pan, Bacs: p.n, 'Premier': p.pan + '.1', 'Dernier': p.last, 'Sens de pose': MP_MODE_TXT[p.mode] || '', Type: p.curved ? 'Voûte' : p.billard ? 'Queue de billard' : 'Bacs parallèles' })));
+    const gs = mpCurveSheets(); if (gs.length) add('Gabarits courbure', gs.flatMap(sh => sh.ords.map(o => ({ Gabarit: sh.title, 'Distance (mm)': Math.round(o[0]), 'Hauteur (mm)': Math.round(o[1]) }))));
+    if (D.items.length) add('Éléments', D.items.map(it => ({ Élément: it.name, Pan: it.pan, 'Décalage (mm)': Math.round(it.u), 'Distance égout (mm)': Math.round(it.v), 'Largeur (mm)': Math.round(it.w), 'Hauteur / profondeur (mm)': it.h === '' ? '' : Math.round(it.h) })));
+    XLSX.writeFile(wb, `dossier_toiture_${isTasseaux ? 'tasseaux' : 'jointdebout'}_altema.xlsx`); showToast('Export Excel (débit + poids) réussi.');
+  }
+  function mpDossierHtml(){
+    return `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;"><span style="font-size:11.5px;color:#4a5056;font-weight:600;">Dossier :</span>
+      <button type="button" data-dossier="pdf" style="${MP_BTN}background:#e8f6f1;border-color:#7cc8b0;">📄 PDF complet</button><button type="button" data-dossier="print" style="${MP_BTN}">🖨 Imprimer</button><button type="button" data-dossier="xlsx" style="${MP_BTN}">📊 Excel (débit + poids)</button>
+      <label style="font-size:11px;color:#4a5056;">Échelle gabarit <select data-ratio style="padding:5px 6px;border:1px solid #c9ced3;border-radius:6px;font-size:12px;">${['auto', 1, 2, 5, 10, 20, 25, 50, 100].map(r => `<option value="${r}"${String(mpDoss.ratio) === String(r) ? ' selected' : ''}>${r === 'auto' ? 'Auto' : '1:' + r}</option>`).join('')}</select></label>${mpCurveSheets().length ? `<button type="button" data-dossier="gabarit" style="${MP_BTN}">📐 PDF gabarits de courbure</button>` : ''}</div>`;
+  }
+  function mpWireDossier(root){
+    root.querySelectorAll('[data-dossier]').forEach(b => b.addEventListener('click', () => ({ pdf: mpExportPdf, print: mpPrintDossier, xlsx: mpExportXlsx, gabarit: mpExportGabarit })[b.dataset.dossier]()));
+    root.querySelectorAll('[data-ratio]').forEach(s => s.addEventListener('change', () => { mpDoss.ratio = s.value === 'auto' ? 'auto' : +s.value; const r = $('mpResults'); if (r && mpLastData) mpRenderResults(mpLastData); }));
+  }
+  // Les boutons d'export historiques exportent le dossier multi-pans dès qu'un calepinage existe.
+  function mpHookOldExports(){
+    [['exportPdfBtn', mpExportPdf], ['exportExcelBtn', mpExportXlsx], ['printBtn', mpPrintDossier]].forEach(([k, fn]) => {
+      const b = $(k); if (!b) return;
+      b.addEventListener('click', e => {
+        if (!mpLastData) return;
+        let single = false; try { single = typeof computeZincCalc === 'function' && !!computeZincCalc(); } catch (err) { single = false; }
+        if (single && !confirm('OK = dossier de la toiture multi-pans (plan de pose, débit, poids, vues 3D).\nAnnuler = étude du versant unique.')) return;
+        e.stopImmediatePropagation(); e.preventDefault(); fn();
+      }, true);
+    });
+  }
+  /* ===== v8 : gabarits de courbure (coupe cotée, échelle au choix, points de corde) ===== */
+  const MP_RATIOS = [1, 2, 5, 10, 20, 25, 50, 100, 200];
+  mpDoss.ratio = 'auto';
+  function mpOrdStep(span){ const t = span / 10; return [50, 100, 125, 250, 500, 1000].find(s => s >= t) || 1000; }
+  function mpYAtX(pts, x){
+    for (let i = 0; i < pts.length - 1; i++) { const a = pts[i], b = pts[i + 1]; if ((x >= a[0] && x <= b[0]) || (x <= a[0] && x >= b[0])) { const d = b[0] - a[0]; return Math.abs(d) < 1e-9 ? a[1] : a[1] + (b[1] - a[1]) * (x - a[0]) / d; } }
+    return 0;
+  }
+  function mpCurveSheets(){
+    const data = mpLastData, out = []; if (!data) return out;
+    const prof = (title, vi, C, extra) => {
+      const pf = vi.prof || mpVaultProf(vi, C), pts = []; for (let k = 0; k <= 90; k++) { const q = pf(vi.S * k / 90); pts.push([q.a, q.y]); }
+      const W = Math.max(...pts.map(p => p[0])), H = Math.max(...pts.map(p => p[1])), st = mpOrdStep(W), ords = [];
+      for (let x = 0; x <= W + 0.1; x += st) ords.push([x, mpYAtX(pts, Math.min(x, W))]); if (ords[ords.length - 1][0] < W - 1) ords.push([W, mpYAtX(pts, W)]);
+      return Object.assign({ title, kind: 'profile', pts, W, H, S: vi.S, ords }, extra);
+    };
+    if (data.type === 'voute' && data.vault) out.push(prof('Voûte - coupe transversale', data.vault, data.vault.C, { circ: data.vault }));
+    data.pans.forEach((p, pi) => {
+      if (!(p.curved && p.vo && p.vault)) return;
+      const v = (mpModel.vols || [])[p.vol] || {};
+      if (v.roof === 'dvault') { const pf = mpDemiProfile(v); out.push(prof(`Pan ${pi + 1} - demi-voûte - coupe`, p.vault, p.vo.C, { demi: { F: pf.both ? (+v.fl || 0) : (+v.fl || 0), R: +v.Rv || 1500, al: +v.al || 90, gm: v.gm == null ? 3 : +v.gm, both: pf.both } })); }
+      else out.push(prof(`Pan ${pi + 1} - voûte - coupe`, p.vault, p.vo.C, { circ: p.vault }));
+    });
+    if (data.type === 'modele') (mpModel.vols || []).forEach((v, i) => {
+      if (v.roof !== 'arc' && v.roof !== 'coude') return;
+      const g = v.roof === 'arc' ? mpArcGeom(v) : { Ro: (+v.Ri || 1500) + (+v.cw || 5000), Ri: Math.max(300, +v.Ri || 1500), ang: 90, a0: ((+v.a0 || 0) * Math.PI / 180), full: false };
+      const a0 = g.a0 || 0, an = g.ang * Math.PI / 180, arc = (R) => { const pts = []; for (let k = 0; k <= 80; k++) { const t = a0 + an * k / 80; pts.push([R * Math.cos(t), -R * Math.sin(t)]); } return pts; };
+      const chord = g.full ? 0 : 2 * g.Ro * Math.sin(an / 2), fl = g.full ? 0 : g.Ro * (1 - Math.cos(an / 2)), ords = [];
+      if (!g.full) { const st = mpOrdStep(chord), cc = chord / 2, base = Math.sqrt(Math.max(0, g.Ro * g.Ro - cc * cc)); for (let x = 0; x <= chord + 0.1; x += st) ords.push([x, Math.sqrt(Math.max(0, g.Ro * g.Ro - (x - cc) * (x - cc))) - base]); if (ords[ords.length - 1][0] < chord - 1) ords.push([chord, 0]); }
+      out.push({ title: `Volume ${i + 1} - ${v.roof === 'arc' ? (g.full ? 'cercle / anneau' : 'arc de cercle') : 'coude arrondi'} - gabarit en plan`, kind: 'plan', Ro: g.Ro, Ri: g.Ri, ang: g.ang, a0, outer: arc(g.Ro), inner: g.Ri > 0 ? arc(g.Ri) : null, chord, fl, ords, full: g.full, facets: v.roof === 'arc' ? g.n : null });
+    });
+    return out;
+  }
+  function mpCurvePrims(sh){
+    const P = [];
+    if (sh.kind === 'profile') {
+      const x0 = 0, x1 = sh.W, H = sh.H;
+      P.push({ t: 'poly', pts: sh.pts, w: 0.6, c: '#0f766e' });
+      P.push({ t: 'line', a: [x0, 0], b: [x1, 0], w: 0.3, c: '#555', d: [3, 2] });
+      sh.ords.forEach(([x, y]) => { P.push({ t: 'line', a: [x, 0], b: [x, y], w: 0.15, c: '#8aa', d: null }); P.push({ t: 'text', p: [x, y], s: String(Math.round(y)), sz: 6.5, al: 'c', dy: -1.4, c: '#055' }); });
+      P.push({ t: 'dim', a: [x0, 0], b: [x1, 0], off: 14, s: (sh.demi ? 'Largeur en plan ' : 'Corde ') + Math.round(sh.W) + ' mm' });
+      P.push({ t: 'dim', a: [x1, 0], b: [x1, H], off: 12, s: (sh.demi ? 'Chute ' : 'Flèche ') + Math.round(H) + ' mm' });
+      if (sh.circ) {
+        const c = sh.circ, cx = sh.W / 2, cy = c.f - c.R, an = Math.PI * 0.62, ex = cx + c.R * Math.cos(an), ey = cy + c.R * Math.sin(an), k = 0.5, mx = ex + (cx - ex) * k, my = ey + (cy - ey) * k;
+        P.push({ t: 'line', a: [ex, ey], b: [mx, my], w: 0.25, c: '#b3261e', d: [2, 1.5] });
+        P.push({ t: 'text', p: [(ex + mx) / 2, (ey + my) / 2], s: 'R ' + Math.round(c.R) + ' mm', sz: 8, al: 'c', dy: -1.8, c: '#b3261e' });
+        P.push({ t: 'text', p: [cx, H], s: 'Développé ' + Math.round(sh.S) + ' mm - ouverture ' + (c.th0 * 360 / Math.PI).toFixed(1) + ' deg', sz: 8, al: 'c', dy: -6, c: '#111' });
+      } else if (sh.demi) {
+        const d = sh.demi; P.push({ t: 'text', p: [sh.W / 2, H], s: `Plat ${Math.round(d.F)} mm (pente ${d.gm} deg) + arc R ${Math.round(d.R)} mm / ${d.al} deg - développé ${Math.round(sh.S)} mm`, sz: 8, al: 'c', dy: -6, c: '#111' });
+      }
+    } else {
+      P.push({ t: 'poly', pts: sh.outer, w: 0.6, c: '#0f766e' });
+      if (sh.inner) P.push({ t: 'poly', pts: sh.inner, w: 0.6, c: '#0f766e' });
+      const e = a => a[a.length - 1]; if (!sh.full) { P.push({ t: 'line', a: sh.outer[0], b: sh.inner ? sh.inner[0] : [0, 0], w: 0.4, c: '#0f766e', d: null }); P.push({ t: 'line', a: e(sh.outer), b: sh.inner ? e(sh.inner) : [0, 0], w: 0.4, c: '#0f766e', d: null }); P.push({ t: 'line', a: sh.outer[0], b: e(sh.outer), w: 0.3, c: '#555', d: [3, 2] }); }
+      P.push({ t: 'line', a: [-20, 0], b: [20, 0], w: 0.2, c: '#b3261e', d: null }); P.push({ t: 'line', a: [0, -20], b: [0, 20], w: 0.2, c: '#b3261e', d: null });
+      const mid = Math.PI * 0.25; P.push({ t: 'line', a: [0, 0], b: [sh.Ro * Math.cos(mid) * -1, sh.Ro * Math.sin(mid) * -1], w: 0.25, c: '#b3261e', d: [2, 1.5] });
+      P.push({ t: 'text', p: [-sh.Ro * 0.5 * Math.cos(mid), -sh.Ro * 0.5 * Math.sin(mid)], s: 'R ext ' + Math.round(sh.Ro) + ' mm', sz: 8, al: 'c', dy: -1.8, c: '#b3261e' });
+      if (sh.Ri > 0) P.push({ t: 'text', p: [0, 0], s: 'R int ' + Math.round(sh.Ri) + ' mm', sz: 8, al: 'c', dy: 6, c: '#b3261e' });
+      if (!sh.full) { P.push({ t: 'dim', a: sh.outer[0], b: e(sh.outer), off: 14, s: 'Corde ext. ' + Math.round(sh.chord) + ' mm' }); P.push({ t: 'text', p: [(sh.outer[0][0] + e(sh.outer)[0]) / 2, (sh.outer[0][1] + e(sh.outer)[1]) / 2], s: `Flèche ${Math.round(sh.fl)} mm - angle ${Math.round(sh.ang)} deg - développé ext. ${Math.round(sh.Ro * sh.ang * Math.PI / 180)} mm`, sz: 8, al: 'c', dy: 18, c: '#111' }); }
+      else P.push({ t: 'text', p: [0, sh.Ro], s: `Cercle R ${Math.round(sh.Ro)} mm - circonférence ${Math.round(2 * Math.PI * sh.Ro)} mm`, sz: 8, al: 'c', dy: -6, c: '#111' });
+    }
+    return P;
+  }
+  // Primitives (mm réels) -> opérations papier (mm) à l'échelle 1:N, y vers le bas.
+  function mpCurveOps(prims, N){
+    const sc = 1 / N, ops = [], X = p => p[0] * sc, Y = p => -p[1] * sc;
+    prims.forEach(q => {
+      if (q.t === 'poly') for (let i = 0; i < q.pts.length - 1; i++) ops.push({ k: 'seg', x1: X(q.pts[i]), y1: Y(q.pts[i]), x2: X(q.pts[i + 1]), y2: Y(q.pts[i + 1]), w: q.w, c: q.c, d: q.d });
+      else if (q.t === 'line') ops.push({ k: 'seg', x1: X(q.a), y1: Y(q.a), x2: X(q.b), y2: Y(q.b), w: q.w, c: q.c, d: q.d });
+      else if (q.t === 'text') ops.push({ k: 'txt', x: X(q.p), y: Y(q.p) + (q.dy || 0), s: q.s, sz: q.sz, al: q.al, c: q.c });
+      else if (q.t === 'dim') {
+        const ax = X(q.a), ay = Y(q.a), bx = X(q.b), by = Y(q.b), dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L; let nx = -uy, ny = ux; if (q.off < 0) { nx = -nx; ny = -ny; } const o = Math.abs(q.off), c = '#222';
+        const Ax = ax + nx * o, Ay = ay + ny * o, Bx = bx + nx * o, By = by + ny * o;
+        ops.push({ k: 'seg', x1: ax, y1: ay, x2: Ax + nx * 2, y2: Ay + ny * 2, w: 0.15, c, d: null }, { k: 'seg', x1: bx, y1: by, x2: Bx + nx * 2, y2: By + ny * 2, w: 0.15, c, d: null }, { k: 'seg', x1: Ax, y1: Ay, x2: Bx, y2: By, w: 0.25, c, d: null });
+        [[Ax, Ay, 1], [Bx, By, -1]].forEach(([px, py, sg]) => { ops.push({ k: 'seg', x1: px, y1: py, x2: px + sg * ux * 2.4 + nx * 0.9, y2: py + sg * uy * 2.4 + ny * 0.9, w: 0.25, c, d: null }, { k: 'seg', x1: px, y1: py, x2: px + sg * ux * 2.4 - nx * 0.9, y2: py + sg * uy * 2.4 - ny * 0.9, w: 0.25, c, d: null }); });
+        ops.push({ k: 'txt', x: (Ax + Bx) / 2 + nx * 3.2, y: (Ay + By) / 2 + ny * 3.2 + 1.2, s: q.s, sz: 8, al: 'c', c });
+      }
+    });
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    ops.forEach(o => { if (o.k === 'seg') { x0 = Math.min(x0, o.x1, o.x2); x1 = Math.max(x1, o.x1, o.x2); y0 = Math.min(y0, o.y1, o.y2); y1 = Math.max(y1, o.y1, o.y2); } else { const w = o.s.length * o.sz * 0.2, h = o.sz * 0.36; x0 = Math.min(x0, o.x - w / 2); x1 = Math.max(x1, o.x + w / 2); y0 = Math.min(y0, o.y - h); y1 = Math.max(y1, o.y + h * 0.4); } });
+    return { ops, box: { x0: x0 - 6, y0: y0 - 6, x1: x1 + 6, y1: y1 + 6 }, N };
+  }
+  function mpCurveFit(sh, W, H){
+    const prims = mpCurvePrims(sh), want = mpDoss.ratio === 'auto' ? 0 : +mpDoss.ratio;
+    if (want) return mpCurveOps(prims, want);
+    let r = null; for (const N of MP_RATIOS) { r = mpCurveOps(prims, N); if (r.box.x1 - r.box.x0 <= W && r.box.y1 - r.box.y0 <= H) return r; } return r;
+  }
+  function mpCurveSvg(sh){
+    const r = mpCurveFit(sh, 260, 150), b = r.box, f = o => o.toFixed(2);
+    const body = r.ops.map(o => o.k === 'seg' ? `<line x1="${f(o.x1)}" y1="${f(o.y1)}" x2="${f(o.x2)}" y2="${f(o.y2)}" stroke="${o.c}" stroke-width="${o.w}"${o.d ? ` stroke-dasharray="${o.d[0]} ${o.d[1]}"` : ''}/>` : `<text x="${f(o.x)}" y="${f(o.y)}" font-size="${(o.sz * 0.3528).toFixed(2)}" text-anchor="${o.al === 'c' ? 'middle' : o.al === 'r' ? 'end' : 'start'}" fill="${o.c}" font-family="Arial,sans-serif">${String(o.s).replace(/&/g, '&amp;').replace(/</g, '&lt;')}</text>`).join('');
+    return { N: r.N, svg: `<svg viewBox="${f(b.x0)} ${f(b.y0)} ${f(b.x1 - b.x0)} ${f(b.y1 - b.y0)}" style="width:100%;height:auto;max-height:340px;background:#fff;border:1px solid #e3e6e9;border-radius:6px;">${body}</svg>` };
+  }
+  function mpCurveHtml(){
+    const sheets = mpCurveSheets(); if (!sheets.length) return '';
+    return `<div class="panel-title" style="font-size:12px;margin-top:14px;">Gabarits de courbure — coupe cotée</div>
+      <div class="biais-hint" style="margin-top:-2px;">Échelle : ${mpDoss.ratio === 'auto' ? 'automatique' : '1:' + mpDoss.ratio} (réglable au-dessus du plan, « Échelle gabarit »). Le PDF gabarit se découpe en tuiles A4 quand l'échelle est grande (1:1, 1:2...).</div>
+      ${sheets.map(sh => { const s = mpCurveSvg(sh); return `<div style="margin:8px 0;"><div style="font-size:12px;font-weight:700;color:#0f766e;margin-bottom:3px;">${sh.title} <span style="font-weight:400;color:#6b7178;">(aperçu 1:${s.N})</span></div>${s.svg}
+        <div style="max-height:150px;overflow:auto;margin-top:4px;"><table class="biais-seg-table"><thead><tr><th>${sh.kind === 'profile' ? 'Distance au bord (mm)' : 'Distance sur la corde (mm)'}</th><th>Hauteur (mm)</th></tr></thead><tbody>${sh.ords.map(o => `<tr><td>${Math.round(o[0])}</td><td>${Math.round(o[1])}</td></tr>`).join('')}</tbody></table></div></div>`; }).join('')}`;
+  }
+  /* ----- PDF : une ou plusieurs tuiles A4 par gabarit ----- */
+  function mpPdfClip(x1, y1, x2, y2, r){
+    let t0 = 0, t1 = 1; const dx = x2 - x1, dy = y2 - y1;
+    for (const [p, q] of [[-dx, x1 - r.x0], [dx, r.x1 - x1], [-dy, y1 - r.y0], [dy, r.y1 - y1]]) { if (p === 0) { if (q < 0) return null; } else { const t = q / p; if (p < 0) { if (t > t1) return null; if (t > t0) t0 = t; } else { if (t < t0) return null; if (t < t1) t1 = t; } } }
+    return [x1 + t0 * dx, y1 + t0 * dy, x1 + t1 * dx, y1 + t1 * dy];
+  }
+  function mpPdfCurve(doc, sh, head, newPage){
+    const r = mpCurveFit(sh, 262, 150), b = r.box, W = b.x1 - b.x0, H = b.y1 - b.y0, tw = 262, th = 150, ov = 10, nx = Math.max(1, Math.ceil((W - ov) / (tw - ov))), ny = Math.max(1, Math.ceil((H - ov) / (th - ov)));
+    const hex = c => [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)];
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      newPage(); head(`Gabarit - ${sh.title}`);
+      const tx0 = b.x0 + i * (tw - ov), ty0 = b.y0 + j * (th - ov), R = { x0: tx0, y0: ty0, x1: tx0 + tw, y1: ty0 + th }, ox = 12 - tx0, oy = 24 - ty0;
+      r.ops.forEach(o => {
+        if (o.k === 'seg') { const s = mpPdfClip(o.x1, o.y1, o.x2, o.y2, R); if (!s) return; const [cr, cg, cb] = hex(o.c); doc.setDrawColor(cr, cg, cb); doc.setLineWidth(o.w); try { doc.setLineDashPattern(o.d || [], 0); } catch (e) { /* ancien jsPDF */ } doc.line(s[0] + ox, s[1] + oy, s[2] + ox, s[3] + oy); }
+        else if (o.x >= R.x0 && o.x <= R.x1 && o.y >= R.y0 && o.y <= R.y1) { const [cr, cg, cb] = hex(o.c); doc.setTextColor(cr, cg, cb); doc.setFontSize(o.sz); doc.text(mpAscii(o.s), o.x + ox, o.y + oy, { align: o.al === 'c' ? 'center' : o.al === 'r' ? 'right' : 'left' }); }
+      });
+      try { doc.setLineDashPattern([], 0); } catch (e) { /* ignore */ } doc.setTextColor(0); doc.setDrawColor(0); doc.setLineWidth(0.2);
+      doc.setDrawColor(150); [[12, 24], [12 + tw, 24], [12, 24 + th], [12 + tw, 24 + th]].forEach(([x, y]) => { doc.line(x - 3, y, x + 3, y); doc.line(x, y - 3, x, y + 3); }); doc.setDrawColor(0);
+      doc.setFontSize(8.5); doc.setTextColor(60); doc.text(mpAscii(`Echelle 1:${r.N}${nx * ny > 1 ? ` - tuile ${i + 1}/${nx} x ${j + 1}/${ny} : assembler bord à bord (recouvrement ${ov} mm) en alignant les croix` : ''} - imprimer à 100 % (sans mise à l'échelle) et vérifier une cote avant découpe.`), 12, 24 + th + 9); doc.setTextColor(0);
+    }
+    newPage(); head(`Points de corde - ${sh.title}`);
+    doc.setFontSize(9); doc.text(mpAscii(sh.kind === 'profile' ? 'Hauteur de la courbe au-dessus de la ligne d\'appui, mesurée depuis le bord (mm) :' : 'Hauteur de l\'arc extérieur au-dessus de la corde, mesurée le long de la corde (mm) :'), 12, 28);
+    return mpPdfTable(doc, 36, [{ t: sh.kind === 'profile' ? 'Distance au bord (mm)' : 'Sur la corde (mm)', w: 60, al: 'r' }, { t: 'Hauteur (mm)', w: 50, al: 'r' }], sh.ords.map(o => [String(Math.round(o[0])), String(Math.round(o[1]))]), { top: 26, newPage: () => { doc.addPage(); head(`Points de corde - ${sh.title} (suite)`); } });
+  }
+  async function mpExportGabarit(){
+    const sheets = mpCurveSheets(); if (!sheets.length) { showToast('Aucune partie courbe dans ce projet.'); return; }
+    const { jsPDF } = window.jspdf, doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' }); let first = true;
+    const head = t => { doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(15, 118, 110); doc.text(mpAscii(t), 12, 14); doc.setTextColor(90); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text(mpAscii(`ALTEMA - gabarits de courbure - ${mpMatNow().label}`), 285, 14, { align: 'right' }); doc.setTextColor(0); doc.setDrawColor(15, 118, 110); doc.line(12, 17, 285, 17); doc.setDrawColor(0); };
+    const np = () => { if (first) first = false; else doc.addPage(); };
+    sheets.forEach(sh => mpPdfCurve(doc, sh, head, np));
+    const n = doc.internal.getNumberOfPages(); for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFontSize(8); doc.setTextColor(120); doc.text(`${i} / ${n}`, 285, 204, { align: 'right' }); }
+    doc.save('gabarits_courbure_altema.pdf'); showToast('PDF des gabarits généré.');
+  }
 
   $('mpReplayBtn').addEventListener('click', mpPlayInstallation);
   mpBuildControls();
   mpSetupV4();
+  mpHookOldExports();
 
   $('mpExplodeRange').addEventListener('input', e => {
     mpExplodeAmount = parseFloat(e.target.value) || 0;
