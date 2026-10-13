@@ -425,6 +425,28 @@
   .tab-btn:hover{color:var(--text-dim);}
   .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
   .tab-panel{display:none;}
+  /* Accueil : petite ville interactive en plein écran */
+  .town-wrap{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:#cfe6f7;}
+  .town-wrap canvas{display:block;width:100%;height:clamp(420px,76vh,880px);touch-action:manipulation;}
+  html.home-full,html.home-full body{overflow:hidden;}
+  html.home-full .tabs-nav,html.home-full header{display:none !important;}
+  html.home-full #tab-accueil .town-wrap{position:fixed;inset:0;z-index:40;border-radius:0;border:0;}
+  html.home-full #tab-accueil .town-wrap canvas{height:100vh;height:100dvh;}
+  .town-top{position:absolute;top:10px;left:12px;right:12px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;z-index:6;pointer-events:none;}
+  .town-top>*,.town-bottom>*{pointer-events:auto;}
+  .town-brand{display:flex;align-items:center;gap:9px;padding:7px 15px 7px 11px;border-radius:12px;background:rgba(20,24,28,.82);backdrop-filter:blur(6px);color:#fff;font-weight:800;letter-spacing:1.6px;font-size:15px;box-shadow:0 6px 18px rgba(0,0,0,.25);}
+  .town-actions{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;}
+  .town-actions button,.town-links button{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid rgba(255,255,255,.18);border-radius:10px;background:rgba(20,24,28,.78);backdrop-filter:blur(6px);color:#fff;font-size:12.5px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.22);}
+  .town-actions button b{font-weight:400;}
+  .town-actions button:hover,.town-links button:hover{background:rgba(255,138,31,.92);border-color:#ffb35c;}
+  .town-bottom{position:absolute;left:12px;right:12px;bottom:10px;display:flex;flex-direction:column;align-items:center;gap:7px;z-index:6;pointer-events:none;}
+  .town-hint{padding:4px 12px;border-radius:999px;background:rgba(255,255,255,.72);color:#2a2f35;font-size:11.5px;text-align:center;}
+  .town-links{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;}
+  .town-tip{position:absolute;pointer-events:none;max-width:290px;background:rgba(20,24,28,.94);color:#fff;border:1px solid rgba(255,255,255,.14);border-left:4px solid #ff8a1f;border-radius:10px;padding:9px 12px;font-size:12.5px;line-height:1.4;box-shadow:0 8px 24px rgba(0,0,0,.4);opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s;z-index:7;}
+  .town-tip.on{opacity:1;transform:none;}
+  .town-tip b{display:block;font-size:13.5px;margin-bottom:3px;color:#ffb35c;}
+  .town-tip i{display:block;margin-top:6px;font-style:normal;font-size:11px;color:#9fe0b8;}
+  @media (max-width:700px){.town-actions button span{display:none}.town-actions button{padding:8px 10px}.town-links button{padding:6px 9px;font-size:11.5px}.town-hint{display:none}.town-brand{font-size:13px}}
   .tab-panel.active{display:block;}
 
   .seg-row{
@@ -1199,7 +1221,8 @@ details[data-sec] > summary{-webkit-tap-highlight-color:transparent;}
   </header>
 
   <div class="tabs-nav">
-    <button class="tab-btn active" data-tab="tab-debit">Plan de débit</button>
+    <button class="tab-btn active" data-tab="tab-accueil">🏠 Accueil</button>
+    <button class="tab-btn" data-tab="tab-debit">Plan de débit</button>
     <button class="tab-btn" data-tab="tab-pliage">Plan de pliage</button>
     <button class="tab-btn" data-tab="tab-assemblage">Assemblage</button>
     <button class="tab-btn" data-tab="tab-tasseaux" style="display:none">Bac à tasseaux</button>
@@ -1207,7 +1230,37 @@ details[data-sec] > summary{-webkit-tap-highlight-color:transparent;}
     <button class="tab-btn" data-tab="tab-couvertine">Couvertine acrotère</button>
   </div>
 
-  <div id="tab-debit" class="tab-panel active">
+  <div id="tab-accueil" class="tab-panel active">
+    <div class="town-wrap">
+      <canvas id="altemaTownCv" aria-label="Petite ville ALTEMA : clique sur un lieu pour ouvrir l'outil correspondant"></canvas>
+      <div class="town-top">
+        <div class="town-brand"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M0 20 L7.6 0 L12.4 0 L20 20 L15.6 20 L10 7.2 L4.4 20 Z M6 13 H14 V15.4 H6 Z" fill="#ff7a1a"/></svg>ALTEMA</div>
+        <div class="town-actions">
+          <button type="button" data-town-hdr="openTutorialBtn" title="Guide de prise en main"><b>▶</b><span>Guide</span></button>
+          <button type="button" data-town-hdr="exportProjectBtn" title="Exporter le projet complet"><b>💾</b><span>Exporter</span></button>
+          <button type="button" data-town-hdr="import" title="Importer un projet"><b>📂</b><span>Importer</span></button>
+          <button type="button" data-town-hdr="requestBtn" title="Demande de mise à jour"><b>✉</b><span>Mise à jour</span></button>
+          <button type="button" data-town-hdr="themeToggleBtn" title="Mode clair / sombre"><b>☀</b><span>Thème</span></button>
+          <button type="button" data-town-hdr="settingsBtn" title="Paramètres"><b>⚙</b><span>Paramètres</span></button>
+        </div>
+      </div>
+      <div class="town-bottom">
+        <div class="town-hint">Survole un lieu pour voir à quoi il sert, clique pour l'ouvrir (tablette : touche une fois pour la description, une seconde fois pour y aller).</div>
+        <div class="town-links">
+          <button type="button" data-town-go="debit">✂ Plan de débit</button>
+          <button type="button" data-town-go="pliage">📐 Plan de pliage</button>
+          <button type="button" data-town-go="assemblage">🔧 Assemblage</button>
+          <button type="button" data-town-go="couvertine">🏠 Couvertine d'acrotère</button>
+          <button type="button" data-town-go="jd">Zinc joint debout</button>
+          <button type="button" data-town-go="acier">Bac acier</button>
+          <button type="button" data-town-go="tasseaux">Zinc à tasseaux</button>
+        </div>
+      </div>
+      <div id="altemaTownTip" class="town-tip" role="tooltip"></div>
+    </div>
+  </div>
+
+  <div id="tab-debit" class="tab-panel">
     <div class="grid">
       <div>
         <div class="panel">
@@ -2288,16 +2341,6 @@ function updateProfile3DLabels(){
     const lbl = document.createElement('div');
     lbl.textContent = d.text;
     lbl.style.cssText = `position:absolute;left:${d.mid.x}px;top:${d.mid.y}px;transform:translate(-50%,-50%);
-      font-family:'JetBrains Mono',monospace;font-size:11px;${freeLabelTextStyle(false)}`;
-    profile3DLabelsWrap.appendChild(lbl);
-  }
-  function drawSimpleLabel(p, text){
-    const dot = document.createElement('div');
-    dot.style.cssText = `position:absolute;left:${p.x}px;top:${p.y}px;width:5px;height:5px;margin:-2.5px;border-radius:50%;background:var(--accent);`;
-    profile3DLabelsWrap.appendChild(dot);
-    const lbl = document.createElement('div');
-    lbl.textContent = text;
-    lbl.style.cssText = `position:absolute;left:${p.x}px;top:${p.y - 16}px;transform:translate(-50%,-100%);
       font-family:'JetBrains Mono',monospace;font-size:11px;${freeLabelTextStyle(false)}`;
     profile3DLabelsWrap.appendChild(lbl);
   }
@@ -8608,6 +8651,8 @@ function createZincController(suffix, kind){
 
   root.innerHTML = `
     <div>
+      <!-- Ancien mode « versant unique » : retiré de l'interface (remplacé par le calculateur multi-pans). Le code reste inerte, hors écran. -->
+      <div id="${id('legacyZinc')}" style="display:none;" aria-hidden="true">
       <div class="panel">
         <div class="panel-title"><span>Forme du versant</span></div>
         <div class="dir-toggle male-toggle" id="${id('shapeModeToggle')}" style="margin-bottom:12px;">
@@ -8693,10 +8738,6 @@ function createZincController(suffix, kind){
         <div class="panel-title"><span>${isTasseaux ? 'Bac à tasseaux' : 'Joint debout'} — calepinage</span></div>
         <div class="sheet-fields">
           <div class="field">
-            <label>Largeur utile / bac (mm)</label>
-            <input type="number" id="${id('largeurBac')}" value="500" min="50">
-          </div>
-          <div class="field">
             <label>${isTasseaux ? 'Largeur tasseau (mm)' : 'Largeur relief joint debout (mm)'}</label>
             <input type="number" id="${id('largeurTasseau')}" value="${isTasseaux ? 40 : 25}" min="10">
           </div>
@@ -8771,6 +8812,7 @@ function createZincController(suffix, kind){
         <div class="toggle-row" style="margin-top:6px;"><input type="checkbox" id="${id('optVolige')}"><span>Volige sous la couverture</span></div>
         <div class="toggle-row" style="margin-top:6px;"><input type="checkbox" id="${id('optBandeZ')}"><span>Habillage en bande Z en bas de pente</span></div>
       </div>
+      </div>
 
       <div class="panel" style="margin-top:16px;">
         <div class="panel-title"><span>Calculateur multi-pans (arêtiers, faîtage, noues)</span></div>
@@ -8797,6 +8839,10 @@ function createZincController(suffix, kind){
                 <option value="T">En T</option>
                 <option value="U">En U</option>
               </select>
+            </div>
+            <div class="field" style="margin-top:10px;">
+              <label>Largeur utile d'un bac zinc (mm)</label>
+              <input type="number" id="${id('largeurBac')}" value="500" min="50" step="10">
             </div>
           </div>
 
@@ -8835,6 +8881,7 @@ function createZincController(suffix, kind){
         </div>
       </div>
 
+      <div id="${id('legacyZinc2')}" style="display:none;" aria-hidden="true">
       <div class="panel" style="margin-top:16px;">
         <div class="panel-title"><span>Accessoires (rive, égout, faîtage)</span></div>
         <div id="${id('accessoiresWrap')}"></div>
@@ -8845,6 +8892,7 @@ function createZincController(suffix, kind){
       </button>
       <button class="mail-btn" id="${id('exportPdfBtn')}" type="button" style="margin-top:10px;">📄 Exporter en PDF (avec plan &amp; vue 3D)</button>
       <button class="mail-btn" id="${id('exportExcelBtn')}" type="button" style="margin-top:10px;">📊 Exporter le récapitulatif (Excel)</button>
+      </div>
     </div>
 
     <div>
@@ -8918,7 +8966,7 @@ function createZincController(suffix, kind){
         <div id="${id('mpResults')}" style="margin-top:12px;"></div>
       </div>
 
-      <div class="panel" style="margin-top:16px;">
+      <div class="panel" style="margin-top:16px;display:none;" aria-hidden="true">
         <div class="panel-title"><span>Vue globale du projet (tous les versants)</span></div>
         <div class="biais-hint">Cumule tous les versants enregistrés ci-dessus — pratique pour une toiture à plusieurs pans.</div>
         <div id="${id('globalPlanWrap')}" style="background:#fff;border-radius:8px;padding:10px;margin-top:10px;"></div>
@@ -9380,7 +9428,6 @@ function createZincController(suffix, kind){
   const MP_EXPLODE_MAX = 900;
   
   let mpLastData = null;
-  function mpStagedOffset(startFraction){ return Math.max(0, mpExplodeAmount - MP_EXPLODE_MAX * startFraction); }
   // Sens de pose par pan : le bac de départ est posé en premier (ne bouge
   // jamais dans l'éclaté), les autres se soulèvent en s'en éloignant.
   let mpBacStartByPan = [];
@@ -9730,22 +9777,41 @@ function createZincController(suffix, kind){
       rects: [{ x0: 0, y0: 0, sx: bw, sy: bh, z: 0, fill: null, wallsPoly: pts.map(q => ({ x: q.x, y: q.y })), tan }],
       valleys: new Set(), tan, houseH, type: "libre", libre: { N: I.N, area: I.area, per: I.per }, off: { x: 0, y: 0 } };
   }
-  function mpLibreCotesSvg(data, fs){
-    const pts = data.pans[0].pts, N = pts.length, f = fs * 0.85; let s = "";
-    pts.forEach((a, i) => {
-      const b = pts[(i + 1) % N], c = pts[(i - 1 + N) % N], dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy);
-      if (L > 200) {
-        const nx = dy / L, ny = -dx / L, mx = (a.x + b.x) / 2 + nx * f * 1.7, my = (a.y + b.y) / 2 + ny * f * 1.7;
+  // Cotes de TOUTES les arêtes de TOUS les pans (arête partagée = une seule cote, centrée sur le trait).
+  // Valeur principale = longueur en plan ; entre parenthèses = longueur réelle suivant la pente (si elle diffère).
+  function mpPlanEdgeCotes(data, fs){
+    const f = fs * 1.05, cnt = new Map(), seen = new Set(); let s = '';
+    const keyOf = (a, b) => [mpKey(a, b), mpKey(b, a)].sort().join('|');
+    data.pans.forEach(p => p.pts.forEach((a, i) => { const k = keyOf(a, p.pts[(i + 1) % p.pts.length]); cnt.set(k, (cnt.get(k) || 0) + 1); }));
+    data.pans.forEach(p => {
+      const pts = p.pts, N = pts.length; let cx = 0, cy = 0; pts.forEach(q => { cx += q.x / N; cy += q.y / N; });
+      pts.forEach((a, i) => {
+        const b = pts[(i + 1) % N], k = keyOf(a, b); if (seen.has(k)) return; seen.add(k);
+        const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy); if (L < f * 4) return;
+        const L3 = Math.hypot(dx, dy, b.h - a.h), shared = cnt.get(k) > 1, two = L3 > L * 1.01 && L3 - L > 5;
+        let nx = dy / L, ny = -dx / L; if (((a.x + b.x) / 2 - cx) * nx + ((a.y + b.y) / 2 - cy) * ny < 0) { nx = -nx; ny = -ny; }
+        const off = shared ? 0 : f * (two ? 2.1 : 1.6), mx = (a.x + b.x) / 2 + nx * off, my = (a.y + b.y) / 2 + ny * off;
         let ang = Math.atan2(dy, dx) * 180 / Math.PI; if (ang > 90 || ang < -90) ang += 180;
-        s += `<text transform="translate(${mx},${my}) rotate(${ang})" font-size="${f}" fill="#0f766e" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono, monospace" font-weight="700">${Math.round(L)}</text>`;
-      }
-      const d1x = a.x - c.x, d1y = a.y - c.y, turn = Math.atan2(d1x * dy - d1y * dx, d1x * dx + d1y * dy) * 180 / Math.PI, ia = 180 - turn;
-      if (Math.abs(ia - 180) > 1) {
-        const l1 = Math.hypot(c.x - a.x, c.y - a.y) || 1, l2 = L || 1;
-        let bx = (c.x - a.x) / l1 + dx / l2, by = (c.y - a.y) / l1 + dy / l2; const bl = Math.hypot(bx, by) || 1; bx /= bl; by /= bl;
-        if (ia > 180) { bx = -bx; by = -by; }
-        s += `<text x="${a.x + bx * f * 2.6}" y="${a.y + by * f * 2.6}" font-size="${f * 0.9}" fill="#6b7178" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono, monospace">${Math.round(ia)}°</text>`;
-      }
+        const T = (y, size, fill, txt, wgt) => `<text y="${y}" font-size="${size}" fill="${fill}" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono, monospace" font-weight="${wgt}" paint-order="stroke" stroke="#fff" stroke-width="${f * 0.3}" stroke-linejoin="round">${txt}</text>`;
+        s += `<g transform="translate(${mx},${my}) rotate(${ang})" pointer-events="none">${T(two ? -f * 0.5 : 0, f, '#0f766e', Math.round(L), 700)}${two ? T(f * 0.62, f * 0.78, '#6b7178', '(' + Math.round(L3) + ')', 400) : ''}</g>`;
+      });
+    });
+    return s;
+  }
+  function mpLibreCotesSvg(data, fs){
+    const f = fs * 0.85; let s = mpShowEdgeCotes ? mpPlanEdgeCotes(data, fs) : "";
+    data.pans.forEach(p => {   // angles intérieurs de chaque pan (avant : seulement le premier pan)
+      const pts = p.pts, N = pts.length;
+      pts.forEach((a, i) => {
+        const b = pts[(i + 1) % N], c = pts[(i - 1 + N) % N], dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy);
+        const d1x = a.x - c.x, d1y = a.y - c.y, turn = Math.atan2(d1x * dy - d1y * dx, d1x * dx + d1y * dy) * 180 / Math.PI, ia = 180 - turn;
+        if (Math.abs(ia - 180) > 1 && Math.abs(ia - 90) > 0.5) {   // les angles droits ne sont pas répétés partout
+          const l1 = Math.hypot(c.x - a.x, c.y - a.y) || 1, l2 = L || 1;
+          let bx = (c.x - a.x) / l1 + dx / l2, by = (c.y - a.y) / l1 + dy / l2; const bl = Math.hypot(bx, by) || 1; bx /= bl; by /= bl;
+          if (ia > 180) { bx = -bx; by = -by; }
+          s += `<text x="${a.x + bx * f * 2.6}" y="${a.y + by * f * 2.6}" font-size="${f * 0.9}" fill="#6b7178" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono, monospace" paint-order="stroke" stroke="#fff" stroke-width="${f * 0.25}">${Math.round(ia)}°</text>`;
+        }
+      });
     });
     return s;
   }
@@ -10190,6 +10256,9 @@ function createZincController(suffix, kind){
     faitage: [["std", "Faîtière standard", 333], ["demi", "Faîtière demi-boudin", 333], ["plate", "Faîtière plate (deux plis)", 333], ["ventile", "Faîtière ventilée", 400]]
   };
   let mpAcc = { rive: { t: "auto", dev: 0 }, egout: { t: "auto", dev: 0 }, faitage: { t: "auto", dev: 0 } };
+  // Compléments de bas de pente (repris de l'ancien mode « versant unique ») : développés indicatifs, modifiables plus tard si besoin
+  let mpCompl = { sousFace: false, bandeZ: false };
+  const MP_COMPL = { sousFace: ['Sous-face (cassette) en bas de pente', 300], bandeZ: ['Bande Z (habillage bas de pente)', 85] };
   function mpAccId(kind){ const a = mpAcc[kind]; if (a && a.t && a.t !== "auto") return a.t; return kind === "faitage" && mpMatNow().steel ? "demi" : "std"; }
   function mpAccDef(kind){
     const list = MP_ACC_TYPES[kind]; if (!list) return null;
@@ -10204,10 +10273,11 @@ function createZincController(suffix, kind){
       return `<label style="font-size:11px;color:#4a5056;">${t} <select data-acct="${k}" style="${sel}"><option value="auto"${cur === "auto" ? " selected" : ""}>Standard : ${stdLab}</option>${MP_ACC_TYPES[k].map(x => `<option value="${x[0]}"${cur === x[0] ? " selected" : ""}>${x[1]}</option>`).join("")}</select></label>
         <label style="font-size:11px;color:#4a5056;">dév. <input data-accdev="${k}" type="number" min="0" step="10" value="${Math.round(d.dev)}" style="${nin}"> mm</label>`;
     };
-    return `<div style="display:flex;gap:6px 12px;flex-wrap:wrap;align-items:center;margin-bottom:6px;"><span style="font-size:11.5px;color:#4a5056;font-weight:600;">Accessoires :</span>${row("rive", "Rive")}${row("egout", "Bande d'égout")}${row("faitage", "Faîtage")}
-      <div style="flex-basis:100%;font-size:11px;color:#6b7178;">Sans choix, c'est le standard (faîtière demi-boudin en bac acier). Les développés par défaut sont indicatifs : modifie-les si tu as tes valeurs.</div></div>`;
+    return `<div style="display:flex;gap:6px 12px;flex-wrap:wrap;align-items:center;margin-bottom:6px;"><span style="font-size:11.5px;color:#4a5056;font-weight:600;">Accessoires :</span>${row("rive", "Rive")}${row("egout", "Bande d'égout")}${row("faitage", "Faîtage")}<label style="font-size:11px;color:#4a5056;display:inline-flex;gap:4px;align-items:center;"><input type="checkbox" data-compl="sousFace"${mpCompl.sousFace ? " checked" : ""}> Sous-face (cassette) en bas de pente</label><label style="font-size:11px;color:#4a5056;display:inline-flex;gap:4px;align-items:center;"><input type="checkbox" data-compl="bandeZ"${mpCompl.bandeZ ? " checked" : ""}> Bande Z en bas de pente</label>
+      <div style="flex-basis:100%;font-size:11px;color:#6b7178;">Sans choix, c'est le standard (faîtière demi-boudin en bac acier). Les développés par défaut sont indicatifs : modifie-les si tu as tes valeurs. Sous-face : 300 mm de profondeur, bande Z : 85 mm développés (indicatif).</div></div>`;
   }
   function mpAccWire(root, again){
+    root.querySelectorAll("[data-compl]").forEach(e => e.addEventListener("change", () => { mpCompl[e.dataset.compl] = e.checked; again(); }));
     root.querySelectorAll("[data-acct]").forEach(e => e.addEventListener("change", () => { mpAcc[e.dataset.acct] = { t: e.value, dev: 0 }; again(); }));
     root.querySelectorAll("[data-accdev]").forEach(e => e.addEventListener("change", () => { const k = e.dataset.accdev, d = mpAccDef(k), n = Math.max(0, parseFloat(e.value) || 0); mpAcc[k] = { t: (mpAcc[k] && mpAcc[k].t) || "auto", dev: n === d.base ? 0 : n }; again(); }));
   }
@@ -10297,10 +10367,6 @@ function createZincController(suffix, kind){
 
 
   // Repère local d'un pan (u = le long de l'égout, v = pente, n = normale).
-  function mpPanPointAlongEdge(A, B, mm, totalLen){
-    const t = totalLen > 0.01 ? mm / totalLen : 0;
-    return { x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t, h: A.h + (B.h - A.h) * t };
-  }
   function mpDot3(A, B){ return A.x * B.x + A.y * B.y + A.h * B.h; }
   function mpLocalUV(basis, Q){
     const d = { x: Q.x - basis.p0.x, y: Q.y - basis.p0.y, h: Q.h - basis.p0.h };
@@ -10319,6 +10385,7 @@ function createZincController(suffix, kind){
   let mpL = { pannes: [], volige: [], ecran: [], bacs: [], acc: [] };
   let mpVis = { pannes: true, volige: true, ecran: true, bacs: true, acc: true, maison: true, pins: true };
   let mpPlanZoom = 1;
+  let mpShowEdgeCotes = true;   // cotes de toutes les arêtes de tous les pans
   let mpEcorche = true, mpPins = [], mpPinLayer = null, mpHouse = [], mpAnimating = false;
   const mpCam = { th: 0.8, ph: 1.0, r: 1000, r0: 1000, t: null };
   const mpKey = (A, B) => [A.x, A.y, A.h, B.x, B.y, B.h].map(v => Math.round(v)).join('_');
@@ -10570,6 +10637,8 @@ function createZincController(suffix, kind){
         ${seg.nDiv && seg.ovArea > 0 ? tr('Surface en recouvrement transversal', seg.ovArea.toFixed(2).replace('.', ',') + ' m²') : ''}
         ${seg.nDiv && seg.P.iso && seg.P.mode !== 'aucun' ? tr('Démoussage PIR (' + MP_DEM_TXT[seg.P.mode] + ')', `${seg.demLin.toFixed(1).replace('.', ',')} m de largeur · ${seg.demArea.toFixed(2).replace('.', ',')} m²`) : ''}
         ${ed.egout > 1 ? tr(mpAccDef('egout').label, mm(ed.egout)) : ''}
+        ${mpCompl.sousFace && ed.egout > 1 ? tr(MP_COMPL.sousFace[0], mm(ed.egout)) : ''}
+        ${mpCompl.bandeZ && ed.egout > 1 ? tr(MP_COMPL.bandeZ[0], mm(ed.egout)) : ''}
         ${ed.rive > 1 ? tr(mpAccDef('rive').label, mm(ed.rive)) : ''}
         ${ed.mur ? tr('Solins contre mur', mm(ed.mur)) : ''}
         ${ed.rejet ? tr('Rejets d\'eau (bavette)', mm(ed.rejet)) : ''}
@@ -10653,6 +10722,7 @@ function createZincController(suffix, kind){
       if (mode === 'left') arrow(0.08, 0.85, off); else if (mode === 'right') arrow(0.92, 0.15, off); else { arrow(0.5, 0.12, off); arrow(0.5, 0.88, off); }
     });
     if (data.type === 'libre') svg += mpLibreCotesSvg(data, fs);
+    else if (mpShowEdgeCotes && data.type !== 'voute') svg += mpPlanEdgeCotes(data, fs);
     svg += mpRulersSvg(data, fs);
     mpItems.forEach(it => { svg += mpItemG(it, data, fs); });
     if (data.type === 'modele') svg += mpModelSvg(data, fs);
@@ -10662,7 +10732,7 @@ function createZincController(suffix, kind){
     const btn = 'padding:5px 11px;border:1px solid #c9ced3;border-radius:6px;background:#f4f6f8;color:#2a2f35;font-size:12px;cursor:pointer;';
     wrap.innerHTML = mpToolbarHtml() + `<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
         <button type="button" data-z="out" style="${btn}">−</button><button type="button" data-z="in" style="${btn}">+</button>
-        <button type="button" data-z="fit" style="${btn}">Ajuster</button><button type="button" data-z="full" style="${btn}">⛶ Plein écran</button>
+        <button type="button" data-z="fit" style="${btn}">Ajuster</button><button type="button" data-z="cotes" style="${btn}${mpShowEdgeCotes ? 'background:#d9f2ee;border-color:#7cc8b0;' : ''}" title="Afficher / masquer les cotes de toutes les arêtes">📏 Cotes des arêtes</button><button type="button" data-z="full" style="${btn}">⛶ Plein écran</button>
         <span style="font-size:11px;color:#8a8f98;">Zoom ${Math.round(mpPlanZoom * 100)} % — fais défiler pour voir tous les bacs</span></div>
       <div data-sc style="overflow:auto;max-height:78vh;border:1px solid #e3e6e9;border-radius:6px;background:#fff;">${svg}</div>
       <div style="margin-top:8px;font-size:11.5px;color:#4a5056;display:flex;flex-wrap:wrap;">${legend}</div>
@@ -10675,6 +10745,7 @@ function createZincController(suffix, kind){
         if (on) document.exitFullscreen(); else if (sc.requestFullscreen) { sc.requestFullscreen(); sc.style.maxHeight = '100vh'; }
         return;
       }
+      if (z === 'cotes') { mpShowEdgeCotes = !mpShowEdgeCotes; mpDrawPlan(data); return; }
       mpPlanZoom = z === 'fit' ? 1 : Math.min(8, Math.max(0.5, mpPlanZoom * (z === 'in' ? 1.5 : 1 / 1.5)));
       mpDrawPlan(data);
     }));
@@ -10969,6 +11040,18 @@ function createZincController(suffix, kind){
           const lc = mid.clone().addScaledVector(s, -58).addScaledVector(n3, 4).add(new THREE.Vector3(0, -22, 0));
           add('acc', mpBox(lc, e, new THREE.Vector3(0, 1, 0), len, 48, 4, M.acc.egout), n3, reveal);
         }
+        if (kind0 === 'egout' && (mpCompl.sousFace || mpCompl.bandeZ)) { try {
+          const out = s.clone().negate(), yv = new THREE.Vector3(0, 1, 0), dn = (y) => new THREE.Vector3(0, y, 0);
+          if (mpCompl.bandeZ) {   // Z : âme verticale sous la bande d'égout + retour bas vers l'extérieur
+            const zc = mid.clone().addScaledVector(out, 62).add(dn(-86));
+            add('acc', mpBox(zc, e, yv, len, 80, 3, M.acc.egout), n3, reveal);
+            add('acc', mpBox(zc.clone().addScaledVector(out, 12).add(dn(-40)), e, yv, len, 3, 25, M.acc.egout), n3, reveal);
+          }
+          if (mpCompl.sousFace) {   // plaque horizontale sous le débord (300 mm de profondeur)
+            const sf = new THREE.MeshStandardMaterial({ color: 0xd8d6ce, roughness: 0.85, metalness: 0.05 });
+            add('acc', mpBox(mid.clone().addScaledVector(out, -92).add(dn(-48 - (mpCompl.bandeZ ? 80 : 0))), e, yv, len, 6, 300, sf), n3, reveal);
+          }
+        } catch (err) { console.warn('sous-face / bande Z', err); } }
         if (kind === 'rive' || kind === 'mur') {
           const up = new THREE.Vector3(0, 1, 0).addScaledVector(e, -e.y).normalize(), out = s.clone().negate(), drop = kind === 'rive' ? -(mpAccDef('rive').drop || MP_RIVE_DROP) / 2 : 75;
           add('acc', mpBox(mid.clone().addScaledVector(out, kind === 'rive' ? 6 : 2).addScaledVector(n3, lift - 3).addScaledVector(up, drop), e, up, len, kind === 'rive' ? (mpAccDef('rive').drop || MP_RIVE_DROP) : 150, 4, M.acc[kind]), n3, reveal);
@@ -10982,7 +11065,7 @@ function createZincController(suffix, kind){
       if (pi === 0 && bacs.length) {
         const order = bacs.map((_, bi) => bi).sort((a, b) => dists[a] - dists[b]), bc = bacs[order[Math.floor((order.length - 1) * 0.3)]];
         const pl = bc.polys[0], ctr = pl.p3.reduce((s, q) => s.add(V(q)), new THREE.Vector3()).multiplyScalar(1 / pl.p3.length);
-        addPin(isTasseaux ? 'Bacs zinc à tasseaux' : 'Bacs zinc joint debout', ctr.addScaledVector(n3, 4));
+        addPin(mpBacPin(), ctr.addScaledVector(n3, 4)); if (mpBacLblEl) mpBacLblEl.textContent = mpBacNom();
         if (eco) {
           const pinAt = (txt, t, off) => {
             const u = uAt(t), sp = mpSpan(pieces2, 0, u); if (!sp) return;
@@ -11097,12 +11180,16 @@ function createZincController(suffix, kind){
     mpAnimFrame = requestAnimationFrame(step);
   }
 
+  // Libellés des bacs selon la matière (avant : « Bacs zinc joint debout » même en bac acier)
+  function mpBacNom(){ const m = mpMatNow(); if (m.steel) return 'Bacs acier'; const f = String(m.fam || 'zinc').toLowerCase(); return 'Bacs ' + f; }
+  function mpBacPin(){ const m = mpMatNow(); if (m.steel) return 'Bacs acier — ' + m.steel.pr.name; return mpBacNom() + (isTasseaux ? ' à tasseaux' : ' joint debout'); }
+  let mpBacLblEl = null;
   function mpBuildControls(){
     const rb = $('mpReplayBtn');
     if (!rb || !rb.parentNode) return;
     const bar = document.createElement('div');
     bar.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:12px;color:var(--text);align-items:center;';
-    [['ecorche', 'Vue écorchée'], ['ghost', 'Murs transparents'], ['pannes', 'Charpente (pannes + chevrons)'], ['volige', 'Volige'], ['ecran', 'Écran sous-toiture'], ['bacs', 'Bacs zinc'], ['acc', 'Rives / faîtage / égout'], ['maison', 'Maison'], ['pins', 'Repères']].forEach(([k, label]) => {
+    [['ecorche', 'Vue écorchée'], ['ghost', 'Murs transparents'], ['pannes', 'Charpente (pannes + chevrons)'], ['volige', 'Volige'], ['ecran', 'Écran sous-toiture'], ['bacs', mpBacNom()], ['acc', 'Rives / faîtage / égout'], ['maison', 'Maison'], ['pins', 'Repères']].forEach(([k, label]) => {
       const l = document.createElement('label'); l.style.cssText = 'display:inline-flex;align-items:center;gap:5px;cursor:pointer;';
       const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = k === 'ecorche' ? mpEcorche : k === 'ghost' ? mpGhost : mpVis[k];
       cb.addEventListener('change', () => {
@@ -11110,7 +11197,7 @@ function createZincController(suffix, kind){
         else if (k === 'ghost') { mpGhost = cb.checked; mpApplyGhost(); mpRender(); }
         else { mpVis[k] = cb.checked; mpApplyVisibility(); mpRender(); }
       });
-      l.appendChild(cb); l.appendChild(document.createTextNode(label)); bar.appendChild(l);
+      const tn = document.createTextNode(label); if (k === 'bacs') mpBacLblEl = tn; l.appendChild(cb); l.appendChild(tn); bar.appendChild(l);
     });
     rb.parentNode.insertBefore(bar, rb);
   }
@@ -12184,7 +12271,10 @@ function createZincController(suffix, kind){
     if (data.edgeTotals) Object.assign(ed, data.edgeTotals);
     return ed;
   }
-  function mpBarSplit(l){ const full = Math.floor(l / 3000), rest = l - full * 3000; return l <= 3000 ? '1 x ' + Math.round(l) + ' mm' : full + ' x 3000 mm' + (rest > 20 ? ' + 1 x ' + Math.round(rest) + ' mm' : ''); }
+  // Longueur des barres d'accessoires (rives, égout, faîtage…) : 2100 mm en bac acier, 2000 mm en zinc (joint debout / tasseaux)
+  let mpBarL = 2000;
+  function mpBarTxt(){ return (mpBarL / 1000).toString().replace('.', ',') + ' m'; }
+  function mpBarSplit(l){ const B = mpBarL, full = Math.floor(l / B), rest = l - full * B; return l <= B ? '1 x ' + Math.round(l) + ' mm' : full + ' x ' + B + ' mm' + (rest > 20 ? ' + 1 x ' + Math.round(rest) + ' mm' : ''); }
   function mpDossier(){
     const data = mpLastData; if (!data) return null;
     const MT = mpMatNow(), fam = MT.fam, st = MT.steel, th = st ? st.ep : (mpDoss.th > 0 ? mpDoss.th : MP_THK[fam]), dens = st ? 7.85 : MP_DENS[fam];
@@ -12208,8 +12298,10 @@ function createZincController(suffix, kind){
     });
     const std = [500, 600, 670, 800, 1000], coilW = st ? st.pr.w : (mpDoss.coil > 0 ? mpDoss.coil : (std.find(w => w >= maxDevW) || Math.ceil(maxDevW / 50) * 50)), marge = st ? 0 : (mpDoss.marge >= 0 ? mpDoss.marge : 5);
     const metrageCmd = metrage * (1 + marge / 100), coilKg = st ? kgGross : metrageCmd * coilW / 1000 * th * dens;
+    mpBarL = st ? 2100 : 2000;
     const ed = mpEdgeLens(data), acc = [], ACC = st ? MP_ACC_STEEL : MP_ACC_DEV; let accKg = 0, accSurf = 0;
-    Object.keys(ACC).forEach(k => { if (!(ed[k] > 1)) return; const df = mpAccDef(k), dw = df ? df.dev : ACC[k][0], s = ed[k] / 1000 * dw / 1000, kg = s * th * dens; acc.push({ k, label: df ? df.label : ACC[k][1], len: ed[k], dw, surf: s, kg, nb: Math.ceil(ed[k] / 3000) }); accKg += kg; accSurf += s; });
+    Object.keys(ACC).forEach(k => { if (!(ed[k] > 1)) return; const df = mpAccDef(k), dw = df ? df.dev : ACC[k][0], s = ed[k] / 1000 * dw / 1000, kg = s * th * dens; acc.push({ k, label: df ? df.label : ACC[k][1], len: ed[k], dw, surf: s, kg, nb: Math.ceil(ed[k] / mpBarL) }); accKg += kg; accSurf += s; });
+    ['sousFace', 'bandeZ'].forEach(k => { if (!mpCompl[k] || !(ed.egout > 1)) return; const c = MP_COMPL[k], s = ed.egout / 1000 * c[1] / 1000, kg = s * th * dens; acc.push({ k, label: c[0], len: ed.egout, dw: c[1], surf: s, kg, nb: Math.ceil(ed.egout / mpBarL) }); accKg += kg; accSurf += s; });
     // Chiens assis : toiture + joues en même matière, solin arrière et noues latérales.
     const dormers = mpItems.filter(it => it.type === 'chien').map(it => {
       const p = data.pans[it.pan]; if (!p) return null; const bs = mpPanBasis(p), g = mpChienGeom(it, bs), hf = +it.hf || 1100, w = +it.w || 1200, Lr = g.Lh / Math.cos(g.pc * Math.PI / 180) + 150;
@@ -12218,8 +12310,8 @@ function createZincController(suffix, kind){
     if (dormers.length) {
       const sum = k => dormers.reduce((t, d) => t + d[k], 0), sz = sum('roof') + sum('cheek'), dwn = st ? 500 : 333;
       acc.push({ k: 'chien', label: 'Chiens assis : toiture + joues (' + dormers.length + ')', len: sum('w'), dw: '', surf: sz, kg: sz * th * dens, nb: '' });
-      acc.push({ k: 'chienS', label: 'Solins arrière de chiens assis', len: sum('solin'), dw: 250, surf: sum('solin') / 1000 * 0.25, kg: sum('solin') / 1000 * 0.25 * th * dens, nb: Math.ceil(sum('solin') / 3000) });
-      acc.push({ k: 'chienN', label: 'Noues latérales de chiens assis', len: sum('noue'), dw: dwn, surf: sum('noue') / 1000 * dwn / 1000, kg: sum('noue') / 1000 * dwn / 1000 * th * dens, nb: Math.ceil(sum('noue') / 3000) });
+      acc.push({ k: 'chienS', label: 'Solins arrière de chiens assis', len: sum('solin'), dw: 250, surf: sum('solin') / 1000 * 0.25, kg: sum('solin') / 1000 * 0.25 * th * dens, nb: Math.ceil(sum('solin') / mpBarL) });
+      acc.push({ k: 'chienN', label: 'Noues latérales de chiens assis', len: sum('noue'), dw: dwn, surf: sum('noue') / 1000 * dwn / 1000, kg: sum('noue') / 1000 * dwn / 1000 * th * dens, nb: Math.ceil(sum('noue') / mpBarL) });
       acc.slice(-3).forEach(a => { accKg += a.kg; accSurf += a.surf; });
     }
     const warn = [];
@@ -12248,7 +12340,7 @@ function createZincController(suffix, kind){
         if (per[kind] !== undefined) per[kind] += l3;
         edgeRows.push({ pan: pi + 1, n: i + 1, kind: EL[kind] || kind, len: l3, plan: l2, dh: b.h - a.h });
         const k1 = mpKey(a, b), k2 = mpKey(b, a);
-        if (!(seenA.has(k1) || seenA.has(k2))) { seenA.add(k1); const df = (kind === 'egout' || kind === 'rive' || kind === 'faitage') ? mpAccDef(kind) : null, A = ACCX[kind]; if (A) accPieces.push({ ref: `Pan ${pi + 1} - arête ${i + 1}`, label: df ? df.label : A[1], len: l3, dw: df ? df.dev : A[0], nb: Math.ceil(l3 / 3000), cut: mpBarSplit(l3) }); }
+        if (!(seenA.has(k1) || seenA.has(k2))) { seenA.add(k1); const df = (kind === 'egout' || kind === 'rive' || kind === 'faitage') ? mpAccDef(kind) : null, A = ACCX[kind]; if (A) accPieces.push({ ref: `Pan ${pi + 1} - arête ${i + 1}`, label: df ? df.label : A[1], len: l3, dw: df ? df.dev : A[0], nb: Math.ceil(l3 / mpBarL), cut: mpBarSplit(l3) }); if (kind === 'egout') ['sousFace', 'bandeZ'].forEach(ck => { if (mpCompl[ck]) accPieces.push({ ref: `Pan ${pi + 1} - arête ${i + 1}`, label: MP_COMPL[ck][0], len: l3, dw: MP_COMPL[ck][1], nb: Math.ceil(l3 / mpBarL), cut: mpBarSplit(l3) }); }); }
       });
       pts.forEach((q, i) => vertRows.push({ pan: pi + 1, n: i + 1, x: q.x, y: q.y, h: q.h }));
       const pin = panInfo.find(x => x.pan === pi + 1);
@@ -12398,11 +12490,11 @@ function createZincController(suffix, kind){
     yy = H2(D.matTitle, yy);
     D.matLines.forEach(l => { doc.text(mpAscii(l), M, yy, { maxWidth: W - 2 * M }); yy += 5; });
     yy = H2('Accessoires et linéaires', yy + 4);
-    yy = mpPdfTable(doc, yy + 2, [{ t: 'Accessoire', w: 70 }, { t: 'Longueur', w: 30, al: 'r' }, { t: 'Dév. (mm)', w: 24, al: 'r' }, { t: 'Surface m2', w: 28, al: 'r' }, { t: 'kg', w: 24, al: 'r' }, { t: 'Barres de 3 m', w: 30, al: 'r' }],
+    yy = mpPdfTable(doc, yy + 2, [{ t: 'Accessoire', w: 70 }, { t: 'Longueur', w: 30, al: 'r' }, { t: 'Dév. (mm)', w: 24, al: 'r' }, { t: 'Surface m2', w: 28, al: 'r' }, { t: 'kg', w: 24, al: 'r' }, { t: 'Barres de ' + mpBarTxt(), w: 30, al: 'r' }],
       D.acc.map(a => [a.label, `${mpFr(a.len / 1000, 2)} m`, String(a.dw), mpFr(a.surf, 2), mpFr(a.kg, 1), String(a.nb)]).concat([{ bold: true, c: ['TOTAL accessoires', '', '', mpFr(D.accSurf, 2), mpFr(D.accKg, 1), ''] }]), { top: 26, newPage: newPage('Accessoires') });
     if (D.accPieces.length) {
       if (yy > 150) { doc.addPage(); head('Accessoires - pièces à débiter'); yy = 26; }
-      yy = H2('Accessoires - longueur de chaque pièce (barres de 3 m)', yy + 4);
+      yy = H2('Accessoires - longueur de chaque pièce (barres de ' + mpBarTxt() + ')', yy + 4);
       yy = mpPdfTable(doc, yy + 2, [{ t: 'Repère', w: 40 }, { t: 'Accessoire', w: 80 }, { t: 'Longueur (mm)', w: 30, al: 'r' }, { t: 'Dév. (mm)', w: 24, al: 'r' }, { t: 'Barres', w: 18, al: 'r' }, { t: 'Débit', w: 62 }],
         D.accPieces.map(a => [a.ref, a.label, String(Math.round(a.len)), String(a.dw), String(a.nb), a.cut]), { top: 26, newPage: newPage('Accessoires - suite') });
     }
@@ -12441,8 +12533,8 @@ function createZincController(suffix, kind){
       ${D.cuts.length ? `<div class="pg"><h2>Ouvertures — cotes de découpe par bac</h2>${tb(['Bac', 'Élément', 'Avant', 'Hauteur', 'Après', 'Gauche', 'Largeur', 'Droite'], D.cuts.map(c => [c.bac, c.el + (c.partiel ? ' (partiel)' : ''), Math.round(c.avant), Math.round(c.haut), Math.round(c.apres), Math.round(c.gauche), Math.round(c.larg), Math.round(c.droite)]))}<h2>Points de mesure (depuis l'origine O du pan)</h2>${tb(['Point', 'Élément', 'Pan', 'X le long de l\'égout (mm)', 'Y le long de la pente (mm)'], D.pts.map(q => [q.no, q.el, q.pan, Math.round(q.u), Math.round(q.v)]))}</div>` : ''}
       <div class="pg"><h2>Formats à débiter (regroupés)</h2>${tb(['Format développé (l × L) mm', 'Qté', 'Type', 'N° (exemples)', 'kg / pièce', 'kg total'], D.groups.map(g => [`${Math.round(g.devW)} × ${Math.round(g.devL)}`, g.qty, g.billard ? 'Queue de billard' : 'Bac', g.nos.join(', ') + (g.qty > 4 ? ' …' : ''), mpFr(g.kg, 2), mpFr(g.kg * g.qty, 1)]))}
       <h2>${esc(D.matTitle)}</h2><p>${D.matLines.map(esc).join('<br>')}</p>
-      <h2>Accessoires et linéaires</h2>${tb(['Accessoire', 'Longueur', 'Dév. (mm)', 'Surface m²', 'kg', 'Barres de 3 m'], D.acc.map(a => [a.label, mpFr(a.len / 1000, 2) + ' m', a.dw, mpFr(a.surf, 2), mpFr(a.kg, 1), a.nb]).concat([{ bold: true, c: ['TOTAL accessoires', '', '', mpFr(D.accSurf, 2), mpFr(D.accKg, 1), ''] }]))}
-      ${D.accPieces.length ? `<h2>Accessoires — longueur de chaque pièce (barres de 3 m)</h2>${tb(['Repère', 'Accessoire', 'Longueur (mm)', 'Dév. (mm)', 'Barres', 'Débit'], D.accPieces.map(a => [a.ref, a.label, Math.round(a.len), a.dw, a.nb, a.cut]))}` : ''}
+      <h2>Accessoires et linéaires</h2>${tb(['Accessoire', 'Longueur', 'Dév. (mm)', 'Surface m²', 'kg', 'Barres de ' + mpBarTxt()], D.acc.map(a => [a.label, mpFr(a.len / 1000, 2) + ' m', a.dw, mpFr(a.surf, 2), mpFr(a.kg, 1), a.nb]).concat([{ bold: true, c: ['TOTAL accessoires', '', '', mpFr(D.accSurf, 2), mpFr(D.accKg, 1), ''] }]))}
+      ${D.accPieces.length ? `<h2>Accessoires — longueur de chaque pièce (barres de ${mpBarTxt()})</h2>${tb(['Repère', 'Accessoire', 'Longueur (mm)', 'Dév. (mm)', 'Barres', 'Débit'], D.accPieces.map(a => [a.ref, a.label, Math.round(a.len), a.dw, a.nb, a.cut]))}` : ''}
       ${D.seamLin > 0 ? `<p>${D.st ? 'Recouvrements latéraux' : isTasseaux ? 'Tasseaux + couvre-joints' : 'Joints debout'} : ${mpFr(D.seamLin, 1)} m linéaires · pattes de fixation : ${D.clips}</p>` : ''}
       ${D.items.length ? `<h2>Éléments en toiture</h2>${tb(['Élément', 'Pan', 'Décalage', 'Dist. égout', 'Dimensions'], D.items.map(it => [it.name, it.pan, Math.round(it.u) + ' mm', Math.round(it.v) + ' mm', Math.round(it.w) + (it.h ? ' × ' + Math.round(it.h) : '') + ' mm']))}` : ''}
       <h2>Hypothèses de calcul</h2><p class="n">${D.hyp.map(esc).join('<br>')}</p></div>
@@ -12476,16 +12568,41 @@ function createZincController(suffix, kind){
     // contour dessiné (pan libre)
     const conRows = D.contour ? cluster(D.contour.rows.map(r => r.len)).map(c => [lab(c.len, c.qty), c.qty]) : [];
     const tb = (head, rows) => `<table><thead><tr>${head.map(x => `<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    const kv = (k, v) => `<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`;
+    const legend = MP_EDGE_LEGEND.map(l => `<span><i style="background:${l.color}"></i>${esc(l.label)}</span>`).join('');
+    const nPans = (D.panInfo || []).length, bacsTxt = `${D.rows.length} (${D.nF} entiers · ${D.nC} recoupés${D.nBill ? ' · ' + D.nBill + ' queue de billard' : ''})`;
     const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Plan et longueurs ${esc(D.site)}</title><style>
-      @page{size:A4 landscape;margin:10mm} body{font:11px/1.35 Arial,sans-serif;color:#111;margin:0} h1{font-size:17px;color:#0f766e;margin:0 0 2px} .s{color:#555;font-size:10px;margin-bottom:6px}
-      h2{font-size:12.5px;color:#0f766e;margin:10px 0 4px;border-bottom:1.5px solid #0f766e} svg{width:100%;height:auto;max-height:112mm;display:block}
-      .g{display:grid;grid-template-columns:1fr 1fr;gap:0 22px;align-items:start} table{border-collapse:collapse;width:100%;font-size:11px;break-inside:avoid} th{background:#0f766e;color:#fff;text-align:left;padding:3px 6px} td{padding:3px 6px;border-bottom:1px solid #dde3e8;font-weight:600}
-      td:nth-child(n+2){white-space:nowrap}</style></head><body>
-      <h1>Plan de toiture et longueurs — ${esc(D.sys)}</h1><div class="s">${esc(D.site || '')}${D.site ? ' · ' : ''}${esc(D.date)} · pente ${esc(D.pente)}°</div>
-      ${plan ? plan.markup : '<p>Plan indisponible.</p>'}
-      <div class="g"><div><h2>Longueurs des bacs (mm)</h2>${tb(['Longueur', 'Qté', 'Linéaire'], bacRows)}</div>
-      <div>${accRows.length ? `<h2>Longueurs des arêtes / accessoires</h2>${tb(['Type', 'Longueur', 'Qté', 'Total'], accRows)}` : ''}${conRows.length ? `<h2>Côtés du contour dessiné</h2>${tb(['Longueur', 'Qté'], conRows)}` : ''}</div></div>
-      </body></html>`;
+      @page{size:A4 landscape;margin:8mm} *{box-sizing:border-box} html,body{margin:0}
+      body{font:11px/1.35 "Segoe UI",Arial,sans-serif;color:#1c2328;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .pg{height:192mm;padding-top:1.5mm;display:flex;flex-direction:column;gap:5mm}
+      .hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2.5px solid #0f766e;padding-bottom:3mm}
+      .hd .t{font-size:20px;font-weight:800;color:#0f766e;letter-spacing:.2px;line-height:1.1} .hd .t small{display:block;font-size:11px;font-weight:600;color:#5b6872;letter-spacing:1.5px;margin-bottom:1px}
+      .hd .r{text-align:right;font-size:11px;color:#3d4850;line-height:1.5} .hd .r b{color:#1c2328}
+      .main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 84mm;gap:6mm}
+      .plan{display:flex;flex-direction:column;min-height:0;border:1.2px solid #b9c4cb;border-radius:3mm;padding:3mm;background:#fff}
+      .plan .sv{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden} .plan svg{width:100%;height:100%;max-height:150mm;display:block}
+      .lg{display:flex;flex-wrap:wrap;gap:2mm 5mm;font-size:9.5px;color:#4a5560;border-top:1px solid #e1e6ea;padding-top:2mm;margin-top:2mm} .lg i{display:inline-block;width:9mm;height:1.6mm;border-radius:1mm;margin-right:1.5mm;vertical-align:middle}
+      .note{font-size:9px;color:#6b7782;margin-top:1.2mm}
+      .side{display:flex;flex-direction:column;gap:4mm;min-height:0}
+      .card{border:1px solid #cfd8de;border-radius:2.5mm;overflow:hidden;break-inside:avoid}
+      .card h2{margin:0;padding:1.6mm 3mm;font-size:11px;font-weight:700;letter-spacing:.3px;color:#fff;background:#0f766e;text-transform:uppercase}
+      .kv{padding:1.5mm 3mm} .kv div{display:flex;justify-content:space-between;gap:4mm;padding:.9mm 0;border-bottom:1px dotted #cfd8de} .kv div:last-child{border-bottom:0} .kv span{color:#5b6872} .kv b{text-align:right}
+      table{border-collapse:collapse;width:100%;font-size:11px} th{background:#e8f1f0;color:#0b524b;text-align:left;padding:1.2mm 3mm;font-size:9.5px;text-transform:uppercase;letter-spacing:.3px}
+      td{padding:1.3mm 3mm;border-top:1px solid #e4e9ec;font-weight:600;white-space:nowrap} td:first-child{white-space:normal} tr:nth-child(even) td{background:#f7fafa}
+      td.q{font-size:12.5px;color:#0f766e;font-weight:800}
+      .ft{display:flex;justify-content:space-between;font-size:9px;color:#7a858d;border-top:1px solid #dfe5e9;padding-top:1.5mm}</style></head><body><div class="pg">
+      <div class="hd"><div class="t"><small>ALTÉMA</small>Plan de toiture — ${esc(D.sys)}</div><div class="r">${D.site ? `Chantier : <b>${esc(D.site)}</b><br>` : ''}Date : <b>${esc(D.date)}</b></div></div>
+      <div class="main">
+        <div class="plan"><div class="sv">${plan ? plan.markup : '<p>Plan indisponible.</p>'}</div>
+          <div class="lg">${legend}</div>
+          <div class="note">Cotes en mm. Valeur seule = longueur en plan · (valeur entre parenthèses) = longueur réelle suivant la pente. N° = pan.ordre de pose · orange = bacs recoupés.</div></div>
+        <div class="side">
+          <div class="card"><h2>Toiture</h2><div class="kv">${kv('Matière', D.MT.label)}${kv('Épaisseur', mpFr(D.th, 2) + ' mm')}${kv('Pente', D.pente + ' °')}${kv('Surface de couverture', mpFr(D.surf, 2) + ' m²')}${kv('Pans', String(nPans))}${kv('Bacs', bacsTxt)}</div></div>
+          <div class="card"><h2>Longueurs des bacs</h2>${bacRows.length ? `<table><thead><tr><th>Longueur</th><th>Linéaire</th></tr></thead><tbody>${bacRows.map(r => `<tr><td class="q">${esc(r[0])}</td><td>${esc(r[2])}</td></tr>`).join('')}</tbody></table>` : '<div class="kv">—</div>'}</div>
+          ${accRows.length ? `<div class="card"><h2>Arêtes et accessoires</h2><table><thead><tr><th>Type</th><th>Longueur</th></tr></thead><tbody>${accRows.map(r => `<tr><td>${esc(r[0])}</td><td class="q">${esc(r[1])}</td></tr>`).join('')}</tbody></table></div>` : ''}
+          ${conRows.length ? `<div class="card"><h2>Côtés du contour dessiné</h2><table><tbody>${conRows.map(r => `<tr><td class="q">${esc(r[0])}</td></tr>`).join('')}</tbody></table></div>` : ''}
+        </div></div>
+      <div class="ft"><span>ALTÉMA ${esc(APP_VERSION_LABEL)}</span><span>Plan indicatif — vérifier les cotes sur chantier avant découpe</span></div></div></body></html>`;
     const fr = document.createElement('iframe'); fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;'; document.body.appendChild(fr);
     fr.contentDocument.open(); fr.contentDocument.write(html); fr.contentDocument.close();
     setTimeout(() => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (e) { showToast('Impression impossible ici.'); } setTimeout(() => fr.remove(), 60000); }, 600);
@@ -12503,8 +12620,8 @@ function createZincController(suffix, kind){
     add('Arêtes', D.edgeRows.map(e => ({ Pan: e.pan, Arête: e.n, Type: e.kind, 'Longueur réelle (mm)': Math.round(e.len), 'Longueur en plan (mm)': Math.round(e.plan), 'Dénivelé (mm)': Math.round(e.dh) })));
     add('Sommets', D.vertRows.map(v => ({ Pan: v.pan, Point: v.n, 'X (mm)': Math.round(v.x), 'Y (mm)': Math.round(v.y), 'Hauteur (mm)': Math.round(v.h) })));
     add('Formats à débiter', D.groups.map(g => ({ 'Largeur développée (mm)': Math.round(g.devW), 'Longueur développée (mm)': Math.round(g.devL), Quantité: g.qty, Type: g.billard ? 'Queue de billard' : 'Bac', 'kg / pièce': +g.kg.toFixed(2), 'kg total': +(g.kg * g.qty).toFixed(1), 'Exemples': g.nos.join(', ') })));
-    add('Accessoires', D.acc.map(a => ({ Accessoire: a.label, 'Longueur (m)': +(a.len / 1000).toFixed(2), 'Développé (mm)': a.dw, 'Surface (m²)': +a.surf.toFixed(2), 'Poids (kg)': +a.kg.toFixed(1), 'Barres de 3 m': a.nb })));
-    add('Accessoires - pièces', D.accPieces.map(a => ({ Repère: a.ref, Accessoire: a.label, 'Longueur (mm)': Math.round(a.len), 'Développé (mm)': a.dw, 'Barres de 3 m': a.nb, Débit: a.cut })));
+    add('Accessoires', D.acc.map(a => ({ Accessoire: a.label, 'Longueur (m)': +(a.len / 1000).toFixed(2), 'Développé (mm)': a.dw, 'Surface (m²)': +a.surf.toFixed(2), 'Poids (kg)': +a.kg.toFixed(1), ['Barres de ' + mpBarTxt()]: a.nb })));
+    add('Accessoires - pièces', D.accPieces.map(a => ({ Repère: a.ref, Accessoire: a.label, 'Longueur (mm)': Math.round(a.len), 'Développé (mm)': a.dw, ['Barres de ' + mpBarTxt()]: a.nb, Débit: a.cut })));
     add('Sens de pose', D.panInfo.map(p => ({ Pan: p.pan, Bacs: p.n, 'Premier': p.pan + '.1', 'Dernier': p.last, 'Sens de pose': MP_MODE_TXT[p.mode] || '', Type: p.curved ? 'Voûte' : p.billard ? 'Queue de billard' : 'Bacs parallèles' })));
     if (D.cuts.length) { add('Découpes ouvertures', D.cuts.map(c => ({ Bac: c.bac, Élément: c.el, 'Avant (mm)': Math.round(c.avant), 'Hauteur (mm)': Math.round(c.haut), 'Après (mm)': Math.round(c.apres), 'Gauche (mm)': Math.round(c.gauche), 'Largeur (mm)': Math.round(c.larg), 'Droite (mm)': Math.round(c.droite) }))); add('Points de mesure', D.pts.map(q => ({ Point: q.no, Élément: q.el, Pan: q.pan, 'X égout (mm)': Math.round(q.u), 'Y pente (mm)': Math.round(q.v) }))); }
     const gs = mpCurveSheets(); if (gs.length) add('Gabarits courbure', gs.flatMap(sh => sh.ords.map(o => ({ Gabarit: sh.title, 'Distance (mm)': Math.round(o[0]), 'Hauteur (mm)': Math.round(o[1]) }))));
@@ -12522,17 +12639,6 @@ function createZincController(suffix, kind){
     root.querySelectorAll('[data-ratio]').forEach(s => s.addEventListener('change', () => { mpDoss.ratio = s.value === 'auto' ? 'auto' : +s.value; const r = $('mpResults'); if (r && mpLastData) mpRenderResults(mpLastData); }));
   }
   // Les boutons d'export historiques exportent le dossier multi-pans dès qu'un calepinage existe.
-  function mpHookOldExports(){
-    [['exportPdfBtn', mpExportPdf], ['exportExcelBtn', mpExportXlsx], ['printBtn', mpPrintDossier]].forEach(([k, fn]) => {
-      const b = $(k); if (!b) return;
-      b.addEventListener('click', e => {
-        if (!mpLastData) return;
-        let single = false; try { single = typeof computeZincCalc === 'function' && !!computeZincCalc(); } catch (err) { single = false; }
-        if (single && !confirm('OK = dossier de la toiture multi-pans (plan de pose, débit, poids, vues 3D).\nAnnuler = étude du versant unique.')) return;
-        e.stopImmediatePropagation(); e.preventDefault(); fn();
-      }, true);
-    });
-  }
   /* ===== v8 : gabarits de courbure (coupe cotée, échelle au choix, points de corde) ===== */
   const MP_RATIOS = [1, 2, 5, 10, 20, 25, 50, 100, 200];
   mpDoss.ratio = 'auto';
@@ -12759,7 +12865,6 @@ function createZincController(suffix, kind){
   $('mpReplayBtn').addEventListener('click', mpPlayInstallation);
   mpBuildControls();
   mpSetupV4();
-  mpHookOldExports();
 
   $('mpExplodeRange').addEventListener('input', e => {
     mpExplodeAmount = parseFloat(e.target.value) || 0;
@@ -13459,10 +13564,6 @@ function createZincController(suffix, kind){
     arrondi: "Comme la queue de billard, mais le dernier bac se referme en bord courbe plutôt qu'en pointe droite.",
     manuel: "Saisis toi-même la largeur de chaque bac (à l'égout) — utile pour caler des bacs dépareillés existants."
   };
-  function currentEgoutLenForManual(){
-    const geo = computeRoofGeometry();
-    return geo ? geo.egoutLen : 5000;
-  }
   function renderBacManualList(){
     const wrap = $('bacManualList');
     if (!manualBacWidths.length) {
@@ -13519,8 +13620,9 @@ function createZincController(suffix, kind){
         pieces.push({ no: (i + 1) + (nL > 1 ? '-L' + l.k : ''), wA, wB, L: l.L, devW, devL, ar, kn: knn, kg: kgg });
       });
     });
+    mpBarL = 2000;
     const accs = [];
-    const add = (lab, len, dw) => { const sf = len / 1000 * dw / 1000; accs.push({ label: lab, len, dw, nb: Math.ceil(len / 3000), cut: mpBarSplit(len), surf: sf, kg: sf * th * dens }); };
+    const add = (lab, len, dw) => { const sf = len / 1000 * dw / 1000; accs.push({ label: lab, len, dw, nb: Math.ceil(len / mpBarL), cut: mpBarSplit(len), surf: sf, kg: sf * th * dens }); };
     const dr = mpAccDef('rive'), de = mpAccDef('egout'), df = mpAccDef('faitage');
     add(dr.label + ' (2 rives cumulées)', acc.riveTotal, dr.dev); add(de.label, acc.egoutTotal, de.dev); add(df.label, acc.faitageTotal, df.dev);
     acc.openingsRows.forEach((o, i) => add(`Solin ${o.type === 'velux' ? 'Vélux' : 'cheminée'} ${i + 1} (${o.w}×${o.h} mm)`, o.perim, 250));
@@ -13534,7 +13636,7 @@ function createZincController(suffix, kind){
     return `<div class="print-section-title">Matière et poids</div>${T(['Matière', 'Épaisseur', 'Surface de couverture', 'Surface développée à débiter', 'Poids posé', 'Poids à commander', 'Métrage de bobine (chutes comprises)'], [[SD.MT.label, szF(SD.th, 2) + ' mm', szF(SD.mat.surfaceM2, 2) + ' m²', szF(SD.pieces.reduce((t, p) => t + p.devW * p.devL / 1e6, 0), 2) + ' m²', szF(SD.kn + SD.accKg, 0) + ' kg', szF(SD.kg + SD.accKg, 0) + ' kg', szF(SD.mat.avecMarge, 1) + ' m' + (SD.mat.nBobines ? ' · ' + SD.mat.nBobines + ' bobine(s)' : '')]])}
       <div class="print-section-title">Débit pièce par pièce</div>${T(['Bac', 'Largeur (mm)', 'Longueur (mm)', 'Dév. larg. (mm)', 'Dév. long. (mm)', 'm²', 'kg posé', 'kg à cmd'], szPieceRows(SD))}
       ${SD.les.length > 1 ? `<div class="print-section-title">Lés et joints de bout</div>${T(['Lé', 'Longueur (mm)', 'Début depuis l\'égout (mm)', 'Fin (mm)', 'Recouvrement avec le lé précédent (mm)'], SD.les.map(l => [l.k, Math.round(l.L), Math.round(l.a), Math.round(l.b), Math.round(l.rec) || '—']))}` : ''}
-      <div class="print-section-title">Accessoires — longueur de chaque pièce (barres de 3 m)</div>${T(['Accessoire', 'Longueur (mm)', 'Dév. (mm)', 'Barres', 'Débit', 'm²', 'kg'], SD.accs.map(a => [a.label, Math.round(a.len), a.dw, a.nb, a.cut, szF(a.surf, 2), szF(a.kg, 1)]).concat([{ bold: true, c: ['TOTAL accessoires', '', '', '', '', szF(SD.accSurf, 2), szF(SD.accKg, 1)] }]))}
+      <div class="print-section-title">Accessoires — longueur de chaque pièce (barres de ${mpBarTxt()})</div>${T(['Accessoire', 'Longueur (mm)', 'Dév. (mm)', 'Barres', 'Débit', 'm²', 'kg'], SD.accs.map(a => [a.label, Math.round(a.len), a.dw, a.nb, a.cut, szF(a.surf, 2), szF(a.kg, 1)]).concat([{ bold: true, c: ['TOTAL accessoires', '', '', '', '', szF(SD.accSurf, 2), szF(SD.accKg, 1)] }]))}
       <div style="font-size:10px;color:#555;margin:6px 0;">Hypothèses : développés = largeur / longueur + ${mpDev.w} mm / ${mpDev.l} mm de relevés ; poids = surface × épaisseur × densité (${szF(SD.dens, 1)}), estimation à ±5 % ; accessoires : ${mpAccSummary()}.</div>`;
   }
   /* ---------- Impression ---------- */
@@ -13633,7 +13735,7 @@ function createZincController(suffix, kind){
     const SD = szDetail(data, acc);
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(SD.pieces.map(p => ({ Bac: p.no, 'Largeur début (mm)': Math.round(p.wA), 'Largeur fin (mm)': Math.round(p.wB), 'Longueur (mm)': Math.round(p.L), 'Dév. largeur (mm)': Math.round(p.devW), 'Dév. longueur (mm)': Math.round(p.devL), 'Surface (m²)': +p.ar.toFixed(3), 'Poids posé (kg)': +p.kn.toFixed(2), 'Poids à commander (kg)': +p.kg.toFixed(2) }))), 'Pièces');
     if (SD.les.length > 1) XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(SD.les.map(l => ({ Lé: l.k, 'Longueur (mm)': Math.round(l.L), 'Début depuis égout (mm)': Math.round(l.a), 'Fin (mm)': Math.round(l.b), 'Recouvrement (mm)': Math.round(l.rec) }))), 'Lés');
-    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(SD.accs.map(a => ({ Accessoire: a.label, 'Longueur (mm)': Math.round(a.len), 'Développé (mm)': a.dw, 'Barres de 3 m': a.nb, Débit: a.cut, 'Surface (m²)': +a.surf.toFixed(2), 'Poids (kg)': +a.kg.toFixed(1) }))), 'Accessoires - pièces');
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(SD.accs.map(a => ({ Accessoire: a.label, 'Longueur (mm)': Math.round(a.len), 'Développé (mm)': a.dw, ['Barres de ' + mpBarTxt()]: a.nb, Débit: a.cut, 'Surface (m²)': +a.surf.toFixed(2), 'Poids (kg)': +a.kg.toFixed(1) }))), 'Accessoires - pièces');
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{ Info: 'Matière', Valeur: SD.MT.label }, { Info: 'Épaisseur (mm)', Valeur: SD.th }, { Info: 'Densité', Valeur: SD.dens }, { Info: 'Surface développée à débiter (m²)', Valeur: +SD.pieces.reduce((t, p) => t + p.devW * p.devL / 1e6, 0).toFixed(2) }, { Info: 'Poids posé bacs + accessoires (kg)', Valeur: +(SD.kn + SD.accKg).toFixed(0) }, { Info: 'Poids à commander bacs + accessoires (kg)', Valeur: +(SD.kg + SD.accKg).toFixed(0) }, { Info: 'Accessoires choisis', Valeur: mpAccSummary() }, { Info: 'Logiciel', Valeur: APP_VERSION_LABEL }]), 'Matière et poids');
     XLSX.writeFile(workbook, `etude_zinc_${suffix}_altema.xlsx`);
     showToast('Export Excel de l\'étude toiture réussi !');
@@ -13726,7 +13828,7 @@ function createZincController(suffix, kind){
     if (SD.les.length > 1) { if (y > 150) { np('Les et joints de bout')(); y = 24; } doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.text('Les et joints de bout', M, y); y += 2;
       y = mpPdfTable(doc, y + 4, [{ t: 'Le', w: 20 }, { t: 'Longueur (mm)', w: 40, al: 'r' }, { t: 'Debut depuis l\'egout (mm)', w: 56, al: 'r' }, { t: 'Fin (mm)', w: 34, al: 'r' }, { t: 'Recouvrement (mm)', w: 44, al: 'r' }], SD.les.map(l => [String(l.k), String(Math.round(l.L)), String(Math.round(l.a)), String(Math.round(l.b)), l.rec ? String(Math.round(l.rec)) : '-']), { top: 24, newPage: np('Les - suite') }) + 6; }
     if (y > 140) { np('Accessoires - pieces')(); y = 24; }
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.text('Accessoires - longueur de chaque piece (barres de 3 m)', M, y);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.text('Accessoires - longueur de chaque piece (barres de ' + mpBarTxt() + ')', M, y);
     y = mpPdfTable(doc, y + 4, [{ t: 'Accessoire', w: 92 }, { t: 'Longueur (mm)', w: 32, al: 'r' }, { t: 'Dev. (mm)', w: 24, al: 'r' }, { t: 'Barres', w: 18, al: 'r' }, { t: 'Debit', w: 56 }, { t: 'm2', w: 18, al: 'r' }, { t: 'kg', w: 18, al: 'r' }],
       SD.accs.map(a => [mpAscii(a.label), String(Math.round(a.len)), String(a.dw), String(a.nb), a.cut, szF(a.surf, 2), szF(a.kg, 1)]).concat([{ bold: true, c: ['TOTAL accessoires', '', '', '', '', szF(SD.accSurf, 2), szF(SD.accKg, 1)] }]), { top: 24, newPage: np('Accessoires - suite') }) + 6;
     if (y > 170) { np('Matiere et poids')(); y = 24; }
@@ -15019,7 +15121,7 @@ const DEFAULT_LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAArwAAAJKCAMA
 // sécurité forte (le fichier reste modifiable par quiconque le possède).
 const SETTINGS_PASSWORD_SHA256 = '679ec1048b2f9d3826a4e39c63bba18f384396636335f6fa6750de886f956b06';
 const UPDATE_REQUEST_EMAIL = 'hugo.saglier@altema.pro';
-const APP_VERSION_LABEL = 'v61';
+const APP_VERSION_LABEL = 'v68';
 
 // SHA-256 en JavaScript pur (indépendant du contexte sécurisé du navigateur)
 function sha256Hex(msg){
@@ -16394,6 +16496,496 @@ epRenderA();
   }
   setup(); window.addEventListener('load', setup); setTimeout(setup, 700);
 })();
+</script>
+<script>
+/* ===== ALTEMA — Accueil : petite ville isométrique interactive (canvas 2D, sans dépendance) ===== */
+(function(){
+'use strict';
+const cv = document.getElementById('altemaTownCv'); if (!cv) return;
+const tip = document.getElementById('altemaTownTip'), panel = document.getElementById('tab-accueil'), ctx = cv.getContext('2d');
+const HW = 32, HH = 16, ZH = 34, WW = 26, WH = 20;
+let S = 1, OX = 0, OY = 0, FS = 1, FOX = 0, FOY = 0, DPR = 1, CW = 0, CH = 0, T0 = performance.now(), hover = null, lastTouch = null;
+const P = (x, y, z) => [(x - y) * HW, (x + y) * HH - (z || 0) * ZH];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+function sh(hex, f){ const n = parseInt(hex.slice(1), 16), r = clamp(Math.round(((n >> 16) & 255) * f), 0, 255), g = clamp(Math.round(((n >> 8) & 255) * f), 0, 255), b = clamp(Math.round((n & 255) * f), 0, 255); return `rgb(${r},${g},${b})`; }
+
+/* ---------- lieux cliquables ---------- */
+const HOTS = {
+  debit:      { tab: 'tab-debit',       color: '#ff8a1f', title: 'Plan de débit',                 desc: "La guillotine : optimise la découpe de tes tôles dans les formats de feuilles (calepinage, chutes, export PDF)." },
+  pliage:     { tab: 'tab-pliage',      color: '#3d8bff', title: 'Plan de pliage',                desc: "La plieuse numérique : dessine le profil, cote chaque pli et visualise la pièce en 3D." },
+  assemblage: { tab: 'tab-assemblage',  color: '#2fbf71', title: 'Assemblage',                    desc: "La table de montage, avec son dévidoir à bobine : assemble plusieurs pièces pliées et visualise l'ensemble en 3D." },
+  couvertine: { tab: 'tab-couvertine',  color: '#b46bff', title: "Couvertine d'acrotère",         desc: "La maison à toit plat : calcule les couvertines d'acrotère, leurs angles, éclisses et fixations." },
+  jd:         { tab: 'tab-jointdebout', mat: 'zn', color: '#17b6a6', title: 'Toiture zinc — joint debout', desc: "Calepinage d'un toit en zinc à joint debout : pans, arêtiers, noues, plan de pose, débit et dossier à imprimer." },
+  acier:      { tab: 'tab-jointdebout', mat: 'jb', color: '#e5484d', title: 'Toiture bac acier',     desc: "Le même calculateur de toiture avec des bacs acier : profils, tronçons avec recouvrement, isolation PIR." },
+  tasseaux:   { tab: 'tab-tasseaux',    color: '#e8b923', title: 'Toiture zinc à tasseaux',       desc: "Calepinage d'un toit en bacs zinc sur tasseaux : pans, débit, accessoires et plan imprimable." }
+};
+const PIN = { debit: [17.8, 4.6, 1.9], pliage: [21.2, 4.6, 2.3], assemblage: [18.0, 6.9, 1.25], couvertine: [7.7, 14.8, 3.1], jd: [2.8, 3.0, 3.1], acier: [7.5, 3.0, 3.1], tasseaux: [2.8, 14.6, 3.1] };
+Object.keys(HOTS).forEach(k => HOTS[k].id = k);
+
+/* ---------- primitives ---------- */
+let curHot = null, HOTP = [], hotN = 0;
+function rec(pts){ if (!curHot) return; HOTP.push({ id: curHot, o: hotN++, p: pts.map(q => [q[0] * S + OX, q[1] * S + OY]) }); }
+function poly(pts, fill, stroke, lw){
+  ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath();
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw || 1; ctx.stroke(); }
+  rec(pts);
+}
+function box(x, y, z, w, d, h, c, o){
+  o = o || {}; const ed = o.edge === undefined ? 'rgba(0,0,0,.26)' : o.edge, t = o.t || sh(c, 1.12), l = o.l || sh(c, 0.9), r = o.r || sh(c, 0.7);
+  const A = P(x, y, z + h), B = P(x + w, y, z + h), C = P(x + w, y + d, z + h), D = P(x, y + d, z + h), E = P(x, y + d, z), F = P(x + w, y + d, z), G = P(x + w, y, z);
+  poly([E, F, C, D], l, ed, .8); poly([G, F, C, B], r, ed, .8); poly([A, B, C, D], t, ed, .8);
+}
+// décor sur la face +y (u le long de x, v vers le haut) et sur la face +x (u le long de y)
+function onY(x0, Y, z0, fn){ const o = P(x0, Y, z0); ctx.save(); ctx.translate(o[0], o[1]); ctx.transform(HW, HH, 0, -ZH, 0, 0); fn(); ctx.restore(); }
+function onX(X, y0, z0, fn){ const o = P(X, y0, z0); ctx.save(); ctx.translate(o[0], o[1]); ctx.transform(-HW, HH, 0, -ZH, 0, 0); fn(); ctx.restore(); }
+function fr(u, v, w, h, fill){ ctx.fillStyle = fill; ctx.fillRect(u, v, w, h); }
+function cyl(x, y, z, r, h, c, o){
+  o = o || {}; const [cx, cy] = P(x, y, z), rx = r * HW * 1.4142, ry = r * HH * 1.4142, hp = h * ZH;
+  const g = ctx.createLinearGradient(cx - rx, 0, cx + rx, 0); g.addColorStop(0, sh(c, 1.1)); g.addColorStop(.4, sh(c, .96)); g.addColorStop(1, sh(c, .6));
+  ctx.beginPath(); ctx.moveTo(cx - rx, cy - hp); ctx.lineTo(cx - rx, cy); ctx.ellipse(cx, cy, rx, ry, 0, Math.PI, 0, true); ctx.lineTo(cx + rx, cy - hp); ctx.closePath(); ctx.fillStyle = g; ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx, cy - hp, rx, ry, 0, 0, Math.PI * 2); ctx.fillStyle = o.top || sh(c, 1.16); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.28)'; ctx.lineWidth = .8; ctx.stroke();
+  if (o.hole) { ctx.beginPath(); ctx.ellipse(cx, cy - hp, rx * .32, ry * .32, 0, 0, Math.PI * 2); ctx.fillStyle = 'rgba(30,34,38,.85)'; ctx.fill(); }
+  rec([[cx - rx, cy - hp - ry], [cx + rx, cy - hp - ry], [cx + rx, cy + ry], [cx - rx, cy + ry]]);
+}
+function shadow(x, y, w, d, h, a){ const k = (h || 1) * .45; poly([P(x + k, y + k, 0), P(x + w + k, y + k, 0), P(x + w + k, y + d + k, 0), P(x + k, y + d + k, 0)], `rgba(20,30,20,${a || .16})`); }
+function blob(x, y, rr, a){ const [cx, cy] = P(x, y, 0); ctx.beginPath(); ctx.ellipse(cx, cy, rr * HW * 1.4, rr * HH * 1.4, 0, 0, Math.PI * 2); ctx.fillStyle = `rgba(20,30,20,${a || .2})`; ctx.fill(); }
+function logoL(u, v, w, h, onDark, mirror){
+  // symbole A orange géométrique + ALTEMA en blanc (le seul texte dessiné dans la scène). mirror=true : face +x (axe u inversé à l'écran)
+  const s = h; ctx.save();
+  const fpx = Math.round(s * 62); ctx.font = `800 ${fpx}px Arial, Helvetica, sans-serif`; const tw = ctx.measureText('ALTEMA').width * .01, W = s * 1.18 + tw;
+  ctx.translate(u + (mirror ? W : 0), v); if (mirror) ctx.scale(-1, 1);
+  ctx.fillStyle = '#ff7a1a'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(.38 * s, s); ctx.lineTo(.62 * s, s); ctx.lineTo(s, 0); ctx.lineTo(.78 * s, 0); ctx.lineTo(.5 * s, .72 * s); ctx.lineTo(.22 * s, 0); ctx.closePath(); ctx.fill();
+  ctx.fillRect(.3 * s, .2 * s, .4 * s, .1 * s);
+  ctx.save(); ctx.translate(s * 1.18, s * .18); ctx.scale(.01, -.01); ctx.fillStyle = onDark === false ? '#2a2f35' : '#ffffff'; ctx.font = `800 ${fpx}px Arial, Helvetica, sans-serif`; ctx.textBaseline = 'alphabetic'; ctx.fillText('ALTEMA', 0, 0); ctx.restore();
+  ctx.restore();
+}
+
+/* ---------- personnages, véhicules, végétation ---------- */
+function person(x, y, o){
+  o = o || {}; const z = o.z || 0, fx = o.fx === undefined ? 0 : o.fx, fy = o.fy === undefined ? 1 : o.fy, ph = o.ph || 0, mv = o.mv ? 1 : 0;
+  const lx = -fy, ly = fx, sw = Math.sin(ph) * .09 * mv, cl = o.pants || '#2d3a55', vest = o.vest || '#ff8a1f', skin = o.skin || '#f0c9a0';
+  blob(x + .03, y + .03, .1, .22);
+  const foot = (s) => P(x + fx * sw * s + lx * .05 * s, y + fy * sw * s + ly * .05 * s, z);
+  const hip = (s) => P(x + lx * .05 * s, y + ly * .05 * s, z + .3);
+  ctx.lineCap = 'round'; ctx.strokeStyle = cl; ctx.lineWidth = 3;
+  [1, -1].forEach(s => { const a = hip(s), b = foot(s); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); });
+  box(x - .09, y - .06, z + .28, .18, .12, .3, vest, { edge: 'rgba(0,0,0,.2)' });
+  const arm = (s, a, b) => { const sp = P(x + lx * .1 * s, y + ly * .1 * s, z + .55), hp = P(x + lx * .1 * s + fx * a, y + ly * .1 * s + fy * a, z + .55 + b); ctx.strokeStyle = vest; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(sp[0], sp[1]); ctx.lineTo(hp[0], hp[1]); ctx.stroke(); ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(hp[0], hp[1], 1.4, 0, 7); ctx.fill(); };
+  const al = o.al || [Math.sin(ph + 3.1) * .08 * mv, -.25], ar = o.ar || [Math.sin(ph) * .08 * mv, -.25];
+  arm(1, al[0], al[1]); arm(-1, ar[0], ar[1]);
+  const hd = P(x, y, z + .68); ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(hd[0], hd[1], 3.6, 0, 7); ctx.fill();
+  ctx.fillStyle = o.helmet || '#ffd23a'; ctx.beginPath(); ctx.arc(hd[0], hd[1] - .8, 3.9, Math.PI, 0); ctx.fill();
+  if (o.carry) { const a = P(x - fx * .2 + lx * .02, y - fy * .2, z + .66), b = P(x + fx * .55, y + fy * .55, z + .66); ctx.strokeStyle = '#c9d1d8'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
+}
+function carDraw(x, y, axis, c, o){
+  o = o || {}; const L = o.len || 1.5, W = .72; const w = axis === 'x' ? L : W, d = axis === 'x' ? W : L;
+  const px = x - w / 2, py = y - d / 2; shadow(px, py, w, d, .4, .18);
+  box(px, py, .08, w, d, .3, c); box(px + (axis === 'x' ? L * .25 : .06), py + (axis === 'x' ? .06 : L * .25), .38, axis === 'x' ? L * .5 : W - .12, axis === 'x' ? W - .12 : L * .5, .26, '#dbe6ee', { t: sh(c, 1.15) });
+  box(px + .04, py + .04, 0, axis === 'x' ? .28 : .14, axis === 'x' ? .14 : .28, .1, '#22262b', { edge: null }); box(px + w - (axis === 'x' ? .32 : .18), py + d - (axis === 'x' ? .18 : .32), 0, axis === 'x' ? .28 : .14, axis === 'x' ? .14 : .28, .1, '#22262b', { edge: null });
+}
+function truckDraw(x, y, logo, o){   // camion le long de l'axe x, cabine vers +x
+  o = o || {}; const L = o.len || 3.1, W = 1.0; const px = x - L / 2;
+  shadow(px, y - W / 2, L, W, 1, .2);
+  box(px, y - W / 2, .14, L * .72, W, 1.05, '#f1f3f5'); box(px, y - W / 2, .14, L * .72, W, .1, '#ff7a1a', { edge: null });
+  box(px + L * .74, y - W / 2 + .04, .14, L * .26, W - .08, .72, '#3a3f45'); box(px + L * .86, y - W / 2 + .06, .5, L * .14, W - .12, .3, '#bcd7ea', { t: '#d2e6f2' });
+  box(px + .3, y - W / 2, 0, .4, W, .16, '#1d2024', { edge: null }); box(px + L * .78, y - W / 2, 0, .38, W, .16, '#1d2024', { edge: null });
+  if (logo) onY(px, y + W / 2, .14, () => { fr(.0, .0, L * .72, .08, '#ff7a1a'); logoL(.28, .32, 0, .48); });
+}
+function tree(x, y, k, ph, sz){
+  sz = sz || 1; const sw = Math.sin(tNow * 1.1 + (ph || 0)) * 1.4, [cx, cy] = P(x, y, 0);
+  blob(x + .15, y + .15, .42 * sz, .2); box(x - .05, y - .05, 0, .1, .1, .5 * sz, '#7a5a3a', { edge: null });
+  const cols = ['#4f9a43', '#5fae4c', '#3f8a3c', '#78b857'], col = cols[(k || 0) % 4];
+  [[0, -1.25, .5], [-.26, -1.0, .38], [.26, -1.0, .38]].forEach(([dx, dz, rr], i) => {
+    const px = cx + dx * HW * sz + sw * (1 + dz * .3), py = cy + dz * ZH * sz * .85, r = rr * HW * 1.25 * sz;
+    const g = ctx.createRadialGradient(px - r * .3, py - r * .35, r * .1, px, py, r); g.addColorStop(0, sh(col, 1.3)); g.addColorStop(1, sh(col, .78));
+    ctx.beginPath(); ctx.arc(px, py, r, 0, 7); ctx.fillStyle = g; ctx.fill();
+  });
+}
+function lamp(x, y){ box(x - .03, y - .03, 0, .06, .06, 1.1, '#3b4047', { edge: null }); const p = P(x, y, 1.12); ctx.fillStyle = '#fff2b8'; ctx.beginPath(); ctx.arc(p[0], p[1], 2.4, 0, 7); ctx.fill(); }
+
+/* ---------- toitures ---------- */
+// crête le long de l'axe 'x' ou 'y' ; style : 'tuile' | 'zinc' (joint debout) | 'acier' (bac nervuré) | 'tasseaux'
+function gable(x, y, w, d, z, rh, axis, style, ov){
+  ov = ov === undefined ? .22 : ov; const col = { tuile: '#c8613a', zinc: '#8f9ca7', acier: '#3a4047', tasseaux: '#9aa6af' }[style];
+  const eaveHi = style === 'acier' ? .92 : 1;
+  if (axis === 'x') {
+    const rY = y + d / 2, eY = y + d + ov, x0 = x - ov, x1 = x + w + ov;
+    // pignon (face +x) en couleur de mur géré par l'appelant ; versant visible : +y
+    const A = P(x0, rY, z + rh), B = P(x1, rY, z + rh), C = P(x1, eY, z - .05), D = P(x0, eY, z - .05);
+    poly([A, B, C, D], sh(col, 1.0), 'rgba(0,0,0,.3)', .9);
+    roofLines(style, col, (u) => [P(u, rY, z + rh), P(u, eY, z - .05)], x0 + .12, x1 - .05, w);
+    // égout zinc + ridge
+    const e1 = P(x0, eY, z - .05), e2 = P(x1, eY, z - .05); ctx.strokeStyle = '#c9d1d8'; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(e1[0], e1[1]); ctx.lineTo(e2[0], e2[1]); ctx.stroke();
+    ctx.strokeStyle = sh(col, 1.35); ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke();
+    // flanc droit du toit (+x) : tranche
+    poly([P(x1, rY, z + rh), P(x1, rY, z + rh - .06), P(x1, eY, z - .11), P(x1, eY, z - .05)], sh(col, .6));
+  } else {
+    const rX = x + w / 2, eX = x + w + ov, y0 = y - ov, y1 = y + d + ov;
+    const A = P(rX, y0, z + rh), B = P(rX, y1, z + rh), C = P(eX, y1, z - .05), D = P(eX, y0, z - .05);
+    poly([A, B, C, D], sh(col, .8), 'rgba(0,0,0,.3)', .9);
+    roofLines(style, col, (u) => [P(rX, u, z + rh), P(eX, u, z - .05)], y0 + .12, y1 - .05, d, true);
+    const e1 = P(eX, y0, z - .05), e2 = P(eX, y1, z - .05); ctx.strokeStyle = '#c9d1d8'; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(e1[0], e1[1]); ctx.lineTo(e2[0], e2[1]); ctx.stroke();
+    ctx.strokeStyle = sh(col, 1.2); ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke();
+    poly([P(rX, y1, z + rh), P(rX, y1, z + rh - .06), P(eX, y1, z - .11), P(eX, y1, z - .05)], sh(col, .55));
+  }
+}
+function roofLines(style, col, line, u0, u1, span, dark){
+  const dim = dark ? .8 : 1;
+  if (style === 'tuile') { for (let k = 1; k < 7; k++) { const t = k / 7, a = line(u0)[0], b = line(u1)[0]; /* rangs de tuiles : lignes parallèles au faîtage */ const p0 = line(u0), p1 = line(u1); const q0 = [lerp(p0[0][0], p0[1][0], t), lerp(p0[0][1], p0[1][1], t)], q1 = [lerp(p1[0][0], p1[1][0], t), lerp(p1[0][1], p1[1][1], t)]; ctx.strokeStyle = 'rgba(70,25,10,.28)'; ctx.lineWidth = .8; ctx.beginPath(); ctx.moveTo(q0[0], q0[1]); ctx.lineTo(q1[0], q1[1]); ctx.stroke(); } return; }
+  const step = style === 'acier' ? .11 : style === 'tasseaux' ? .52 : .3;
+  let n = 0;
+  for (let u = u0; u <= u1; u += step, n++) {
+    const [a, b] = line(u);
+    if (style === 'zinc') { ctx.strokeStyle = 'rgba(40,50,60,.35)'; ctx.lineWidth = 1.7; ctx.beginPath(); ctx.moveTo(a[0] + 1, a[1] + .5); ctx.lineTo(b[0] + 1, b[1] + .5); ctx.stroke(); ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
+    else if (style === 'acier') { ctx.strokeStyle = n % 2 ? 'rgba(255,255,255,.22)' : 'rgba(0,0,0,.35)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
+    else { ctx.strokeStyle = 'rgba(30,40,50,.45)'; ctx.lineWidth = 4.2; ctx.beginPath(); ctx.moveTo(a[0] + 1.4, a[1] + .8); ctx.lineTo(b[0] + 1.4, b[1] + .8); ctx.stroke(); ctx.strokeStyle = '#c4ccd3'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = .9; ctx.beginPath(); ctx.moveTo(a[0] - .6, a[1]); ctx.lineTo(b[0] - .6, b[1]); ctx.stroke(); }
+  }
+}
+function windowsY(x0, Y, z0, w, h, cols, rows){   // fenêtres sur la face +y
+  onY(x0, Y, z0, () => { const cw = .5, ch = .5, gx = (w - cols * cw) / (cols + 1), gy = (h - rows * ch) / (rows + 1); for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { const u = gx + c * (cw + gx), v = gy + r * (ch + gy); fr(u, v, cw, ch, '#e9f3fa'); fr(u + .03, v + .03, cw - .06, ch - .06, '#8cb8d6'); fr(u + cw / 2 - .015, v, .03, ch, '#e9f3fa'); fr(u - .05, v - .04, cw + .1, .05, '#f4f1ea'); } });
+}
+function windowsX(X, y0, z0, d, h, cols, rows){
+  onX(X, y0, z0, () => { const cw = .5, ch = .5, gx = (d - cols * cw) / (cols + 1), gy = (h - rows * ch) / (rows + 1); for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { const u = gx + c * (cw + gx), v = gy + r * (ch + gy); fr(u, v, cw, ch, '#dcebf5'); fr(u + .03, v + .03, cw - .06, ch - .06, '#6f9bbd'); fr(u + cw / 2 - .015, v, .03, ch, '#dcebf5'); } });
+}
+/* maison : murs + toit ; kind : 'flat' | 'gx' | 'gy' */
+function house(o){
+  const { x, y, w, d, h, wall, kind, style, hot, rh } = o; curHot = hot || null;
+  shadow(x, y, w, d, h + (rh || 0), .17);
+  box(x, y, 0, w, d, h, wall);
+  windowsY(x, y + d, .28, w, h - .35, Math.max(2, Math.round(w / 1.3)), h > 1.9 ? 2 : 1);
+  windowsX(x + w, y, .28, d, h - .35, Math.max(2, Math.round(d / 1.5)), h > 1.9 ? 2 : 1);
+  onY(x + w * .5 - .22, y + d, 0, () => { fr(0, 0, .44, .78, '#6b4a33'); fr(.03, .03, .38, .72, '#8a5f40'); fr(.34, .36, .04, .04, '#f0d27a'); });
+  // gouttière + descente
+  box(x + w + .02, y + d - .02, .04, .05, .05, h - .04, '#c7ced4', { edge: null });
+  if (kind === 'flat') {
+    box(x, y, h, w, d, .05, '#3a3f45', { t: '#454b52' });                       // membrane sombre
+    const cop = '#c9d1d8', ct = .16, chh = .11;   // couvertines (acrotère)
+    box(x - .06, y - .06, h, w + .12, ct, chh, cop, { t: '#e4e9ed' }); box(x - .06, y + d - ct + .06, h, w + .12, ct, chh, cop, { t: '#e4e9ed' });
+    box(x - .06, y - .06, h, ct, d + .12, chh, cop, { t: '#e4e9ed' }); box(x + w - ct + .06, y - .06, h, ct, d + .12, chh, cop, { t: '#e4e9ed' });
+    box(x + w * .3, y + d * .35, h + .05, .4, .4, .28, '#9aa3ab'); box(x + w * .62, y + d * .5, h + .05, .22, .22, .4, '#6b737a');   // édicule + sortie
+  } else if (kind === 'gx') {
+    // pignon face +x
+    poly([P(x + w, y, h), P(x + w, y + d, h), P(x + w, y + d / 2, h + rh)], sh(wall, .72), 'rgba(0,0,0,.25)', .8);
+    gable(x, y, w, d, h, rh, 'x', style);
+  } else {
+    poly([P(x, y + d, h), P(x + w, y + d, h), P(x + w / 2, y + d, h + rh)], sh(wall, .92), 'rgba(0,0,0,.25)', .8);
+    gable(x, y, w, d, h, rh, 'y', style);
+  }
+  curHot = null;
+}
+
+/* ---------- scène ---------- */
+let tNow = 0; const ITEMS = [];
+const add = (k, f) => ITEMS.push({ k, f });
+function flat(x0, y0, x1, y1, c, z){ poly([P(x0, y0, z || 0), P(x1, y0, z || 0), P(x1, y1, z || 0), P(x0, y1, z || 0)], c); }
+
+function rackBay(ax, u, v, len, dep, seed){
+  // ax 'x' : la baie s'étend en x (longueur len) et en y (profondeur dep) ; ax 'y' : l'inverse
+  const W = (uu, vv, du, dv) => ax === 'x' ? [uu, vv, du, dv] : [vv, uu, dv, du];
+  const OR = '#ff7a1a', BL = '#2f6fdb', mid = (uu, vv) => ax === 'x' ? uu + vv : vv + uu;
+  const key = (a, b) => ax === 'x' ? a + b : b + a;
+  const post = (pu, pv) => { const [x, y, w, d] = W(pu, pv, .09, .09); add(x + y + .2, () => box(x, y, 0, w, d, 2.75, OR, { edge: 'rgba(0,0,0,.25)' })); };
+  post(u, v); post(u + len - .09, v); post(u, v + dep - .09); post(u + len - .09, v + dep - .09);
+  [1.28, 2.55].forEach(z => {
+    let [x, y, w, d] = W(u, v, len, .08); add(key(u + len / 2, v) + .1, () => box(x, y, z, w, d, .12, BL, { edge: 'rgba(0,0,0,.25)' }));
+    [x, y, w, d] = W(u, v + dep - .08, len, .08); add(key(u + len / 2, v + dep) + .3, () => box(x, y, z, w, d, .12, BL, { edge: 'rgba(0,0,0,.25)' }));
+  });
+  [0, 1.4, 2.67].forEach((z, lv) => {
+    for (let i = 0; i < 2; i++) {
+      const pu = u + .1 + i * (len - .2) / 2, pv = v + (dep - .9) / 2, kind = (seed + lv * 2 + i) % 3;
+      const [x, y, w, d] = W(pu, pv, (len - .2) / 2 - .06, .9);
+      add(key(pu + w / 2, pv + .45) + .25 + lv * .01, () => {
+        box(x, y, z + (lv ? .12 : 0), w, d, .12, '#b98b55');
+        const zz = z + (lv ? .12 : 0) + .12;
+        if (kind === 0) { box(x + .04, y + .04, zz, w - .08, d - .08, .4, '#b7c0c8'); box(x + w * .3, y + .02, zz, .03, d - .04, .41, '#2b2f34', { edge: null }); box(x + w * .65, y + .02, zz, .03, d - .04, .41, '#2b2f34', { edge: null }); }
+        else if (kind === 1) cyl(x + w / 2, y + d / 2, zz, Math.min(w, d) * .42, .62, '#a9b4bd', { hole: true });
+        else { box(x + .04, y + .04, zz, w - .08, d - .08, .3, '#d9dfe4'); box(x + .04, y + d * .5, zz + .3, w - .08, .06, .06, '#2f6fdb', { edge: null }); }
+      });
+    }
+  });
+}
+function forklift(x, y, dir, lift, loaded){
+  const f = dir, bx = x - .5, by = y - .35; shadow(bx, by, 1.2, .7, .8, .18);
+  box(bx + (f > 0 ? 0 : .35), by, .1, .85, .7, .5, '#ff7a1a'); box(bx + (f > 0 ? .1 : .5), by + .05, .6, .5, .6, .08, '#2b2f34');
+  [[.08, 0], [.08, .5]].forEach(([a, b]) => box(bx + (f > 0 ? .15 + a : .75 - a), by + b, 0, .22, .2, .14, '#1d2024', { edge: null }));
+  const mx = f > 0 ? bx + .85 : bx - .05;
+  box(mx, by + .1, .1, .08, .08, 1.2, '#3d4348'); box(mx, by + .52, .1, .08, .08, 1.2, '#3d4348');
+  const fx = f > 0 ? mx + .06 : mx - .55; box(fx, by + .14, .1 + lift, .55, .08, .04, '#7d848b', { edge: null }); box(fx, by + .46, .1 + lift, .55, .08, .04, '#7d848b', { edge: null });
+  if (loaded) { box(fx + .02, by + .08, .14 + lift, .5, .48, .1, '#b98b55'); box(fx + .06, by + .12, .24 + lift, .42, .4, .34, '#b7c0c8'); }
+}
+
+function buildWorkshop(){
+  const X0 = 14.2, X1 = 25.2, Y0 = .8, Y1 = 7.6, HW_ = 3.4;
+  // murs du fond (bardage anthracite, bandeau orange) — vue écorchée pour voir l'atelier
+  for (let i = 0; i < 5; i++) { const x = X0 + i * 2.2; add(x + 1.1 + Y0 + .2, () => {
+    curHot = null; box(x, Y0, 0, 2.2, .4, HW_, '#3a3f45', { edge: 'rgba(0,0,0,.35)' });
+    onY(x, Y0 + .4, 0, () => {
+      fr(0, 3.02, 2.2, .26, '#ff7a1a'); for (let k = 1; k < 11; k++) fr(k * .2, 0, .012, 3.0, 'rgba(255,255,255,.07)');
+      if (i === 2) { fr(.12, .55, 1.96, 1.9, '#2a2e33'); logoL(.28, 1.15, 0, .62); } else { fr(.22, .8, 1.76, 1.5, '#7fa7c4'); fr(.22, .8, 1.76, .06, '#2a2e33'); fr(1.08, .8, .04, 1.5, '#2a2e33'); fr(.22, 1.55, 1.76, .04, '#2a2e33'); }
+    });
+  }); }
+  [[1.2, 3.35], [3.35, 5.5], [5.5, 7.6]].forEach(([a, b], i) => add(X0 + .2 + (a + b) / 2, () => {
+    curHot = null; box(X0, a, 0, .4, b - a, HW_, '#3f454b');
+    onX(X0 + .4, a, 0, () => { const L = b - a; fr(0, 3.02, L, .26, '#ff7a1a'); if (i !== 1) { fr(.2, .15, L - .4, 2.55, '#8fb6d0'); for (let k = 1; k < 4; k++) fr(.2 + k * (L - .4) / 4, .15, .04, 2.55, '#2a2e33'); fr(.2, 1.3, L - .4, .05, '#2a2e33'); } else { fr(.25, .8, L - .5, 1.2, '#7fa7c4'); } });
+  }));
+  // murets bas côté ouvert + poteaux oranges + poutres
+  for (let x = X0; x < X1 - .1; x += 2.75) add(x + 1.3 + Y1, () => box(x, Y1 - .05, 0, 2.75, .12, .28, '#d3d6d9'));
+  for (let y = Y0 + .4; y < Y1 - .1; y += 3.2) add(X1 + y + 1.6, () => box(X1 - .05, y, 0, .12, Math.min(3.2, Y1 - y), .28, '#d3d6d9'));
+  [[X0 + 2.8, Y1 - .12], [X0 + 5.6, Y1 - .12], [X0 + 8.4, Y1 - .12], [X1 - .14, Y1 - .12], [X1 - .14, 5.0], [X1 - .14, 2.4]].forEach(([x, y]) => add(x + y + .3, () => box(x, y, 0, .1, .1, HW_, '#ff7a1a')));
+  [X0 + 5.9, X1 - .12].forEach(x => add(x + 4.4 + 40, () => box(x, Y0 + .4, HW_ - .05, .08, Y1 - Y0 - .5, .1, '#ff7a1a', { edge: 'rgba(0,0,0,.2)' })));
+  // racks orange & bleu : fond et mur ouest
+  [14.9, 17.25, 19.6, 21.95].forEach((x, i) => rackBay('x', x, 1.35, 2.2, 1.0, i));
+  rackBay('y', 3.0, 14.75, 2.1, 1.0, 1); rackBay('y', 5.25, 14.75, 2.1, 1.0, 2);
+
+  // GUILLOTINE 4 m  → Plan de débit
+  const gx = 16.9, gy = 4.2;
+  add(gx + 1 + gy + .4, () => {
+    curHot = 'debit';
+    shadow(gx, gy, 2, .75, 1, .2);
+    box(gx, gy + .12, 0, 2, .6, .5, '#55606b'); box(gx - .05, gy, .5, 2.1, .76, .08, '#b9c3cb', { t: '#d5dde3' });
+    box(gx - .1, gy - .04, .1, .13, .84, 1.5, '#c0392b'); box(gx + 1.97, gy - .04, .1, .13, .84, 1.5, '#c0392b');
+    const bz = 1.02 + Math.max(0, Math.sin(tNow * 2.4)) * .0 - Math.max(0, Math.sin(tNow * 2.4 + 1.2)) * .3;
+    box(gx, gy - .02, 1.06, 2, .32, .45, '#c0392b', { t: '#d9503f' }); box(gx, gy + .3, bz, 2, .1, .14, '#2c3036');
+    box(gx + .25, gy + .22, .58, 1.55, .5, .025, '#e3e8ec', { t: '#f2f5f7' });
+    box(gx + 1.65, gy + .66, 0, .2, .2, .55, '#2c3036'); curHot = null;
+  });
+  // PLIEUSE NUMÉRIQUE 4 m → Plan de pliage
+  const px = 20.2, py = 4.2;
+  add(px + 1 + py + .5, () => {
+    curHot = 'pliage';
+    shadow(px, py, 2.4, 1, 1.6, .2);
+    box(px, py + .15, 0, 2, .75, .5, '#2f5f9e'); box(px - .1, py, 0, .14, .95, 1.62, '#2f5f9e'); box(px + 1.96, py, 0, .14, .95, 1.62, '#2f5f9e');
+    const rz = .98 + Math.max(0, -Math.sin(tNow * 2.0)) * .0 - Math.max(0, Math.sin(tNow * 2.0)) * .22;
+    box(px, py + .22, rz, 2, .36, .6, '#e8772a', { t: '#f59447' }); box(px + .05, py + .4, rz - .2, 1.9, .1, .22, '#cfd6dc');
+    box(px + .1, py + .55, .5, 1.8, .36, .03, '#e3e8ec', { t: '#f2f5f7' });
+    box(px + 2.25, py + .35, 0, .42, .5, 1.25, '#2b3138'); onY(px + 2.25, py + .85, 0, () => { fr(.05, .75, .32, .32, '#6fe3ff'); fr(.07, .77, .28, .08, '#d9fbff'); fr(.07, .3, .28, .06, '#ff8a1f'); }); curHot = null;
+  });
+  // TABLE 4 m + DÉVIDOIR → Assemblage
+  const tx = 17.2, ty = 6.5;
+  add(tx + 1 + ty + .4, () => {
+    curHot = 'assemblage'; shadow(tx, ty, 2.1, .9, .7, .18);
+    [[0, 0], [1.9, 0], [0, .76], [1.9, .76]].forEach(([a, b]) => box(tx + a, ty + b, 0, .1, .1, .5, '#4b535c', { edge: null }));
+    box(tx - .05, ty - .05, .5, 2.1, .92, .08, '#d3dae0', { t: '#e8edf1' });
+    box(tx + .3, ty + .15, .58, .9, .22, .05, '#c3ccd3'); box(tx + .3, ty + .15, .63, .9, .06, .14, '#aeb8c1'); box(tx + 1.3, ty + .4, .58, .6, .3, .05, '#c9d1d8'); box(tx + 1.3, ty + .4, .63, .06, .3, .16, '#aeb8c1');
+    box(tx + .1, ty + .55, .58, 1.1, .12, .03, '#e6ebef', { edge: null }); curHot = null;
+  });
+  add(15.9 + 6.9 + .2, () => {   // dévidoir à bobine de zinc
+    curHot = 'assemblage'; blob(16.5, 7.0, .5, .2);
+    box(16.0, 6.55, 0, .9, .9, .1, '#2b3138'); cyl(16.45, 7.0, .1, .42, .06, '#3b4047'); cyl(16.45, 7.0, .16, .36, .52, '#9ba7b0', { hole: true });
+    const [cx, cy] = P(16.45, 7.0, .68), a = tNow * 1.4; ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * 11, cy + Math.sin(a) * 5.4); ctx.stroke();
+    box(16.8, 6.95, .52, .5, .12, .02, '#dfe5ea', { edge: null }); curHot = null;
+  });
+  // chariot élévateur (clé de tri dynamique)
+  const fkState = () => { const u = (Math.sin(tNow * .35) + 1) / 2; return { x: lerp(16.2, 24.2, u), dir: Math.cos(tNow * .35) > 0 ? 1 : -1, lift: .3 + .45 * Math.abs(Math.sin(tNow * .35 * 2)) }; };
+  add(() => fkState().x + 3.25, () => { const s = fkState(); forklift(s.x, 3.15, s.dir, s.lift, s.dir > 0); });
+  // cour : benne orange, palette de tôles, totem ALTEMA à l'entrée
+  add(15.6 + 8.4 + .3, () => { shadow(14.9, 8.0, 1.5, .8, .3, .15); box(14.9, 8.0, 0, 1.5, .8, .35, '#f08a25'); box(14.95, 8.05, .35, 1.4, .7, .06, '#ffb35c'); });
+  add(19.8 + 8.4 + .5, () => { shadow(19.3, 8.0, 1, .8, .6, .16); box(19.3, 8.0, 0, 1, .8, .12, '#b98b55'); box(19.35, 8.05, .12, .9, .7, .45, '#b7c0c8'); box(19.6, 8.03, .12, .03, .74, .46, '#2b3138', { edge: null }); });
+  add(13.9 + 8.2 + 1, () => { shadow(13.6, 7.0, .4, 1.7, 3, .16); box(13.6, 7.0, 0, .4, 1.7, 3.1, '#3a3f45'); box(13.6, 7.0, 3.1, .4, 1.7, .12, '#ff7a1a', { edge: null });
+    onX(14.0, 7.0, 0, () => { fr(.08, 1.35, 1.54, 1.5, '#2a2e33'); logoL(.1, 1.85, 0, .4, true, true); fr(.08, 1.2, 1.54, .06, '#ff7a1a'); }); });
+}
+
+function buildTown(){
+  // ---- maisons cliquables (toits adaptés à chaque système) ----
+  const H = (o) => add(o.x + o.w / 2 + o.y + o.d / 2, () => house(o));
+  H({ x: 1.0, y: 1.2, w: 3.6, d: 3.4, h: 1.6, wall: '#f1e6d2', kind: 'gx', style: 'zinc', rh: 1.15, hot: 'jd' });
+  H({ x: 5.8, y: 1.4, w: 3.4, d: 3.4, h: 1.6, wall: '#dfe3e6', kind: 'gy', style: 'acier', rh: 1.1, hot: 'acier' });
+  H({ x: 1.0, y: 12.9, w: 3.6, d: 3.4, h: 1.6, wall: '#ecd3c2', kind: 'gy', style: 'tasseaux', rh: 1.15, hot: 'tasseaux' });
+  H({ x: 5.8, y: 13.0, w: 3.7, d: 3.7, h: 2.3, wall: '#f4f2ec', kind: 'flat', hot: 'couvertine' });
+  // ---- bâtiments décoratifs ----
+  H({ x: 1.2, y: 6.0, w: 3.0, d: 2.4, h: 1.3, wall: '#f3d9a4', kind: 'gx', style: 'tuile', rh: .9 });
+  H({ x: 5.6, y: 6.0, w: 2.6, d: 2.6, h: 1.3, wall: '#c9def0', kind: 'gy', style: 'tuile', rh: .9 });
+  H({ x: 14.4, y: 12.6, w: 3.4, d: 2.2, h: 1.3, wall: '#f6c9a8', kind: 'gx', style: 'tuile', rh: .85 });
+  add(20.3 + 13.8, () => { house({ x: 18.6, y: 12.6, w: 3.8, d: 2.4, h: 1.4, wall: '#f8efe0', kind: 'flat' });
+    for (let i = 0; i < 6; i++) box(18.7 + i * .6, 15.0, 1.0, .6, .6, .07, i % 2 ? '#ffffff' : '#ff7a1a'); });
+  [[19.3, 15.9], [20.7, 16.1], [22.1, 15.9]].forEach(([x, y], i) => add(x + y, () => { blob(x + .1, y + .1, .28, .16); box(x - .03, y - .03, 0, .06, .06, .5, '#6b737a', { edge: null }); cyl(x, y, .5, .26, .04, '#f3f1ea'); if (i === 1) { person(x - .35, y + .2, { fx: 1, fy: 0, vest: '#e56b8a', helmet: '#5a3d2b', pants: '#3d4a64' }); person(x + .38, y - .2, { fx: -1, fy: 0, vest: '#4aa6d9', helmet: '#2b2b2b' }); } }));
+  // cheminées et fumée sur les maisons à tuiles
+  [[3.3, 6.6], [7.0, 6.9]].forEach(([x, y]) => add(x + y + 1.5, () => { box(x, y, 1.9, .24, .24, .5, '#9b6b57'); for (let k = 0; k < 4; k++) { const ph = (tNow * .5 + k / 4) % 1, p = P(x + .12 + ph * .25, y + .12 + ph * .1, 2.45 + ph * 1.1); ctx.fillStyle = `rgba(235,238,242,${.55 * (1 - ph)})`; ctx.beginPath(); ctx.arc(p[0], p[1], 3 + ph * 7, 0, 7); ctx.fill(); } }));
+  // ---- arbres, lampadaires ----
+  const trees = [[0.7, 5.3], [4.9, 5.4], [9.7, 5.2], [0.8, 9.0], [10.1, 8.7], [4.6, 9.0], [0.9, 12.3], [9.9, 12.4], [4.7, 12.4], [4.9, 17.6], [0.9, 17.2], [9.4, 17.8], [13.8, 8.9], [25.4, 9.0], [13.8, 12.2], [25.3, 12.4], [14.6, 15.6], [16.2, 17.6], [18.0, 15.9], [20.6, 17.8], [23.4, 17.4], [24.8, 15.4], [22.7, 15.2], [11.0, 0.7], [10.8, 4.2], [13.6, 12.8], [13.6, 18.3], [0.9, 0.7], [9.7, 0.6], [25.2, 18.2]];
+  trees.forEach(([x, y], i) => add(x + y + .1, () => tree(x, y, i, i * 1.7)));
+  [[3, 9.2], [8, 9.2], [15, 9.2], [22, 9.2], [3, 11.8], [8, 11.8], [16, 11.8], [23, 11.8]].forEach(([x, y]) => add(x + y + .1, () => lamp(x, y)));
+  add(12 + 10.5 + .2, () => { blob(12, 10.5, .5, .15); tree(12, 10.5, 2, 3, .85); });
+  // voitures garées dans les allées
+  [[3.2, 5.9, 'x', '#d94b3a'], [7.2, 5.5, 'x', '#2f6fdb'], [3.1, 17.1, 'x', '#e8c53a'], [8.3, 17.6, 'x', '#7a8794']].forEach(([x, y, a, c]) => add(x + y, () => carDraw(x, y, a, c)));
+  // banc et fontaine dans le parc
+  add(17.5 + 17.2, () => { box(17.2, 17.2, 0, 1, .22, .28, '#8a5f40'); box(17.2, 17.15, .28, 1, .06, .35, '#8a5f40'); });
+  // wagonnet de chantier / pile de palettes devant l'atelier (coté route)
+  buildWorkshop();
+}
+const WORKERS = [
+  { x: () => 17.9, y: () => 5.5 + .05 * Math.sin(tNow * 2.4), o: () => ({ fx: 0, fy: -1, ph: 0, al: [.22 - .1 * Math.max(0, Math.sin(tNow * 2.4)), -.05], ar: [.22 - .1 * Math.max(0, Math.sin(tNow * 2.4)), -.05], vest: '#ff8a1f', helmet: '#ffd23a' }) },
+  { x: () => 21.2, y: () => 5.8, o: () => ({ fx: 0, fy: -1, al: [.2, .08 + .12 * Math.sin(tNow * 2.0)], ar: [.2, .08 + .12 * Math.sin(tNow * 2.0 + .6)], vest: '#ff8a1f', helmet: '#ffffff' }) },
+  { x: () => 18.7, y: () => 6.0, o: () => ({ fx: 0, fy: 1, al: [.15, .04], ar: [.18, .25 + .22 * Math.sin(tNow * 6)], vest: '#ff8a1f', helmet: '#ffd23a' }) }
+];
+function pathAt(pts, loop, speed, off){
+  const seg = []; let tot = 0; for (let i = 0; i < pts.length - (loop ? 0 : 1); i++) { const a = pts[i], b = pts[(i + 1) % pts.length], l = Math.hypot(b[0] - a[0], b[1] - a[1]); seg.push([a, b, l]); tot += l; }
+  let d = loop ? ((tNow * speed + off) % tot + tot) % tot : (() => { const m = (tNow * speed + off) % (2 * tot); return m < tot ? m : 2 * tot - m; })();
+  const back = !loop && ((tNow * speed + off) % (2 * tot)) >= tot;
+  for (const [a, b, l] of seg) { if (d <= l) { const t = d / l, dx = (b[0] - a[0]) / l, dy = (b[1] - a[1]) / l; return { x: lerp(a[0], b[0], t), y: lerp(a[1], b[1], t), fx: back ? -dx : dx, fy: back ? -dy : dy }; } d -= l; }
+  const a = seg[0]; return { x: a[0][0], y: a[0][1], fx: 1, fy: 0 };
+}
+const WALKERS = [
+  { pts: [[1.0, 9.2], [10.2, 9.2]], loop: false, sp: .55, off: 0, vest: '#e56b8a' }, { pts: [[1.0, 9.2], [10.2, 9.2]], loop: false, sp: .5, off: 9, vest: '#4aa6d9' },
+  { pts: [[14.0, 9.2], [25.2, 9.2]], loop: false, sp: .5, off: 3, vest: '#8ad06b' }, { pts: [[0.8, 11.8], [10.3, 11.8]], loop: false, sp: .6, off: 6, vest: '#f0b429' },
+  { pts: [[13.6, 11.8], [25.0, 11.8]], loop: false, sp: .55, off: 2, vest: '#b46bff' }, { pts: [[10.75, .6], [10.75, 8.6]], loop: false, sp: .5, off: 1, vest: '#ff8a1f' },
+  { pts: [[15, 16.1], [21, 16.1], [21, 18.2], [15, 18.2]], loop: true, sp: .42, off: 0, vest: '#4aa6d9' }, { pts: [[15, 16.1], [21, 16.1], [21, 18.2], [15, 18.2]], loop: true, sp: .42, off: 7, vest: '#e56b8a' },
+  { pts: [[19.2, 14.9], [22.4, 14.9]], loop: false, sp: .4, off: 0, vest: '#ffffff' }
+];
+const CARS = [
+  { ax: 'x', lane: 11.0, v: 1.7, o: 0, c: '#d94b3a' }, { ax: 'x', lane: 11.0, v: 1.7, o: 19, c: '#3b82c4' }, { ax: 'x', lane: 9.95, v: -2.0, o: 8, c: '#e8c53a' },
+  { ax: 'x', lane: 9.95, v: -2.0, o: 26, c: '#4aa66b' }, { ax: 'y', lane: 12.4, v: 1.6, o: 3, c: '#9a5bd3' }, { ax: 'y', lane: 11.6, v: -1.9, o: 12, c: '#f08a25' }, { ax: 'y', lane: 12.4, v: 1.6, o: 17, c: '#5d6b78' }
+];
+const wrapR = (v, m) => ((v % m) + m) % m;
+const edgeA = (p, max) => clamp(p / 1.6, 0, 1) * clamp((max - p) / 1.6, 0, 1);
+function frameItems(){
+  const dyn = [];
+  WORKERS.forEach(w => { const x = w.x(), y = w.y(); dyn.push({ kk: x + y, f: () => person(x, y, w.o()) }); });
+  { const m = pathAt([[19.9, 6.3], [23.9, 6.3]], false, .5, 0); dyn.push({ kk: m.x + m.y, f: () => person(m.x, m.y, { fx: m.fx, fy: m.fy, mv: 1, ph: tNow * 7, carry: true, helmet: '#ffffff' }) }); }
+  { const m = pathAt([[20.6, 8.75], [21.8, 8.75]], false, .3, 0); dyn.push({ kk: m.x + m.y, f: () => person(m.x, m.y, { fx: m.fx, fy: m.fy, mv: 1, ph: tNow * 7, carry: true, vest: '#2f6fdb' }) }); }
+  dyn.push({ kk: 23.6 + 8.5 + .2, f: () => truckDraw(23.6, 8.5, true) });
+  { const x = wrapR(tNow * 1.5 + 6, 34) - 4; dyn.push({ kk: x + 11.0 + .3, f: () => { ctx.globalAlpha = edgeA(x, WW); truckDraw(x, 10.95, true, { len: 3.1 }); ctx.globalAlpha = 1; } }); }
+  CARS.forEach(c => { const m = c.ax === 'x' ? 32 : 24, p = wrapR(c.o + c.v * tNow, m) - 3, x = c.ax === 'x' ? p : c.lane, y = c.ax === 'x' ? c.lane : p; dyn.push({ kk: x + y, f: () => { ctx.globalAlpha = edgeA(p, c.ax === 'x' ? WW : WH); carDraw(x, y, c.ax, c.c); ctx.globalAlpha = 1; } }); });
+  WALKERS.forEach((w, i) => { const m = pathAt(w.pts, w.loop, w.sp, w.off); dyn.push({ kk: m.x + m.y, f: () => person(m.x, m.y, { fx: m.fx, fy: m.fy, mv: 1, ph: tNow * 6 + i, vest: w.vest, helmet: ['#5a3d2b', '#2b2b2b', '#b5651d', '#d9b38c'][i % 4], pants: ['#3d4a64', '#4b4b4b', '#5a4632'][i % 3] }) }); });
+  { const x = wrapR(tNow * 1.25, 44) - 8, y = 19.45;
+    [[0, '#2f5f9e', 1.7], [1.8, '#e8ecef', 1.7], [3.6, '#e8ecef', 1.7]].forEach(([o, c, l], i) => {
+      dyn.push({ kk: x - o + y + .2, f: () => { ctx.globalAlpha = edgeA(x - o, WW); box(x - o - l / 2, y - .38, .12, l, .76, .75, c); if (i === 0) box(x - o + .1, y - .38, .12, .55, .76, .75, '#1d3f6e'); box(x - o - l / 2, y - .38, .45, l, .76, .08, '#ff7a1a', { edge: null }); box(x - o - l / 2, y - .38, 0, l, .76, .12, '#2b3138', { edge: null }); ctx.globalAlpha = 1; } });
+    }); }
+  return dyn;
+}
+
+/* ---------- sol ---------- */
+function drawGround(){
+  const sl = .7;
+  poly([P(0, WH, 0), P(WW, WH, 0), P(WW, WH, -sl), P(0, WH, -sl)], '#8d6b46', 'rgba(0,0,0,.25)', .8);
+  poly([P(WW, 0, 0), P(WW, WH, 0), P(WW, WH, -sl), P(WW, 0, -sl)], '#6e5236', 'rgba(0,0,0,.25)', .8);
+  poly([P(0, WH, 0), P(WW, WH, 0), P(WW, WH, -.12), P(0, WH, -.12)], '#6fae48'); poly([P(WW, 0, 0), P(WW, WH, 0), P(WW, WH, -.12), P(WW, 0, -.12)], '#58933a');
+  flat(0, 0, WW, WH, '#94c96c');
+  for (let x = 0; x < WW; x += 2) for (let y = 0; y < WH; y += 2) if (((x + y) / 2) % 2 === 0) flat(x, y, x + 2, y + 2, 'rgba(255,255,255,.05)');
+  // parc
+  flat(14.0, 15.0, 22.8, 18.8, '#a6d57d'); flat(14.4, 15.8, 21.6, 16.4, '#d9c9a0'); flat(14.4, 17.6, 21.6, 18.2, '#d9c9a0');
+  { const [cx, cy] = P(18.6, 17.0, 0); ctx.beginPath(); ctx.ellipse(cx, cy, 52, 25, 0, 0, 7); ctx.fillStyle = '#6fb8e6'; ctx.fill(); ctx.strokeStyle = '#e8e2c8'; ctx.lineWidth = 3; ctx.stroke(); ctx.beginPath(); ctx.ellipse(cx - 12, cy - 5, 12, 4, 0, 0, 7); ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.fill(); }
+  // routes + trottoirs
+  const asp = '#4b525a', sw = '#cfd2d6';
+  flat(0, 9.0, WW, 12.0, sw); flat(10.5, 0, 13.5, WH, sw);
+  flat(0, 9.5, WW, 11.5, asp); flat(11, 0, 13, WH, asp);
+  for (let x = 0.4; x < WW; x += 1.4) if (x < 10.4 || x > 13.4) flat(x, 10.46, x + .7, 10.54, 'rgba(255,255,255,.7)');
+  for (let y = 0.4; y < WH; y += 1.4) if (y < 8.8 || y > 12.2) flat(11.96, y, 12.04, y + .7, 'rgba(255,255,255,.7)');
+  // rond-point
+  { const pts = []; for (let a = 0; a < 40; a++) pts.push(P(12 + Math.cos(a / 40 * 6.2832) * 2.2, 10.5 + Math.sin(a / 40 * 6.2832) * 2.2, .001)); poly(pts, asp); const p2 = []; for (let a = 0; a < 32; a++) p2.push(P(12 + Math.cos(a / 32 * 6.2832) * .62, 10.5 + Math.sin(a / 32 * 6.2832) * .62, .01)); poly(p2, '#7bbf55', '#cfd2d6', 2); }
+  // passages piétons
+  for (let k = 0; k < 6; k++) { flat(8.6, 9.6 + k * .32, 9.4, 9.8 + k * .32, 'rgba(255,255,255,.8)'); flat(14.6, 9.6 + k * .32, 15.4, 9.8 + k * .32, 'rgba(255,255,255,.8)'); flat(10.6 + k * .32, 5.6, 10.8 + k * .32, 6.4, 'rgba(255,255,255,.8)'); flat(10.6 + k * .32, 14.6, 10.8 + k * .32, 15.4, 'rgba(255,255,255,.8)'); }
+  // voie ferrée
+  flat(0, 18.95, WW, 19.95, '#a9a39a'); for (let x = 0.2; x < WW; x += .5) flat(x, 19.0, x + .16, 19.9, '#6b5238'); flat(0, 19.2, WW, 19.28, '#c9ced3'); flat(0, 19.62, WW, 19.7, '#c9ced3');
+  // atelier : sol béton + marquages orange + cour
+  flat(14.6, 1.2, 25.2, 7.6, '#c5c9cd'); for (let x = 14.6; x < 25.2; x += 1.1) flat(x, 1.2, x + .02, 7.6, 'rgba(0,0,0,.05)');
+  [[16.6, 3.9, 19.2, 5.2], [19.9, 3.9, 22.9, 5.4], [15.5, 6.2, 19.4, 7.5]].forEach(([a, b, c, d]) => { flat(a, b, c, b + .08, '#ff8a1f'); flat(a, d - .08, c, d, '#ff8a1f'); flat(a, b, a + .08, d, '#ff8a1f'); flat(c - .08, b, c, d, '#ff8a1f'); });
+  flat(15.6, 2.4, 25.0, 3.8, 'rgba(255,210,58,.16)');
+  flat(14.2, 7.6, 25.2, 9.0, '#b7babe'); for (let x = 14.4; x < 25.2; x += 1.3) flat(x, 8.45, x + .6, 8.5, 'rgba(255,255,255,.5)');
+  // rues secondaires / allées maisons
+  flat(1.4, 4.9, 4.4, 5.9, '#ddd5c5'); flat(6.0, 4.9, 9.0, 5.9, '#ddd5c5'); flat(1.4, 16.4, 4.4, 17.2, '#ddd5c5'); flat(6.2, 16.8, 9.2, 17.6, '#ddd5c5');
+}
+
+/* ---------- rendu, caméra, interaction ---------- */
+const STATIC = ITEMS; buildTown();
+let NARROW = false, PX = 0, PY = 0, PLIM = [0, 0], drag = null, noClick = false;
+let prevHOT = [], clouds = [{ x: .1, y: .12, s: 1 }, { x: .55, y: .06, s: 1.3 }, { x: .85, y: .2, s: .8 }];
+function fit(){
+  const r = cv.getBoundingClientRect(); DPR = Math.min(2, window.devicePixelRatio || 1); CW = Math.max(200, r.width); CH = Math.max(200, r.height);
+  cv.width = Math.round(CW * DPR); cv.height = Math.round(CH * DPR);
+  const w = (WW + WH) * HW + 70, h = (WW + WH) * HH + 5.2 * ZH + .7 * ZH + 40;
+  NARROW = CW < 700; const top = NARROW ? 96 : 62, bot = NARROW ? 150 : 74, AH = Math.max(160, CH - top - bot);
+  FS = NARROW ? Math.max(CW / w, AH / h * .8) : Math.min(CW / w, AH / h);
+  FOX = CW / 2 - ((WW - WH) / 2 * HW) * FS; FOY = top + AH / 2 - ((WW + WH) * HH * .5 + (.7 - 5.2) * ZH * .5) * FS + 4;
+  if (NARROW) { const F = P(19.5, 4.5, 0); FOX += CW / 2 - (F[0] * FS + FOX); FOY += (top + AH / 2) - (F[1] * FS + FOY); }
+  PLIM = [Math.max(0, (w * FS - CW) / 2 + 40), Math.max(0, (h * FS - AH) / 2 + 40)]; PX = clamp(PX, -PLIM[0], PLIM[0]); PY = clamp(PY, -PLIM[1], PLIM[1]);
+}
+function pinScreen(id){ const q = PIN[id], p = P(q[0], q[1], q[2]); return [p[0] * S + OX, p[1] * S + OY]; }
+function drawPins(){
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  Object.keys(HOTS).forEach((id, i) => {
+    const [x, y] = pinScreen(id), h = HOTS[id], bob = Math.sin(tNow * 3 + i * 1.3) * 4 * S, k = (hover === id ? 1.3 : 1) * clamp(S * 1.15, .75, 1.3), r = 10 * k, cy = y - 22 * k + bob;
+    ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(x, y + 2, 7 * k, 3 * k, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x, y - 4 * k + bob); ctx.lineTo(x - r * .7, cy + r * .6); ctx.arc(x, cy, r, Math.PI * .8, Math.PI * .2, false); ctx.closePath();
+    ctx.fillStyle = h.color; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, cy, r * .38, 0, 7); ctx.fillStyle = '#fff'; ctx.fill();
+  });
+}
+function drawHover(){
+  if (!hover) return; ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const pulse = 2 + Math.sin(tNow * 6) * .7;
+  prevHOT.filter(q => q.id === hover).forEach(q => { ctx.beginPath(); q.p.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.fill(); ctx.strokeStyle = HOTS[hover].color; ctx.lineWidth = pulse; ctx.stroke(); });
+}
+function drawSky(){
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const g = ctx.createLinearGradient(0, 0, 0, CH); g.addColorStop(0, '#bfe0f7'); g.addColorStop(.6, '#e3f2fb'); g.addColorStop(1, '#f4f9ff'); ctx.fillStyle = g; ctx.fillRect(0, 0, CW, CH);
+  clouds.forEach((c, i) => { const x = ((c.x * CW + tNow * (6 + i * 3)) % (CW + 300)) - 150, y = c.y * CH; ctx.fillStyle = 'rgba(255,255,255,.85)'; [[0, 0, 46], [38, 8, 34], [-36, 10, 30], [70, 14, 24]].forEach(([dx, dy, r]) => { ctx.beginPath(); ctx.ellipse(x + dx * c.s, y + dy * c.s, r * c.s * 1.3, r * c.s * .6, 0, 0, 7); ctx.fill(); }); });
+}
+function frame(now){
+  requestAnimationFrame(frame);
+  const act = panel.classList.contains('active'); document.documentElement.classList.toggle('home-full', act);
+  if (!act || document.hidden) return;
+  tNow = (now - T0) / 1000;
+  if (cv.clientWidth !== Math.round(CW) || cv.clientHeight !== Math.round(CH)) fit();
+  const k = clamp(tNow / 3.0, 0, 1), e = 1 - Math.pow(1 - k, 3), m = lerp(1.75, 1, e), F = P(19.5, 4.5, 0);
+  S = FS * m; const ax = lerp(CW * .5, F[0] * FS + FOX + PX, e), ay = lerp(CH * .52, F[1] * FS + FOY + PY, e); OX = ax - F[0] * S; OY = ay - F[1] * S;
+  drawSky(); HOTP = []; hotN = 0;
+  ctx.setTransform(S * DPR, 0, 0, S * DPR, OX * DPR, OY * DPR); ctx.lineJoin = 'round';
+  drawGround();
+  const all = STATIC.map(it => ({ kk: typeof it.k === 'function' ? it.k() : it.k, f: it.f })).concat(frameItems());
+  all.sort((a, b) => a.kk - b.kk); all.forEach(it => { curHot = null; it.f(); curHot = null; });
+  prevHOT = HOTP; drawHover(); drawPins();
+}
+/* ---------- souris / tactile ---------- */
+function inPoly(p, x, y){ let c = false; for (let i = 0, j = p.length - 1; i < p.length; j = i++) { if (((p[i][1] > y) !== (p[j][1] > y)) && (x < (p[j][0] - p[i][0]) * (y - p[i][1]) / (p[j][1] - p[i][1]) + p[i][0])) c = !c; } return c; }
+function pick(x, y){
+  let best = null, bd = 17;
+  Object.keys(HOTS).forEach(id => { const [px, py] = pinScreen(id); const d = Math.hypot(x - px, y - (py - 20)); if (d < bd) { bd = d; best = id; } });
+  if (best) return best;
+  let bo = -1; for (const q of prevHOT) if (q.o > bo && inPoly(q.p, x, y)) { bo = q.o; best = q.id; }
+  return best;
+}
+function showTip(id, x, y){
+  if (!id) { tip.classList.remove('on'); return; }
+  const h = HOTS[id]; tip.style.borderLeftColor = h.color; tip.innerHTML = `<b>${h.title}</b>${h.desc}<i>Cliquer pour ouvrir →</i>`;
+  const wr = cv.parentNode.getBoundingClientRect(), w = tip.offsetWidth || 260, hh = tip.offsetHeight || 80;
+  tip.style.left = clamp(x - w / 2, 8, wr.width - w - 8) + 'px'; tip.style.top = clamp(y - hh - 34 > 8 ? y - hh - 34 : y + 22, 8, wr.height - hh - 8) + 'px'; tip.classList.add('on');
+}
+function setMat(h, tries){
+  const sel = document.querySelector('#' + h.tab + ' [data-mat]');
+  if (!sel) { if (tries < 8) setTimeout(() => setMat(h, tries + 1), 250); return; }
+  const want = h.mat; if (!want) return;
+  if (want === 'zn' && sel.value !== 'jb') return;
+  if (sel.value !== want) { sel.value = want; sel.dispatchEvent(new Event('change')); }
+}
+function go(id){
+  const h = HOTS[id]; if (!h) return; const btn = document.querySelector('.tab-btn[data-tab="' + h.tab + '"]'); if (!btn) return;
+  btn.click(); window.dispatchEvent(new Event('resize')); window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (h.tab === 'tab-jointdebout') setTimeout(() => setMat(h, 0), 450);
+  if (h.tab === 'tab-tasseaux') setTimeout(() => setMat({ tab: h.tab, mat: 'zn' }, 0), 450);
+}
+function rel(e){ const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+cv.addEventListener('pointermove', e => {
+  const [x, y] = rel(e);
+  if (drag && NARROW) { if (Math.hypot(x - drag.x, y - drag.y) > 7) drag.moved = true; if (drag.moved) { PX = clamp(drag.px + x - drag.x, -PLIM[0], PLIM[0]); PY = clamp(drag.py + y - drag.y, -PLIM[1], PLIM[1]); showTip(null); return; } }
+  if (e.pointerType === 'touch') return; hover = pick(x, y); cv.style.cursor = hover ? 'pointer' : 'default'; showTip(hover, x, y);
+});
+cv.addEventListener('pointerleave', ev => { if (ev.pointerType === 'touch') return; hover = null; showTip(null); });
+cv.addEventListener('pointerdown', e => { const [x, y] = rel(e); drag = { x, y, px: PX, py: PY, moved: false }; if (NARROW) { try { cv.setPointerCapture(e.pointerId); } catch (_) {} } });
+cv.addEventListener('pointerup', e => {
+  const d = drag; drag = null; noClick = !!(d && d.moved); if (!d || d.moved || e.pointerType !== 'touch') return;
+  const [x, y] = rel(e), id = pick(x, y);
+  if (id && lastTouch === id) { go(id); lastTouch = null; } else { lastTouch = id; hover = id; showTip(id, x, y); }
+});
+cv.addEventListener('click', e => { if (noClick) { noClick = false; return; } if (e.pointerType === 'touch' || (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents)) return; const [x, y] = rel(e), id = pick(x, y); if (id) go(id); });
+document.querySelectorAll('[data-town-go]').forEach(b => b.addEventListener('click', () => go(b.dataset.townGo)));
+document.querySelectorAll('[data-town-hdr]').forEach(b => b.addEventListener('click', () => { const id = b.dataset.townHdr, el = document.getElementById(id === 'import' ? 'importProjectFile' : id); if (el) el.click(); }));
+window.addEventListener('resize', () => { CW = 0; });
+window.__altemaTown = { hots: HOTS, go, centers: () => Object.keys(HOTS).map(id => { const [x, y] = pinScreen(id); const r = cv.getBoundingClientRect(); return { id, x: r.left + x, y: r.top + y - 20 }; }), pickAt: (x, y) => pick(x, y) };
+requestAnimationFrame(frame);
+})();
+
 </script>
 </body>
 </html>
