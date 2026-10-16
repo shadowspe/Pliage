@@ -451,6 +451,25 @@
   .town-tip b{display:block;font-size:13.5px;margin-bottom:3px;color:#ffce00;}
   .town-tip i{display:block;margin-top:6px;font-style:normal;font-size:11px;color:#9fe0b8;}
     .panel{background:color-mix(in srgb, var(--panel) 86%, transparent);}
+  /* ===== Plein écran avec édition + pastilles des visuels ===== */
+  .vt-tools{position:absolute;top:8px;right:8px;z-index:30;display:flex;gap:6px;pointer-events:auto;}
+  .vt-tools button,.tabfs-open button,.fsbar button{padding:6px 11px;border:1px solid rgba(255,255,255,.22);border-radius:9px;background:rgba(20,24,28,.82);color:#fff;font-size:12px;cursor:pointer;}
+  .vt-tools button:hover,.vt-tools button.on,.tabfs-open button:hover,.fsbar button:hover{background:#ffce00;color:#1c1b1a;border-color:#ffe066;}
+  .tabfs-open{display:flex;justify-content:flex-end;margin:0 0 8px;}
+  html.tabfs-on,html.tabfs-on body{overflow:hidden;}
+  html.tabfs-on header,html.tabfs-on .tabs-nav{display:none !important;}
+  .tab-panel.tab-fs{display:block !important;position:fixed;inset:0;z-index:900;overflow:auto;padding:0 14px 24px;background:var(--bg,#1c1b1a);}
+  .tab-panel.tab-fs>.tabfs-open{display:none;}
+  .fsbar{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:8px;padding:9px 2px;margin-bottom:10px;background:var(--bg,#1c1b1a);border-bottom:1px solid var(--line);}
+  .fsbar b{font-size:14px;letter-spacing:.5px;color:var(--text);} .fsbar .sp{flex:1;} .fsbar .q{border-color:#ffce00;}
+  .tab-fs .grid,.tab-fs [id^="zincRoot_"]{grid-template-columns:minmax(320px,390px) minmax(0,1fr) !important;gap:14px;}
+  .tab-fs.fs-nocontrols .grid,.tab-fs.fs-nocontrols [id^="zincRoot_"]{grid-template-columns:1fr !important;}
+  .tab-fs.fs-nocontrols .grid>:first-child,.tab-fs.fs-nocontrols [id^="zincRoot_"]>:first-child{display:none !important;}
+  .fs-hide{display:none !important;}
+  .tab-fs #canvas3dContainer,.tab-fs #assembleCanvas3dContainer,.tab-fs #acrotereCanvas3dContainer,.tab-fs [id^="mpCanvas3d_"]{height:calc(100vh - 170px) !important;min-height:420px;}
+  .tab-fs [style*="max-height: 78vh"],.tab-fs [style*="max-height:78vh"]{max-height:calc(100vh - 210px) !important;}
+  @media (max-width:880px){.tab-fs .grid,.tab-fs [id^="zincRoot_"]{grid-template-columns:1fr !important;}}
+  @media print{.vt-tools,.tabfs-open,.fsbar{display:none !important;}}
   @media print{#bgFx{display:none !important;}}
   @media (max-width:700px){.town-back{top:62px;font-size:12px;padding:7px 12px}.town-actions button span{display:none}.town-actions button{padding:8px 10px}.town-links button{padding:6px 9px;font-size:11.5px}.town-hint{display:none}.town-brand{font-size:13px}}
   .tab-panel.active{display:block;}
@@ -9431,6 +9450,7 @@ function createZincController(suffix, kind){
   // 45° en plan (cas standard, pentes égales de chaque côté), ailes moins
   // larges que le corps sur lequel elles s'appuient.
   let mp3dScene = null, mp3dRenderer = null, mp3dCamera = null, mp3dGroup = null, mp3dInit = false, mp3dKeyLight = null;
+  window.__mp3dViewers = window.__mp3dViewers || {}; window.__mp3dViewers[suffix] = { r: () => mp3dRenderer, s: () => mp3dScene, c: () => mp3dCamera, g: () => mp3dGroup };   // accès pour « Vue réaliste »
   let mpExplodeAmount = 0;
   const MP_EXPLODE_MAX = 900;
   
@@ -9737,7 +9757,8 @@ function createZincController(suffix, kind){
   }
   // Toiture à 2 pans : la droite du faîtage coupe le contour, un pan de chaque côté.
   function mpLibreCompute2(I, thRad){
-    const R = mpLibre.ridge, P = I.P, dx = R.b.x - R.a.x, dy = R.b.y - R.a.y, Ln = Math.hypot(dx, dy), dir = { x: dx / Ln, y: dy / Ln }, nrm = { x: -dir.y, y: dir.x };
+    const R0 = mpLibre.ridge, R = { a: { x: R0.a.x, y: -R0.a.y }, b: { x: R0.b.x, y: -R0.b.y } }, P = I.P.map(q => ({ x: q.x, y: -q.y })),   // y inversé : le plan 2D/3D reprend exactement le dessin
+      dx = R.b.x - R.a.x, dy = R.b.y - R.a.y, Ln = Math.hypot(dx, dy), dir = { x: dx / Ln, y: dy / Ln }, nrm = { x: -dir.y, y: dir.x };
     const sd = p => (p.x - R.a.x) * nrm.x + (p.y - R.a.y) * nrm.y;
     const clip = sg => {
       const out = [];
@@ -9762,9 +9783,10 @@ function createZincController(suffix, kind){
     mpEdgeMap = map;
     const all = pans.reduce((a, p) => a.concat(p.pts), []), bw = Math.max(...all.map(q => q.x)), bh = Math.max(...all.map(q => q.y)), houseH = mpWallH > 0 ? mpWallH : 2800;
     const hAt = (x, y) => { const sv = sd({ x: x + mx, y: y + my }), k = sv >= 0 ? 0 : 1; return Math.max(0, Hr * (1 - Math.abs(sv) / dmax[k])); };
+    const wp = []; P.forEach((a, i) => { const b = P[(i + 1) % P.length], sa = sd(a), sb = sd(b); wp.push({ x: a.x - mx, y: a.y - my }); if ((sa > 1 && sb < -1) || (sa < -1 && sb > 1)) { const t = sa / (sa - sb); wp.push({ x: a.x + (b.x - a.x) * t - mx, y: a.y + (b.y - a.y) * t - my }); } });
     const sl = dmax.map(d => Math.atan(Hr / d) * 180 / Math.PI);
     if (Math.abs(sl[0] - sl[1]) > 0.5) showToast(`Pans de pentes différentes : ${sl[0].toFixed(1)}° et ${sl[1].toFixed(1)}° (faîtage commun, égouts au même niveau).`);
-    return { segs: [], pans, Lm: bw, Wm: bh, rects: [{ x0: 0, y0: 0, sx: bw, sy: bh, z: 0, fill: null, wallsPoly: P.map(p => ({ x: p.x - mx, y: p.y - my })), tan, hAt }],
+    return { segs: [], pans, Lm: bw, Wm: bh, rects: [{ x0: 0, y0: 0, sx: bw, sy: bh, z: 0, fill: null, wallsPoly: wp, tan, hAt }],
       valleys: new Set(), tan, houseH, type: "libre", libre: { N: I.N, area: I.area, per: I.per, ridge: true, slopes: sl }, off: { x: 0, y: 0 } };
   }
   function mpLibreCompute(thRad){
@@ -10872,7 +10894,12 @@ function createZincController(suffix, kind){
     const c2 = p3.map(p => new THREE.Vector2(p.x * e1[0] + p.y * e1[1] + p.z * e1[2], p.x * e2[0] + p.y * e2[1] + p.z * e2[2]));
     try {
       const t = THREE.ShapeUtils.triangulateShape(c2.slice(), []);
-      if (t && t.length) { const out = []; t.forEach(f => out.push(f[0], f[1], f[2])); return out; }
+      if (t && t.length) {
+        const out = []; let ta = 0, pa = 0;
+        t.forEach(f => { let a = f[0], b = f[1], c = f[2]; const A = p3[a], B = p3[b], C = p3[c], ux = B.x - A.x, uy = B.y - A.y, uz = B.z - A.z, vx = C.x - A.x, vy = C.y - A.y, vz = C.z - A.z, cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx; ta += Math.hypot(cx, cy, cz) / 2; if (cx * nx + cy * ny + cz * nz < 0) { const s = b; b = c; c = s; } out.push(a, b, c); });
+        for (let i = 0; i < n; i++) { const a = p3[i], b = p3[(i + 1) % n]; pa += (a.y - b.y) * (a.z + b.z) * nx + (a.z - b.z) * (a.x + b.x) * ny + (a.x - b.x) * (a.y + b.y) * nz; }
+        if (Math.abs(Math.abs(pa) / 2 - ta) <= Math.max(1, Math.abs(pa) / 2) * 0.03) return out;   // sinon : triangulation incomplète -> repli éventail
+      }
     } catch (e) { /* repli éventail */ }
     const idx = []; for (let i = 1; i < n - 1; i++) idx.push(0, i, i + 1); return idx;
   }
@@ -11105,7 +11132,11 @@ function createZincController(suffix, kind){
     data.rects.forEach(r => {
       if (r.wallsPoly) {   // pan libre : murs qui suivent le plan incliné du toit
         const W0 = r.wallsPoly, cx0 = W0.reduce((q, p) => q + p.x, 0) / W0.length, cy0 = W0.reduce((q, p) => q + p.y, 0) / W0.length;
-        const ins = W0.map(p => { const d = Math.hypot(p.x - cx0, p.y - cy0) || 1, k = Math.max(0, 1 - 40 / d); return { x: cx0 + (p.x - cx0) * k, y: cy0 + (p.y - cy0) * k }; });
+        const ins = (() => {   // décalage de 40 mm vers l'intérieur : chaque sommet suit la bissectrice (mitre limitée)
+          const n = W0.length; let A2 = 0; W0.forEach((a, i) => { const b = W0[(i + 1) % n]; A2 += a.x * b.y - b.x * a.y; }); const sg = A2 >= 0 ? 1 : -1;
+          const nor = (a, b) => { const dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 1; return { x: -sg * dy / l, y: sg * dx / l }; };
+          return W0.map((q, i) => { const a = W0[(i - 1 + n) % n], b = W0[(i + 1) % n], n1 = nor(a, q), n2 = nor(q, b), den = 1 + n1.x * n2.x + n1.y * n2.y, k = 40 / Math.max(den, 0.35); return { x: q.x + (n1.x + n2.x) * k, y: q.y + (n1.y + n2.y) * k }; });
+        })();
         const pos = [], idx = [], hAt = q => (r.hAt ? r.hAt(q.x, q.y) : Math.max(0, q.y) * r.tan) - 40;
         ins.forEach((a, i) => { const b = ins[(i + 1) % ins.length], o = pos.length / 3; [[a, -houseH], [b, -houseH], [b, hAt(b)], [a, hAt(a)]].forEach(([q, y]) => pos.push(q.x - C.x, y, q.y - C.y)); idx.push(o, o + 1, o + 2, o, o + 2, o + 3); });
         const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
@@ -15152,7 +15183,7 @@ const DEFAULT_LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAArwAAAJKCAMA
 // sécurité forte (le fichier reste modifiable par quiconque le possède).
 const SETTINGS_PASSWORD_SHA256 = '679ec1048b2f9d3826a4e39c63bba18f384396636335f6fa6750de886f956b06';
 const UPDATE_REQUEST_EMAIL = 'hugo.saglier@altema.pro';
-const APP_VERSION_LABEL = 'v71';
+const APP_VERSION_LABEL = 'v74';
 
 // SHA-256 en JavaScript pur (indépendant du contexte sécurisé du navigateur)
 function sha256Hex(msg){
@@ -17521,6 +17552,231 @@ function frame(now){
 requestAnimationFrame(frame);
 
 })();
+</script>
+<script>
+/* ===== Outils de visualisation : plein écran (avec édition) + vue 3D réaliste ===== */
+(function(){
+'use strict';
+if (window.__altemaViewTools) return; window.__altemaViewTools = true;
+const $q = (s, r) => (r || document).querySelector(s), $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+const resizeAll = () => { window.dispatchEvent(new Event('resize')); setTimeout(() => window.dispatchEvent(new Event('resize')), 260); setTimeout(() => window.dispatchEvent(new Event('resize')), 700); };
+const toast = m => { try { if (typeof showToast === 'function') showToast(m); } catch (e) {} };
+
+/* ================= 1) PLEIN ÉCRAN AVEC ÉDITION ================= */
+let fsPanel = null, hiddenEls = [], focusEl = null;
+function tabTitle(panel){ const b = $q('.tab-btn[data-tab="' + panel.id + '"]') || $q('#zincTabBtn'); return b ? b.textContent.trim() : 'Plein écran'; }
+function exitFs(silent){
+  if (!fsPanel) return;
+  hiddenEls.forEach(e => e.classList.remove('fs-hide')); hiddenEls = [];
+  if (focusEl) focusEl.classList.remove('fs-focus'); focusEl = null;
+  fsPanel.classList.remove('tab-fs', 'fs-nocontrols'); document.documentElement.classList.remove('tabfs-on');
+  const bar = $q(':scope > .fsbar', fsPanel); if (bar) bar.remove(); fsPanel = null;
+  if (!silent) { resizeAll(); window.scrollTo(0, 0); }
+}
+function enterFs(panel, focus){
+  if (fsPanel) exitFs(true);
+  fsPanel = panel; panel.classList.add('tab-fs'); document.documentElement.classList.add('tabfs-on');
+  const grid = $q('.grid', panel);
+  if (focus && grid) {   // on masque tout sauf la carte choisie : les réglages (colonne de gauche) restent accessibles
+    let node = focus; focusEl = focus; focus.classList.add('fs-focus');
+    while (node.parentElement && node.parentElement !== grid) { const par = node.parentElement; Array.from(par.children).forEach(sib => { if (sib !== node) { sib.classList.add('fs-hide'); hiddenEls.push(sib); } }); node = par; }
+  }
+  const bar = document.createElement('div'); bar.className = 'fsbar';
+  bar.innerHTML = `<b>${tabTitle(panel)}</b><span class="sp"></span><button type="button" data-a="ctl" title="Afficher / masquer les réglages à gauche">◀ Réglages</button>${focus ? '<button type="button" data-a="all" title="Réafficher tous les visuels">Tout afficher</button>' : ''}<button type="button" data-a="quit" class="q">✕ Quitter le plein écran</button>`;
+  bar.addEventListener('click', e => { const a = e.target.closest('button') && e.target.closest('button').dataset.a; if (!a) return;
+    if (a === 'quit') exitFs(); else if (a === 'ctl') { panel.classList.toggle('fs-nocontrols'); resizeAll(); }
+    else if (a === 'all') { hiddenEls.forEach(x => x.classList.remove('fs-hide')); hiddenEls = []; if (focusEl) focusEl.classList.remove('fs-focus'); focusEl = null; e.target.remove(); resizeAll(); } });
+  panel.insertBefore(bar, panel.firstChild); window.scrollTo(0, 0); resizeAll();
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && fsPanel && !$q('.mp-wizard-overlay.show')) exitFs(); });
+function addTabButtons(){
+  $$('.tab-panel').forEach(p => {
+    if (p.id === 'tab-accueil' || $q(':scope > .tabfs-open', p)) return;
+    const d = document.createElement('div'); d.className = 'tabfs-open';
+    d.innerHTML = '<button type="button" title="Tous les visuels en grand, réglages à gauche : tu peux modifier en plein écran">⛶ Plein écran</button>';
+    d.firstChild.addEventListener('click', () => enterFs(p, null)); p.insertBefore(d, p.firstChild);
+  });
+}
+
+/* ================= 2) PASTILLES SUR CHAQUE VISUEL (⛶ et ✨) ================= */
+const VISUALS = [
+  { sel: '#canvas3dContainer', k: '3d', v: 'pliage' }, { sel: '#assembleCanvas3dContainer', k: '3d', v: 'assemblage' }, { sel: '#acrotereCanvas3dContainer', k: '3d', v: 'couvertine' }, { sel: '[id^="mpCanvas3d_"]', k: '3d', v: 'mp' },
+  { sel: '#profileCanvasWrap', k: '2d' }, { sel: '#assemble2DWrap', k: '2d' }, { sel: '#acrotere2DWrap', k: '2d' }, { sel: '[id^="mpPlanWrap_"]', k: '2d' }, { sel: '#results', k: '2d' }
+];
+function cardOf(el){ return el.closest('.panel') || el; }
+function decorate(el, def){
+  if (!el || $q(':scope > .vt-tools', el)) return;
+  if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
+  const bar = document.createElement('div'); bar.className = 'vt-tools';
+  if (def.k === '3d') { const b = document.createElement('button'); b.type = 'button'; b.className = 'vt-real'; b._def = def; b._el = el; b.title = 'Rendu très réaliste : soleil, ombres, reflets, ciel, sol'; b.addEventListener('click', ev => { ev.stopPropagation(); toggleReal(def, el, b); }); bar.appendChild(b); syncChip(b); }
+  const f = document.createElement('button'); f.type = 'button'; f.textContent = '⛶ Plein écran'; f.title = 'Agrandir ce visuel (réglages accessibles à gauche, modification possible)';
+  f.addEventListener('click', ev => { ev.stopPropagation(); const panel = el.closest('.tab-panel'); if (panel) enterFs(panel, cardOf(el)); }); bar.appendChild(f);
+  ['pointerdown', 'wheel', 'mousedown', 'touchstart'].forEach(t => bar.addEventListener(t, e => e.stopPropagation(), { passive: true }));
+  el.appendChild(bar);
+}
+function scan(){ VISUALS.forEach(d => $$(d.sel).forEach(el => decorate(el, d))); $$('.vt-real').forEach(syncChip); }
+let scanQ = false; new MutationObserver(() => { if (scanQ) return; scanQ = true; requestAnimationFrame(() => { scanQ = false; scan(); }); }).observe(document.body, { childList: true, subtree: true });
+
+/* ================= 3) VUE 3D RÉALISTE ================= */
+const REAL = new Map();   // clé du visuel -> état
+const gl = n => { try { return (new Function('return typeof ' + n + " !== 'undefined' ? " + n + ' : null'))(); } catch (e) { return null; } };
+const LEGACY = {   // modes « Vue réaliste » déjà présents dans le pliage et l'assemblage : on les réutilise
+  pliage: { get: () => !!gl('profileRealisticMode'), set: on => new Function('on', 'setProfileRealistic(on)')(on) },
+  assemblage: { get: () => !!gl('assembleRealisticMode'), set: on => new Function('on', 'setAssembleRealistic(on)')(on) }
+};
+function syncChip(b){ const def = b._def, el = b._el; if (!def) return; const on = LEGACY[def.v] ? LEGACY[def.v].get() : REAL.has(realKey(def, el)); b.classList.toggle('on', on); b.textContent = on ? '✨ Vue réaliste : activée' : '✨ Vue réaliste';
+  const bar = b.parentElement; if (!bar) return; let ex = $q(':scope > .vt-exp', bar);
+  if (on && !ex) { ex = document.createElement('span'); ex.className = 'vt-exp'; ex.innerHTML = '<button type="button" data-d="-1" title="Plus sombre">☀−</button><button type="button" data-d="1" title="Plus clair">☀+</button>'; ex.addEventListener('click', e => { const d = e.target.closest('button'); if (!d) return; e.stopPropagation(); const k = d.dataset.d === '1' ? 1.25 : 0.8, st = REAL.get(realKey(def, el)); if (st) { st.exposure = Math.max(0.1, Math.min(5, st.exposure * k)); st.v.r.toneMappingExposure = st.exposure; st.v.r.render(st.v.s, st.v.c); return; } const lv = viewerOf(def, el); if (lv.r) { lv.r.toneMappingExposure = Math.max(0.1, Math.min(5, (lv.r.toneMappingExposure || 1) * k)); try { lv.r.render(lv.s, lv.c); } catch (er) {} } }); ['pointerdown', 'wheel', 'mousedown', 'touchstart'].forEach(t => ex.addEventListener(t, e => e.stopPropagation(), { passive: true })); bar.insertBefore(ex, b.nextSibling); }
+  if (!on && ex) ex.remove(); }
+const realKey = (def, el) => def.v + (def.v === 'mp' ? ':' + el.id : '');
+function viewerOf(def, el){   // accès au rendu / scène / caméra de chaque visionneuse
+  const g = n => { try { return (new Function('return typeof ' + n + " !== 'undefined' ? " + n + ' : null'))(); } catch (e) { return null; } };
+  if (def.v === 'pliage') return { r: g('renderer3D'), s: g('scene3D'), c: g('camera3D'), ground: 'floor', keepBg: !!g('profileBgPhotoTexture') };
+  if (def.v === 'assemblage') return { r: g('assembleRenderer'), s: g('assembleScene'), c: g('assembleCamera'), ground: 'floor', keepBg: !!g('assembleBgPhotoTexture') };
+  if (def.v === 'couvertine') return { r: g('acrotereRenderer'), s: g('acrotereScene'), c: g('acrotereCamera'), g: g('acrotereGroup'), ground: 'floor' };
+  const sfx = el.id.replace('mpCanvas3d_', ''), m = window.__mp3dViewers && window.__mp3dViewers[sfx];
+  return m ? { r: m.r(), s: m.s(), c: m.c(), g: m.g(), ground: 'grass' } : { r: null };
+}
+function lumHsl(col){ const o = {}; col.getHSL(o); return o; }
+function canvasTex(w, h, draw, srgb){ const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; if (srgb) t.encoding = THREE.sRGBEncoding; t.anisotropy = 8; return t; }
+let TEX = null;
+function textures(){
+  if (TEX) return TEX; const rnd = (() => { let s = 12345; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+  TEX = {
+    grass: canvasTex(512, 512, (x, w, h) => { x.fillStyle = '#6f9a4a'; x.fillRect(0, 0, w, h); for (let i = 0; i < 9000; i++) { const t = rnd(); x.fillStyle = t < .5 ? 'rgba(52,96,38,.35)' : t < .8 ? 'rgba(130,176,84,.30)' : 'rgba(190,206,120,.16)'; x.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 2, 2 + rnd() * 5); } }, true),
+    floor: canvasTex(512, 512, (x, w, h) => { x.fillStyle = '#b9bcbf'; x.fillRect(0, 0, w, h); for (let i = 0; i < 7000; i++) { x.fillStyle = rnd() < .5 ? 'rgba(80,84,90,.10)' : 'rgba(255,255,255,.12)'; x.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 2, 1 + rnd() * 2); } x.strokeStyle = 'rgba(60,64,70,.28)'; x.lineWidth = 2; x.strokeRect(0, 0, w, h); }, true),
+    brushed: canvasTex(256, 256, (x, w, h) => { x.fillStyle = '#808080'; x.fillRect(0, 0, w, h); for (let i = 0; i < 900; i++) { const v = 100 + Math.floor(rnd() * 60); x.fillStyle = `rgb(${v},${v},${v})`; x.fillRect(0, rnd() * h, w, 1); } }, false),
+    sky: canvasTex(8, 512, (x, w, h) => { const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#5b93d6'); g.addColorStop(.45, '#a9cdee'); g.addColorStop(.78, '#e4eef7'); g.addColorStop(1, '#f4efe4'); x.fillStyle = g; x.fillRect(0, 0, w, h); }, true)
+  };
+  TEX.sky.wrapS = TEX.sky.wrapT = THREE.ClampToEdgeWrapping; return TEX;
+}
+function makeEnv(R){   // environnement par panneaux lumineux (même recette éprouvée que la vue 3D de toiture) avec ciel clair
+  const pm = new THREE.PMREMGenerator(R), es = new THREE.Scene(); es.background = new THREE.Color(0x9db9d6);
+  const panel = (x, y, z, w, h, i) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(i, i, i), side: THREE.DoubleSide })); m.position.set(x, y, z); m.lookAt(0, 0, 0); es.add(m); };
+  panel(0, 9, 0, 12, 12, 1.6); panel(8, 4, 5, 5, 7, 2.6); panel(-8, 2, -4, 6, 6, 0.8); panel(0, -6, 0, 14, 14, 0.25);
+  const tex = pm.fromScene(es, 0.03).texture; pm.dispose(); return tex;
+}
+const isHelper = o => o.isGridHelper || o.isAxesHelper || o.type === 'GridHelper' || o.type === 'AxesHelper';
+function classify(col){
+  const c = lumHsl(col), s = c.s, l = c.l, h = c.h;
+  if (s < 0.14) return l > 0.42 ? { m: 0.86, r: 0.36, bump: 1 } : { m: 0.78, r: 0.46, bump: 1 };       // zinc, acier, alu, anthracite
+  if (h > 0.05 && h < 0.16 && l > 0.65) return { m: 0, r: 0.92, bump: 0 };                                // enduit / mur clair
+  if (h > 0.2 && h < 0.45) return { m: 0, r: 0.95, bump: 0 };                                              // végétation
+  if (h < 0.07 && s > 0.35) return { m: 0.55, r: 0.45, bump: 1 };                                          // cuivre, tuile, laiton
+  return { m: 0.12, r: 0.7, bump: 0 };
+}
+function processMeshes(st, v){
+  const T = textures(); let n = 0;
+  v.s.traverse(o => {
+    if (!o.isMesh || !o.material || o.userData.__real || o.userData.__realAdded || isHelper(o)) return; o.userData.__real = 1;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    if (!st.shadowOrig.has(o)) st.shadowOrig.set(o, [o.castShadow, o.receiveShadow]);
+    const big = o.geometry && o.geometry.boundingSphere; o.castShadow = true; o.receiveShadow = true;
+    const out = mats.map(m => {
+      if (!m || m.isShaderMaterial || m.isMeshBasicMaterial || m.isPointsMaterial || m.isLineBasicMaterial || m.isSpriteMaterial) return m;
+      if (m.transparent && m.opacity < 0.35) { o.castShadow = false; return m; }
+      if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
+        if (!st.matOrig.has(m)) st.matOrig.set(m, { env: m.envMapIntensity, met: m.metalness, rou: m.roughness, bump: m.bumpMap, bs: m.bumpScale });
+        const k = classify(m.color); if (!st.hasEnv) k.m = Math.min(k.m, 0.4); m.envMapIntensity = 0.9; if (m.metalness < 0.5 && k.m > 0.5) { m.metalness = k.m; } if (k.m > 0.5) { m.roughness = Math.max(0.3, Math.min(m.roughness, k.r)); if (!m.bumpMap && k.bump) { m.bumpMap = T.brushed; m.bumpScale = 0.5; } } m.needsUpdate = true; return m;
+      }
+      if (m.isMeshLambertMaterial || m.isMeshPhongMaterial) {   // matériau simple -> matériau physique (métal / enduit selon la couleur)
+        const k = classify(m.color); if (!st.hasEnv) k.m = Math.min(k.m, 0.4); const nm = new THREE.MeshStandardMaterial({ color: m.color.clone(), map: m.map || null, side: m.side, transparent: m.transparent, opacity: m.opacity, metalness: k.m, roughness: k.r, envMapIntensity: 0.9, flatShading: !!m.flatShading });
+        if (k.bump) { nm.bumpMap = T.brushed; nm.bumpScale = 0.5; } st.swapped.push([o, m, nm]); return nm;
+      }
+      return m;
+    });
+    if (out.some((m, i) => m !== mats[i])) o.material = Array.isArray(o.material) ? out : out[0];
+    n++;
+  });
+  return n;
+}
+function bounds(v){
+  const root = v.g || v.s, boxes = [];
+  root.traverse(o => { if (o.isMesh && !o.userData.__realAdded && !isHelper(o) && o.visible) { try { const bb = new THREE.Box3().expandByObject(o), sz = bb.getSize(new THREE.Vector3()), m = Math.max(sz.x, sz.y, sz.z); if (isFinite(m) && m > 0) boxes.push([bb, m]); } catch (e) {} } });
+  const b = new THREE.Box3();
+  if (boxes.length) { const ms = boxes.map(x => x[1]).sort((p, q) => p - q), med = ms[Math.floor(ms.length / 2)]; boxes.forEach(([bb, m]) => { if (m <= Math.max(med * 60, 1)) b.union(bb); }); if (b.isEmpty()) boxes.forEach(([bb]) => b.union(bb)); }
+  if (b.isEmpty() || !isFinite(b.min.x + b.max.x + b.min.y + b.max.y + b.min.z + b.max.z)) b.set(new THREE.Vector3(-1000, 0, -1000), new THREE.Vector3(1000, 1000, 1000));
+  return b;
+}
+function fitSun(st, v){
+  const b = bounds(v), c = b.getCenter(new THREE.Vector3()), sz = b.getSize(new THREE.Vector3()); let rad = sz.length() * 0.75; if (!isFinite(rad) || rad < 300) rad = 300;
+  const key = [Math.round(c.x), Math.round(c.y), Math.round(c.z), Math.round(rad)].join(',');
+  if (st.fitKey === key) return false; st.fitKey = key;
+  const sun = st.sun; sun.position.set(c.x + rad * 1.1, c.y + rad * 1.9, c.z + rad * 0.9); sun.target.position.copy(c);
+  const sc = sun.shadow.camera; sc.left = -rad; sc.right = rad; sc.top = rad; sc.bottom = -rad; sc.near = 1; sc.far = rad * 6; sc.updateProjectionMatrix();
+  sun.shadow.bias = -0.0005; sun.shadow.normalBias = Math.min(40, Math.max(0.4, rad * 0.0012));
+  if (st.ground) { const tile = Math.max(400, rad * 0.5), size = rad * 20; st.ground.scale.set(size, size, 1); st.ground.position.set(c.x, b.min.y - Math.max(0.5, rad * 0.002), c.z);
+    const tx = st.ground.material.map; tx.repeat.set(size / tile, size / tile); tx.needsUpdate = true; }
+  return true;
+}
+function enableReal(def, el, v){
+  const R = v.r, sc = v.s; const st = { v, def, saved: { tm: R.toneMapping, ex: R.toneMappingExposure, enc: R.outputEncoding, sh: R.shadowMap.enabled, shT: R.shadowMap.type, pr: R.getPixelRatio(), bg: sc.background, env: sc.environment, fog: sc.fog }, lights: [], added: [], swapped: [], matOrig: new Map(), shadowOrig: new Map(), helpers: [], fitKey: '', exposure: 0.9, adj: 0, id: realKey(def, el) };
+  R.outputEncoding = THREE.sRGBEncoding; R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = st.exposure; R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap; R.setPixelRatio(Math.min(2, (window.devicePixelRatio || 1) * 1.25));
+  st.hasEnv = !!sc.environment;
+  if (!st.hasEnv) { try { sc.environment = makeEnv(R); st.hasEnv = true; st.ownEnv = true; } catch (e) { console.warn('environnement', e); } }
+  if (!v.keepBg) sc.background = textures().sky;
+  sc.fog = null;
+  sc.traverse(o => { if (o.isLight && !o.userData.__realAdded) { st.lights.push([o, o.intensity, !!o.castShadow]); o.intensity = o.intensity * (o.isDirectionalLight ? 0.25 : 0.4); if (o.isDirectionalLight) o.castShadow = false; } if (isHelper(o)) { st.helpers.push([o, o.visible]); o.visible = false; } });
+  const sun = new THREE.DirectionalLight(0xfff4e0, 1.35); sun.castShadow = true; sun.userData.__realAdded = 1; const ms = Math.min(4096, R.capabilities.maxTextureSize || 2048); sun.shadow.mapSize.set(ms, ms); sun.shadow.radius = 3;
+  sc.add(sun); sc.add(sun.target); st.sun = sun; st.added.push(sun, sun.target);
+  const hemi = new THREE.HemisphereLight(0xdce9f7, 0x6f7a62, 0.5); hemi.userData.__realAdded = 1; sc.add(hemi); st.added.push(hemi); st.hemi = hemi;
+  const T = textures(), g = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshStandardMaterial({ map: (v.ground === 'grass' ? T.grass : T.floor).clone(), roughness: 0.96, metalness: 0 }));
+  g.material.map.wrapS = g.material.map.wrapT = THREE.RepeatWrapping; g.material.map.needsUpdate = true; g.rotation.x = -Math.PI / 2; g.receiveShadow = true; g.userData.__realAdded = 1; sc.add(g); st.ground = g; st.added.push(g);
+  processMeshes(st, v); fitSun(st, v); autoExpose(st, true);
+  st.timer = setInterval(() => { try { if (!REAL.has(st.id)) return; const n = processMeshes(st, v), f = fitSun(st, v); if (n || f) { autoExpose(st, false); revertIfFailed(st); } } catch (e) {} }, 700);
+  return st;
+}
+/* contrôle automatique de la luminosité : évite les vues « toutes blanches » ou « toutes noires » */
+let _probe = null;
+function centerLum(R){
+  try { if (!_probe) { _probe = document.createElement('canvas'); _probe.width = _probe.height = 32; } const c = _probe.getContext('2d', { willReadFrequently: true }); c.clearRect(0, 0, 32, 32);
+    c.drawImage(R.domElement, 0, 0, 32, 32); const d = c.getImageData(8, 8, 16, 16).data; let sum = 0, n = 0; for (let i = 0; i < d.length; i += 4) { sum += (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255; n++; } return n ? sum / n : -1; } catch (e) { return -1; }
+}
+function autoExpose(st, first){
+  const v = st.v, R = v.r; st.adj = first ? 0 : Math.min(st.adj, 4);
+  for (let i = 0; i < 7; i++) {
+    R.render(v.s, v.c); const L = centerLum(R); if (L < 0) return;   // mesure impossible : on laisse tel quel
+    if (L > 0.86) { st.exposure = Math.max(0.15, st.exposure * 0.72); st.sun.intensity *= 0.85; if (st.hemi) st.hemi.intensity *= 0.85; }
+    else if (L < 0.1) { st.exposure = Math.min(4, st.exposure * 1.5); if (st.hemi) st.hemi.intensity = Math.min(1.4, st.hemi.intensity * 1.25); }
+    else break;
+    R.toneMappingExposure = st.exposure;
+    if (i === 6) { const L2 = (R.render(v.s, v.c), centerLum(R)); if (L2 > 0.93 || (L2 >= 0 && L2 < 0.05)) st.failed = true; }
+  }
+  R.toneMappingExposure = st.exposure;
+}
+function revertIfFailed(st){
+  if (!st.failed) return false; const v = st.v; if (REAL.get(st.id) === st) REAL.delete(st.id); disableReal(st); try { v.r.render(v.s, v.c); } catch (e) {}
+  toast('Vue réaliste indisponible pour cette scène (rendu trop clair ou trop sombre). Retour au rendu normal.'); $$('.vt-real').forEach(syncChip); return true;
+}
+function disableReal(st){
+  clearInterval(st.timer); const v = st.v, R = v.r, sc = v.s, s = st.saved;
+  R.toneMapping = s.tm; R.toneMappingExposure = s.ex; R.outputEncoding = s.enc; R.shadowMap.enabled = s.sh; R.shadowMap.type = s.shT; R.setPixelRatio(s.pr);
+  sc.background = s.bg; sc.environment = s.env; sc.fog = s.fog; if (R.domElement) R.domElement.style.filter = '';
+  st.lights.forEach(([o, i, cs]) => { o.intensity = i; o.castShadow = cs; }); st.helpers.forEach(([o, vis]) => { o.visible = vis; });
+  st.added.forEach(o => { sc.remove(o); if (o.geometry) o.geometry.dispose(); });
+  st.swapped.forEach(([o, old]) => { o.material = old; });
+  st.matOrig.forEach((p, m) => { m.envMapIntensity = p.env; m.metalness = p.met; m.roughness = p.rou; m.bumpMap = p.bump; m.bumpScale = p.bs; m.needsUpdate = true; });
+  st.shadowOrig.forEach((p, o) => { o.castShadow = p[0]; o.receiveShadow = p[1]; delete o.userData.__real; }); sc.traverse(o => { if (o.userData && o.userData.__real) delete o.userData.__real; if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { m.needsUpdate = true; }); } });
+}
+function toggleReal(def, el, btn){
+  const key = realKey(def, el); const cur = REAL.get(key);
+  if (LEGACY[def.v]) {
+    try { LEGACY[def.v].set(!LEGACY[def.v].get()); } catch (e) { console.error(e); toast("La vue 3D n'est pas encore prête : ouvre d'abord la 3D."); }
+    syncChip(btn);
+    if (LEGACY[def.v].get()) setTimeout(() => { try { const v = viewerOf(def, el); if (!v.r) return; for (let i = 0; i < 6; i++) { v.r.render(v.s, v.c); const L = centerLum(v.r); if (L < 0) break; if (L > 0.86) v.r.toneMappingExposure = Math.max(0.15, (v.r.toneMappingExposure || 1) * 0.72); else if (L < 0.1) v.r.toneMappingExposure = Math.min(4, (v.r.toneMappingExposure || 1) * 1.5); else break; } } catch (e) {} }, 700);
+    return;
+  }
+  try {
+    if (cur) { REAL.delete(key); disableReal(cur); syncChip(btn); try { cur.v.r.render(cur.v.s, cur.v.c); } catch (e) {} return; }
+    const v = viewerOf(def, el); if (!v.r || !v.s || !v.c) { toast("La vue 3D n'est pas encore prête : lance d'abord un calcul ou ouvre la 3D."); return; }
+    const st = enableReal(def, el, v); REAL.set(key, st); if (revertIfFailed(st)) return; syncChip(btn); v.r.render(v.s, v.c);
+    toast('Vue réaliste activée : soleil, ombres douces, reflets métal. Clique à nouveau pour revenir au rendu normal.');
+  } catch (e) { console.error('Vue réaliste', e); try { REAL.delete(key); if (cur) disableReal(cur); } catch (_) {} toast('Vue réaliste indisponible sur cet appareil.'); }
+}
+window.__altemaViewTools = { enterFs, exitFs, scan, toggleReal, REAL };
+addTabButtons(); scan(); setInterval(() => $$('.vt-real').forEach(syncChip), 1000);
+})();
+
 </script>
 </body>
 </html>
